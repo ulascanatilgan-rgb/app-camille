@@ -13,16 +13,21 @@ app.use(express.text({ type: ['application/sdp', 'text/plain'] }));
 app.use(express.json());
 app.use(express.static(__dirname));
 
-const tutorInstructions = `
-You are Camille, a French woman around 30 years old and the user's long-term French conversation partner.
-Speak primarily in natural metropolitan French. Keep replies short, warm, calm and conversational, usually 1-3 sentences.
-The user's goal is to improve spoken French through spontaneous conversation, not classroom drills.
-Do not over-correct. If the user's French is understandable, answer naturally first. Correct only important mistakes, and keep corrections brief.
-If the user is stuck, simplify your French. If they ask in Turkish or English, you may explain briefly, then return to French.
-Ask natural follow-up questions so the conversation keeps moving.
-Avoid excessive enthusiasm. Sound composed, friendly, intelligent, down-to-earth and subtly playful.
-Use everyday French that a real person in France would use. Avoid long lectures.
-`;
+const tutorInstructions = [
+  'You are Camille, Ulas Atilgan\\'s long-term French conversation tutor and conversation partner.',
+  'Your goal is to make Ulas speak more French, not to impress him with long answers.',
+  'Use natural metropolitan French at CEFR A1-A2 by default.',
+  'Speak slowly, clearly, calmly and with short pauses.',
+  'Keep a grounded, self-assured, low-energy delivery: warm, slightly husky/velvety if possible, lower register, clear, cool and never bubbly or over-enthusiastic.',
+  'Sound like a confident French woman in her 30s having a relaxed coffee conversation.',
+  'Keep normal replies extremely short: usually one short French sentence plus one short question. Prefer 5-12 words per French sentence.',
+  'Ask only ONE question at a time.',
+  'If Ulas makes a useful language mistake, correct exactly ONE important mistake per turn.',
+  'Correction format: "Petite correction : [wrong fragment] → [correct fragment]." Then say one very short English reason naming the error, maximum 8 words. Then say "Répète : [correct French sentence]." After that, ask one easy French question.',
+  'If there is no important mistake, do not invent one. Continue naturally with one simple question.',
+  'Do not give lists, lectures, grammar monologues, multiple corrections, or long explanations.',
+  'If Ulas is stuck, simplify further. If he asks in Turkish or English, explain briefly, then return to French.'
+].join(' ');
 
 app.post('/session', async (req, res) => {
   if (!process.env.OPENAI_API_KEY) {
@@ -49,7 +54,7 @@ app.post('/session', async (req, res) => {
     const r = await fetch('https://api.openai.com/v1/realtime/calls', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: 'Bearer ' + process.env.OPENAI_API_KEY,
         'OpenAI-Safety-Identifier': safetyId
       },
       body: fd
@@ -68,6 +73,65 @@ app.post('/session', async (req, res) => {
   }
 });
 
+app.post('/simli-session', async (_req, res) => {
+  const apiKey = process.env.SIMLI_API_KEY;
+  const faceId = process.env.SIMLI_FACE_ID;
+
+  if (!apiKey || !faceId) {
+    return res.status(500).json({ error: 'SIMLI_API_KEY or SIMLI_FACE_ID is missing on the server.' });
+  }
+
+  const config = {
+    faceId,
+    handleSilence: true,
+    maxSessionLength: 3600,
+    maxIdleTime: 600,
+    model: 'fasttalk'
+  };
+
+  try {
+    const [tokenResponse, iceResponse] = await Promise.all([
+      fetch('https://api.simli.ai/compose/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-simli-api-key': apiKey
+        },
+        body: JSON.stringify(config)
+      }),
+      fetch('https://api.simli.ai/compose/ice', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-simli-api-key': apiKey
+        }
+      })
+    ]);
+
+    if (!tokenResponse.ok) {
+      const detail = await tokenResponse.text();
+      console.error('Simli token error:', detail);
+      return res.status(tokenResponse.status).json({ error: 'Could not create Simli session.' });
+    }
+
+    const tokenData = await tokenResponse.json();
+    let iceServers = [{ urls: ['stun:stun.l.google.com:19302'] }];
+
+    if (iceResponse.ok) {
+      const data = await iceResponse.json();
+      if (Array.isArray(data) && data.length) iceServers = data;
+    }
+
+    res.json({
+      session_token: tokenData.session_token,
+      ice_servers: iceServers
+    });
+  } catch (error) {
+    console.error('Simli session error:', error);
+    res.status(500).json({ error: 'Failed to create Simli session.' });
+  }
+});
+
 app.post('/translate', async (req, res) => {
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ error: 'OPENAI_API_KEY is missing on the server.' });
@@ -80,7 +144,7 @@ app.post('/translate', async (req, res) => {
     const r = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: 'Bearer ' + process.env.OPENAI_API_KEY,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -88,12 +152,10 @@ app.post('/translate', async (req, res) => {
         input: [
           {
             role: 'system',
-            content: [
-              {
-                type: 'input_text',
-                text: 'Translate French to clear natural English for subtitles. Keep meaning accurate. Keep it concise. Return only the English translation.'
-              }
-            ]
+            content: [{
+              type: 'input_text',
+              text: 'Translate French to clear natural English for subtitles. Preserve any short English correction line as English. Keep it concise. Return only the translation.'
+            }]
           },
           {
             role: 'user',
@@ -117,6 +179,14 @@ app.post('/translate', async (req, res) => {
   }
 });
 
+app.get('/health', (_req, res) => {
+  res.json({
+    ok: true,
+    openai: Boolean(process.env.OPENAI_API_KEY),
+    simli: Boolean(process.env.SIMLI_API_KEY && process.env.SIMLI_FACE_ID)
+  });
+});
+
 app.listen(port, () => {
-  console.log(`Camille is ready at http://localhost:${port}`);
+  console.log('Camille is ready at http://localhost:' + port);
 });
