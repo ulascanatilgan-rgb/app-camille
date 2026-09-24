@@ -1,11 +1,10 @@
-const CACHE = 'camille-pwa-simli-v4';
+const CACHE = 'camille-pwa-simli-v5';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/styles.css',
   '/app.js',
   '/manifest.webmanifest',
-  '/camille-base.png',
   '/icon-192.png',
   '/icon-512.png',
   '/apple-touch-icon.png',
@@ -32,7 +31,7 @@ self.addEventListener('fetch', event => {
 
   if (
     url.origin === self.location.origin &&
-    ['/session', '/simli-session', '/translate', '/health'].includes(url.pathname)
+    ['/session', '/simli-session', '/simli-health', '/translate', '/health'].includes(url.pathname)
   ) {
     return;
   }
@@ -40,16 +39,13 @@ self.addEventListener('fetch', event => {
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
 
   event.respondWith(
-    caches.match(req).then(cached =>
-      cached ||
-      fetch(req)
-        .then(res => {
-          if (res && res.ok) {
-            caches.open(CACHE).then(cache => cache.put(req, res.clone()));
-          }
-          return res;
-        })
-        .catch(() => cached)
-    )
+    fetch(req)
+      .then(res => {
+        if (res && res.ok) {
+          caches.open(CACHE).then(cache => cache.put(req, res.clone()));
+        }
+        return res;
+      })
+      .catch(() => caches.match(req))
   );
 });
