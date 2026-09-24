@@ -16,7 +16,8 @@ const subtitleFr = document.getElementById('subtitleFr');
 const subtitleEn = document.getElementById('subtitleEn');
 const simliVideo = document.getElementById('simliVideo');
 const simliAudio = document.getElementById('simliAudio');
-const fallbackPortrait = document.getElementById('fallbackPortrait');
+const avatarPlaceholder = document.getElementById('avatarPlaceholder');
+const avatarPlaceholderText = document.getElementById('avatarPlaceholderText');
 const avatarBadge = document.getElementById('avatarBadge');
 
 let pc;
@@ -41,9 +42,20 @@ function setStatus(text) {
 
 function setAvatarLive(isLive) {
   portraitWrap.classList.toggle('avatar-live', isLive);
-  fallbackPortrait.classList.toggle('hidden', isLive);
+  avatarPlaceholder.classList.toggle('hidden', isLive);
   simliVideo.classList.toggle('visible', isLive);
-  avatarBadge.textContent = isLive ? 'Simli Live Avatar' : 'Connecting avatar…';
+  avatarBadge.textContent = isLive ? 'Simli Live Avatar' : 'Simli Live Avatar';
+  if (!isLive && avatarPlaceholderText) {
+    avatarPlaceholderText.textContent = "Camille's live avatar will appear here.";
+  }
+}
+
+async function checkSimliHealth() {
+  const response = await fetch('/simli-health', { cache: 'no-store' });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) {
+    throw new Error('Simli API check failed');
+  }
 }
 
 function setSubtitle(fr = '', en = '') {
@@ -219,8 +231,15 @@ async function finalizeAssistantMessage(text) {
 }
 
 async function initializeSimli() {
+  setStatus('Checking Simli…');
+  avatarBadge.textContent = 'Checking Simli…';
+  if (avatarPlaceholderText) avatarPlaceholderText.textContent = 'Checking Simli connection…';
+
+  await checkSimliHealth();
+
   setStatus('Connecting avatar…');
   avatarBadge.textContent = 'Connecting avatar…';
+  if (avatarPlaceholderText) avatarPlaceholderText.textContent = 'Connecting live avatar…';
 
   const response = await fetch('/simli-session', {
     method: 'POST',
@@ -394,13 +413,17 @@ async function connect() {
   } catch (error) {
     console.error(error);
     setStatus('Could not connect');
+    avatarBadge.textContent = 'Simli connection failed';
+    if (avatarPlaceholderText) {
+      avatarPlaceholderText.textContent = 'Simli could not connect. Check Railway variables and deploy status.';
+    }
     micLabel.textContent = 'Try again';
     micButton.disabled = false;
-    await disconnect();
+    await disconnect(false);
   }
 }
 
-async function disconnect() {
+async function disconnect(resetMessage = true) {
   connected = false;
 
   try { recognition?.stop(); } catch {}
@@ -426,8 +449,10 @@ async function disconnect() {
   micButton.classList.remove('live');
   micButton.disabled = false;
   micLabel.textContent = 'Start conversation';
-  setStatus('Ready');
-  setSubtitle(lastSubtitlePair.fr, lastSubtitlePair.en);
+  if (resetMessage) {
+    setStatus('Ready');
+    setSubtitle(lastSubtitlePair.fr, lastSubtitlePair.en);
+  }
 }
 
 micButton.addEventListener('click', () => {
