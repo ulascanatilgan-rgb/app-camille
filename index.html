@@ -32,12 +32,12 @@
 
     <section class="stage-card">
       <div id="portraitWrap" class="portrait-wrap">
-        <img id="frameBase" class="portrait-frame active" src="/camille-base.png" alt="Camille" />
-        <img id="frameTalk1" class="portrait-frame" src="/camille-talk-1.png" alt="Camille speaking" />
-        <img id="frameTalk2" class="portrait-frame" src="/camille-talk-2.png" alt="Camille speaking" />
-        <img id="frameBlink" class="portrait-frame" src="/camille-blink.png" alt="Camille blinking" />
+        <img id="fallbackPortrait" class="fallback-portrait" src="/camille-base.png" alt="Camille" />
+        <video id="simliVideo" class="simli-video" autoplay playsinline muted></video>
+        <audio id="simliAudio" autoplay></audio>
         <div class="stage-vignette"></div>
         <div id="voiceRing" class="voice-ring"></div>
+        <div id="avatarBadge" class="avatar-badge">Simli Live Avatar</div>
 
         <div id="subtitlePanel" class="subtitle-panel">
           <div class="caption-row fr-row">
@@ -52,7 +52,7 @@
       </div>
       <div class="stage-copy">
         <h1>Talk with Camille</h1>
-        <p id="subtitle">Practice natural French with Camille in a relaxed specialty coffee setting.</p>
+        <p id="subtitle">Short, slow French. Camille corrects one important mistake at a time.</p>
       </div>
     </section>
 
@@ -60,9 +60,9 @@
 
     <section class="controls">
       <div class="mode-row">
-        <button class="mode active" data-mode="natural">Natural</button>
+        <button class="mode active" data-mode="natural">Guided</button>
         <button class="mode" data-mode="tutor">Tutor</button>
-        <button class="mode" data-mode="slow">Slow</button>
+        <button class="mode" data-mode="slow">Extra slow</button>
       </div>
 
       <div class="action-row">
@@ -72,7 +72,7 @@
         </button>
         <button id="endButton" class="end-button" disabled>End</button>
       </div>
-      <div class="hint">Speak French. Camille replies with French subtitles above and English below.</div>
+      <div class="hint">Speak French. Camille keeps replies short and corrects your French gently.</div>
     </section>
   </main>
 
@@ -97,7 +97,7 @@
         Correction level
         <select id="correctionLevel">
           <option value="light">Light</option>
-          <option value="medium">Medium</option>
+          <option value="medium" selected>Medium</option>
           <option value="strict">Frequent</option>
         </select>
       </label>
