@@ -14,11 +14,11 @@ app.use(express.json());
 app.use(express.static(__dirname));
 
 const tutorInstructions = [
-  'You are Camille, Ulas Atilgan\\'s long-term French conversation tutor and conversation partner.',
+  "You are Camille, Ulas Atilgan's long-term French conversation tutor and conversation partner.",
   'Your goal is to make Ulas speak more French, not to impress him with long answers.',
   'Use natural metropolitan French at CEFR A1-A2 by default.',
   'Speak slowly, clearly, calmly and with short pauses.',
-  'Keep a grounded, self-assured, low-energy delivery: warm, slightly husky/velvety if possible, lower register, clear, cool and never bubbly or over-enthusiastic.',
+  'Keep a grounded, self-assured, low-energy delivery: warm, slightly husky or velvety if possible, lower register, clear, cool and never bubbly or over-enthusiastic.',
   'Sound like a confident French woman in her 30s having a relaxed coffee conversation.',
   'Keep normal replies extremely short: usually one short French sentence plus one short question. Prefer 5-12 words per French sentence.',
   'Ask only ONE question at a time.',
@@ -26,7 +26,7 @@ const tutorInstructions = [
   'Correction format: "Petite correction : [wrong fragment] → [correct fragment]." Then say one very short English reason naming the error, maximum 8 words. Then say "Répète : [correct French sentence]." After that, ask one easy French question.',
   'If there is no important mistake, do not invent one. Continue naturally with one simple question.',
   'Do not give lists, lectures, grammar monologues, multiple corrections, or long explanations.',
-  'If Ulas is stuck, says he does not know what to say, gives a very short answer, or stays passive, YOU take the lead. Start a simple everyday topic and ask one easy question.',
+  'If Ulas is stuck, says he does not know what to say, gives a very short answer, or stays passive, take the lead. Start a simple everyday topic and ask one easy question.',
   'Prioritize practical French Ulas is likely to use often: greetings and introductions, ordering coffee or food, shopping, asking prices, directions, transport, appointments, weather, daily routine, work small talk, home, travel, hotel, restaurant, meeting new people, and simple social conversation.',
   'Guide the conversation step by step. Do not wait for Ulas to invent topics. Move naturally from one easy practical topic to another when the conversation slows down.',
   'When introducing a useful phrase, say it slowly and clearly, then ask Ulas to use it in a short answer.',
@@ -136,6 +136,43 @@ app.post('/simli-session', async (_req, res) => {
   }
 });
 
+app.get('/simli-health', async (_req, res) => {
+  const apiKey = process.env.SIMLI_API_KEY;
+  const faceId = process.env.SIMLI_FACE_ID;
+
+  if (!apiKey || !faceId) {
+    return res.status(500).json({
+      ok: false,
+      configured: false,
+      error: 'Simli environment variables are missing.'
+    });
+  }
+
+  try {
+    const r = await fetch('https://api.simli.ai/compose/ice', {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-simli-api-key': apiKey
+      }
+    });
+
+    return res.status(r.ok ? 200 : 502).json({
+      ok: r.ok,
+      configured: true,
+      faceIdConfigured: Boolean(faceId),
+      apiReachable: r.ok
+    });
+  } catch (error) {
+    console.error('Simli health error:', error);
+    return res.status(502).json({
+      ok: false,
+      configured: true,
+      faceIdConfigured: Boolean(faceId),
+      apiReachable: false
+    });
+  }
+});
+
 app.post('/translate', async (req, res) => {
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ error: 'OPENAI_API_KEY is missing on the server.' });
@@ -158,7 +195,7 @@ app.post('/translate', async (req, res) => {
             role: 'system',
             content: [{
               type: 'input_text',
-              text: 'Translate French to clear natural English for subtitles. Preserve any short English correction line as English. Keep it concise. Return only the translation.'
+              text: 'Translate French to clear natural English for subtitles. Preserve any short English correction line as English. Keep it concise. Return only the English translation.'
             }]
           },
           {

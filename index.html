@@ -18,7 +18,7 @@
   <main class="app-shell">
     <header class="topbar">
       <div class="identity">
-        <div class="mini-avatar"><img src="/camille-base.png" alt="Camille" /></div>
+        <div class="mini-avatar">C</div>
         <div>
           <div class="name">Camille - French Agent for Ulas Atilgan</div>
           <div id="status" class="status">Ready</div>
@@ -32,7 +32,10 @@
 
     <section class="stage-card">
       <div id="portraitWrap" class="portrait-wrap">
-        <img id="fallbackPortrait" class="fallback-portrait" src="/camille-base.png" alt="Camille" />
+        <div id="avatarPlaceholder" class="avatar-placeholder">
+          <div class="placeholder-monogram">C</div>
+          <div id="avatarPlaceholderText" class="placeholder-text">Camille's live avatar will appear here.</div>
+        </div>
         <video id="simliVideo" class="simli-video" autoplay playsinline muted></video>
         <audio id="simliAudio" autoplay></audio>
         <div class="stage-vignette"></div>
@@ -52,7 +55,7 @@
       </div>
       <div class="stage-copy">
         <h1>Talk with Camille</h1>
-        <p id="subtitle">Short, slow French. Camille corrects one important mistake at a time.</p>
+        <p id="subtitle">Short, slow French. Camille leads the conversation and corrects one important mistake at a time.</p>
       </div>
     </section>
 
@@ -72,7 +75,7 @@
         </button>
         <button id="endButton" class="end-button" disabled>End</button>
       </div>
-      <div class="hint">Speak French. Camille keeps replies short and corrects your French gently.</div>
+      <div class="hint">Press start. Camille will open the conversation in simple French.</div>
     </section>
   </main>
 
