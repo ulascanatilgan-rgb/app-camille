@@ -1,9 +1,9 @@
-const CACHE = 'camille-pwa-simli-v5';
+const CACHE = 'camille-pwa-simli-v6';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/styles.css',
-  '/app.js',
+  '/app.bundle.js',
   '/manifest.webmanifest',
   '/icon-192.png',
   '/icon-512.png',
@@ -39,7 +39,7 @@ self.addEventListener('fetch', event => {
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
 
   event.respondWith(
-    fetch(req)
+    fetch(req, { cache: 'no-store' })
       .then(res => {
         if (res && res.ok) {
           caches.open(CACHE).then(cache => cache.put(req, res.clone()));
