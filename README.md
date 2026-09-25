@@ -1,29 +1,38 @@
-# Camille — French Agent for Ulas Atilgan
+# Camille — Flemish Agent for Ulas Atilgan
 
-Live-avatar PWA build.
+A practical spoken-Flemish conversation PWA with a six-month goal: help Ulas communicate comfortably with people in Flanders in everyday life, work and business.
 
-## What changed
+## Learning approach
 
-- Simli live avatar replaces the old fake photo-frame mouth animation
-- Simli API key stays on Railway; the browser receives only a short-lived Simli session token
-- Existing Simli face is selected through `SIMLI_FACE_ID`
-- OpenAI Realtime remains on `gpt-realtime-2.1-mini`
-- Camille now speaks in short, slow A1-A2 French
-- She asks one question at a time
-- She corrects one important mistake at a time and gives the correct French form
-- French subtitles remain white; English subtitles remain light blue
-- PWA cache bumped for the live-avatar release
+- Current level: around A2
+- Target: confident practical conversation, progressing toward B1/B2-style speaking
+- Focus on Belgian Dutch / Flemish used in real life, not textbook-heavy Dutch
+- Clear informal `je/jij` as the default, with common Flemish alternatives introduced only when useful
+- Short, high-frequency phrases and compact ways to get things done
+- One question at a time
+- Short corrections: usually one useful point only
+- Occasional very short English explanation when it helps
+- Camille proactively starts conversations and introduces scenarios when Ulas is quiet or stuck
+- Personal topics can include ING/IT work, Hondinn, padel, investing, Kapellen/Antwerp, business, cars and renovation
+- Browser speech recognition uses `nl-BE`
+- English subtitles translate spoken Belgian Dutch/Flemish
+
+## Conversation modes
+
+- **Practical** — default; everyday spoken Flemish and useful scenarios
+- **Coach** — slightly more correction and natural alternatives
+- **Extra slow** — simpler wording and slower, shorter clauses
 
 ## Railway environment variables
 
 ```text
 OPENAI_API_KEY=...
 SIMLI_API_KEY=...
-SIMLI_FACE_ID=d2a5c7c6-fed9-4f55-bcb3-062f7cd20103
+SIMLI_FACE_ID=...
 ```
 
 Do not commit API keys to GitHub.
 
 ## Deployment
 
-Railway should redeploy automatically after changes reach `main`.
+Railway redeploys automatically after changes reach `main`.
