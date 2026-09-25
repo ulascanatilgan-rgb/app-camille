@@ -16,40 +16,68 @@ const ANAM_API_BASE = 'https://api.anam.ai/v1';
 const tutorInstructions = [
   "You are Camille, Ulas Atilgan's long-term Flemish conversation coach and conversation partner.",
   "The six-month goal is practical: help Ulas communicate comfortably with people in Flanders in everyday life, work and business situations.",
-  "Ulas is around A2. Build him gradually toward confident practical B1/B2-style conversation, but prioritize usefulness over textbook completeness.",
-  "Teach spoken Belgian Dutch / Flemish as it is commonly used in Flanders. Do not sound like a grammar book and do not overuse very regional dialect that would confuse a learner.",
-  "Default to clear informal je/jij Dutch that works across Flanders. When useful, briefly mention a common Flemish alternative such as ge/gij or a common local phrase, but do not force dialect.",
-  "Prefer short, high-frequency phrases, common words, natural fillers and practical sentence patterns that Ulas can immediately reuse.",
-  "Speak slowly, clearly and naturally. Use short clauses and short pauses. Keep most replies to one or two short sentences and one question.",
-  "Ask only ONE question at a time.",
-  "Do not give grammar lectures, vocabulary lists or long explanations unless Ulas explicitly asks.",
-  "Correct sparingly. Usually correct only ONE useful mistake at a time. Keep the correction short and continue the conversation immediately.",
-  "Useful correction styles are: 'Kleine correctie: [his phrase] → [better phrase].' Or: 'Je kan ook zeggen: [natural phrase].' Or: 'In Vlaanderen hoor je vaak: [common phrase].'",
-  "Only occasionally add one very short English explanation when it genuinely helps. Keep English explanations to one short sentence.",
-  "If Ulas says something understandable but unnatural, prefer a useful alternative over a technical grammar explanation.",
-  "If Ulas cannot remember a Dutch word and switches to English, understand him normally. Give the short Dutch/Flemish word or phrase he needs, then continue in Dutch.",
-  "If he asks a full question in English, understand it. Use English only for a very short clarification when needed, then steer him back to Flemish/Dutch.",
-  "Never punish or stop the conversation because he used English. Treat English as a temporary bridge, not as the conversation language.",
-  "If he mixes English into a Dutch sentence, respond to the meaning first, supply the missing natural Dutch expression, and continue in Dutch.",
-  "When useful, invite him to say the idea again in Flemish: 'In het Vlaams kan je zeggen: ... Probeer eens.' Keep this very short.",
-  "If he is stuck, quiet, gives a very short answer or has no topic, YOU take the lead. Start a simple conversation, tell him something, ask what he thinks, or propose a topic.",
-  "Prioritize practical Flanders situations: greeting people, neighbours, shops, cafés, restaurants, appointments, phone calls, deliveries, tradespeople, asking for help, directions, transport, small talk, social plans, sports, weather, home, services, administration, work conversations, meetings, colleagues, networking, customers, suppliers and business follow-up.",
-  "Use Ulas's real interests and life naturally when useful: he works at ING in IT, runs Hondinn dog hotel, plays padel, invests, lives around Kapellen/Antwerp, and is interested in business, cars and renovation. Do not mention all of these at once; use them as natural conversation topics.",
-  "Teach compact communication: how to get things done with a few natural words and phrases, not how to produce perfect formal Dutch.",
-  "When a practical phrase is useful, say it once clearly, give at most one easier or more Flemish alternative, then invite Ulas to use it.",
-  "Avoid formal Netherlands-Dutch phrasing when an ordinary Flemish/Belgian Dutch expression would be more natural in daily life.",
-  "Keep the tone relaxed, grounded, adult and natural, like a friendly Flemish woman talking over coffee rather than a teacher running a lesson.",
+  "Ulas is around A2. Prioritize useful spoken Belgian Dutch / Flemish, not textbook completeness.",
+  "Use clear informal je/jij Dutch that works across Flanders. Mention a common Flemish alternative only when it is genuinely useful.",
+  "Keep speech easy to follow. Prefer one short statement and one short question. Avoid long answers and stacked clauses.",
+  "Use common practical words and reusable sentence patterns.",
+  "Correct sparingly: one useful correction at a time, then continue.",
+  "If Ulas switches to English because he cannot remember a word, understand him, give the short Dutch/Flemish expression, and continue in Dutch.",
+  "English is a temporary bridge, not the conversation language.",
+  "If Ulas is quiet or stuck, take the lead with one simple practical topic or question.",
+  "Useful topics include neighbours, shops, cafés, appointments, phone calls, deliveries, tradespeople, social plans, padel, weather, home, services, work, meetings, networking, customers and business follow-up.",
+  "Use Ulas's real life naturally when useful: ING/IT, Hondinn dog hotel, padel, investing, Kapellen/Antwerp, business, cars and renovation.",
   "Never use markdown, bullets or headings in spoken replies."
 ].join(' ');
 
-function modeInstruction(mode) {
-  if (mode === 'tutor') {
-    return 'Coach mode: prioritize one short useful correction or one more natural Flemish alternative, then continue the conversation.';
+function difficultyInstruction(level) {
+  const n = Math.max(1, Math.min(5, Number(level) || 2));
+
+  if (n === 1) {
+    return [
+      "Difficulty 1: very easy A1 Dutch.",
+      "Speak very slowly and deliberately.",
+      "Use only very common words.",
+      "Use sentences of about 4 to 6 words.",
+      "Usually say only one short sentence plus one tiny question.",
+      "Use clear pauses and no subordinate clauses."
+    ].join(' ');
   }
-  if (mode === 'slow') {
-    return 'Extra-slow mode: use very easy practical Dutch, short clauses, deliberate pauses, and no sentence longer than about eight words.';
+
+  if (n === 2) {
+    return [
+      "Difficulty 2: easy A2 practical Flemish.",
+      "Speak noticeably slower than normal conversation.",
+      "Use short clauses and clear pauses.",
+      "Keep sentences around 6 to 9 words.",
+      "Usually give one short statement plus one short question.",
+      "Prefer simple everyday patterns over sophisticated wording."
+    ].join(' ');
   }
-  return 'Practical mode: use easy spoken Flemish/Dutch, one short reply, then one simple question or scenario.';
+
+  if (n === 3) {
+    return [
+      "Difficulty 3: practical B1 Dutch.",
+      "Speak at a calm moderate pace.",
+      "Use mostly common vocabulary.",
+      "Keep sentences around 8 to 12 words.",
+      "Use at most two short sentences plus one question."
+    ].join(' ');
+  }
+
+  if (n === 4) {
+    return [
+      "Difficulty 4: natural B2 conversation.",
+      "Speak naturally but clearly.",
+      "Use ordinary Flemish expressions and some richer vocabulary.",
+      "Keep replies concise: usually two short sentences and one question."
+    ].join(' ');
+  }
+
+  return [
+    "Difficulty 5: natural advanced Flemish.",
+    "Use normal adult conversational pace and vocabulary used in Flanders.",
+    "Still keep replies concise and conversational."
+  ].join(' ');
 }
 
 function correctionInstruction(level) {
@@ -60,106 +88,6 @@ function correctionInstruction(level) {
     return 'Correct only when a mistake clearly matters for meaning or natural daily Flemish.';
   }
   return 'Correct one important or recurring mistake when it would genuinely help.';
-}
-
-function findValueByKeys(value, keys, depth = 0) {
-  if (!value || typeof value !== 'object' || depth > 7) return null;
-
-  for (const key of keys) {
-    const candidate = value[key];
-    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
-  }
-
-  for (const child of Object.values(value)) {
-    if (child && typeof child === 'object') {
-      const found = findValueByKeys(child, keys, depth + 1);
-      if (found) return found;
-    }
-  }
-
-  return null;
-}
-
-function findPersonaInPayload(payload, personaId) {
-  if (!payload || typeof payload !== 'object') return null;
-
-  const directId = findValueByKeys(payload, ['id', 'personaId', 'persona_id'], 0);
-  if (directId === personaId && !Array.isArray(payload)) return payload;
-
-  const arrays = [];
-  const visit = (value, depth = 0) => {
-    if (!value || typeof value !== 'object' || depth > 5) return;
-    if (Array.isArray(value)) {
-      arrays.push(value);
-      value.forEach(item => visit(item, depth + 1));
-      return;
-    }
-    Object.values(value).forEach(child => visit(child, depth + 1));
-  };
-  visit(payload);
-
-  for (const list of arrays) {
-    for (const item of list) {
-      if (!item || typeof item !== 'object') continue;
-      const id = item.id || item.personaId || item.persona_id;
-      if (id === personaId) return item;
-    }
-  }
-
-  return null;
-}
-
-async function fetchAnamJson(url, apiKey) {
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    }
-  });
-
-  const text = await response.text();
-  let data = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {}
-
-  return { response, data, text };
-}
-
-async function resolvePublishedPersona(apiKey, personaId) {
-  try {
-    const direct = await fetchAnamJson(`${ANAM_API_BASE}/personas/${encodeURIComponent(personaId)}`, apiKey);
-    if (direct.response.ok && direct.data) {
-      const persona = findPersonaInPayload(direct.data, personaId) || direct.data;
-      return {
-        persona,
-        avatarId: findValueByKeys(persona, ['avatarId', 'avatar_id']),
-        voiceId: findValueByKeys(persona, ['voiceId', 'voice_id']),
-        name: findValueByKeys(persona, ['name'])
-      };
-    }
-  } catch (error) {
-    console.warn('Anam direct persona lookup failed:', error?.message || error);
-  }
-
-  try {
-    const list = await fetchAnamJson(`${ANAM_API_BASE}/personas`, apiKey);
-    if (list.response.ok && list.data) {
-      const persona = findPersonaInPayload(list.data, personaId);
-      if (persona) {
-        return {
-          persona,
-          avatarId: findValueByKeys(persona, ['avatarId', 'avatar_id']),
-          voiceId: findValueByKeys(persona, ['voiceId', 'voice_id']),
-          name: findValueByKeys(persona, ['name'])
-        };
-      }
-    }
-  } catch (error) {
-    console.warn('Anam persona list lookup failed:', error?.message || error);
-  }
-
-  return null;
 }
 
 async function requestAnamSessionToken(apiKey, personaConfig) {
@@ -189,8 +117,6 @@ async function requestAnamSessionToken(apiKey, personaConfig) {
 }
 
 async function buildAnamSession(apiKey, personaId) {
-  // The ID supplied by Ulas is a published Anam Persona ID.
-  // Use the official published-persona flow first: personaConfig: { personaId }.
   const sessionToken = await requestAnamSessionToken(apiKey, { personaId });
 
   return {
@@ -263,10 +189,7 @@ app.get('/anam-health', async (_req, res) => {
   }
 
   try {
-    // This performs the same official token request the app uses,
-    // but never returns the token itself.
     await requestAnamSessionToken(apiKey, { personaId });
-
     return res.json({
       ok: true,
       configured: true,
@@ -275,8 +198,6 @@ app.get('/anam-health', async (_req, res) => {
     });
   } catch (error) {
     const safe = safeAnamError(error);
-    console.error('Anam health token error:', error?.detail || error);
-
     return res.status(safe.status).json({
       ok: false,
       configured: true,
@@ -294,8 +215,8 @@ app.post('/chat', async (req, res) => {
   }
 
   const incoming = Array.isArray(req.body?.messages) ? req.body.messages : [];
-  const mode = req.body?.mode || 'natural';
   const correctionLevel = req.body?.correctionLevel || 'medium';
+  const difficulty = Math.max(1, Math.min(5, Number(req.body?.difficulty) || 2));
   const kickoff = Boolean(req.body?.kickoff);
 
   const history = incoming
@@ -314,15 +235,17 @@ app.post('/chat', async (req, res) => {
   if (kickoff) {
     history.push({
       role: 'user',
-      content: '[Conversation start] Start the conversation yourself now. Pick one practical Flemish topic or one topic from my real life. Use one or two short sentences and one easy question. Do not explain grammar.'
+      content: '[Conversation start] Start now with one very short practical Flemish sentence and one easy question. Do not explain grammar.'
     });
   }
 
   const systemPrompt = [
     tutorInstructions,
-    modeInstruction(mode),
+    difficultyInstruction(difficulty),
     correctionInstruction(correctionLevel)
   ].join(' ');
+
+  const maxTokensByDifficulty = { 1: 45, 2: 55, 3: 70, 4: 85, 5: 95 };
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -338,8 +261,8 @@ app.post('/chat', async (req, res) => {
           ...history
         ],
         stream: true,
-        temperature: 0.65,
-        max_tokens: 140
+        temperature: 0.55,
+        max_tokens: maxTokensByDifficulty[difficulty]
       })
     });
 
@@ -413,7 +336,7 @@ app.post('/translate', async (req, res) => {
             role: 'system',
             content: [{
               type: 'input_text',
-              text: 'Translate spoken Belgian Dutch/Flemish to clear natural English for subtitles. Keep it concise. Return only the English translation.'
+              text: 'Translate spoken Belgian Dutch/Flemish to clear natural English for live subtitles. Keep the same meaning and keep it concise. Return only the English translation.'
             }]
           },
           {
@@ -426,7 +349,6 @@ app.post('/translate', async (req, res) => {
 
     const data = await response.json();
     if (!response.ok) {
-      console.error('Translation error:', data);
       return res.status(response.status).json({ error: 'Translation failed.' });
     }
 
@@ -439,6 +361,75 @@ app.post('/translate', async (req, res) => {
   } catch (error) {
     console.error('Translation request failed:', error);
     return res.status(500).json({ error: 'Translation failed.' });
+  }
+});
+
+app.post('/vocab', async (req, res) => {
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(500).json({ error: 'OPENAI_API_KEY is missing on the server.' });
+  }
+
+  const text = String(req.body?.text || '').trim();
+  const knownWords = Array.isArray(req.body?.knownWords)
+    ? req.body.knownWords.filter(word => typeof word === 'string').slice(-120)
+    : [];
+
+  if (!text) return res.json({ word: null });
+
+  const known = knownWords.length ? knownWords.join(', ') : '(none)';
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        temperature: 0.15,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content: [
+              'You select exactly one useful learning word from a spoken Belgian Dutch/Flemish sentence for an A2 learner.',
+              'Prefer a practical noun, verb, adjective or short fixed expression that is useful in daily life in Flanders.',
+              'Do not pick names, articles, pronouns, basic conjunctions, numbers, or trivial function words.',
+              'Prefer a word not already learned.',
+              'Return JSON only with this shape: {"nl":"...","en":"..."}.',
+              'Use the natural Dutch lemma or short expression in nl and a concise English meaning in en.',
+              'If there is no useful new item, return {"nl":"","en":""}.'
+            ].join(' ')
+          },
+          {
+            role: 'user',
+            content: `Sentence: ${text}\nAlready learned: ${known}`
+          }
+        ],
+        max_tokens: 60
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      return res.status(response.status).json({ word: null });
+    }
+
+    const raw = data.choices?.[0]?.message?.content || '{}';
+    let parsed = {};
+    try {
+      parsed = JSON.parse(raw);
+    } catch {}
+
+    const nl = String(parsed.nl || '').trim();
+    const en = String(parsed.en || '').trim();
+
+    if (!nl || !en) return res.json({ word: null });
+    return res.json({ word: { nl, en } });
+  } catch (error) {
+    console.error('Vocabulary extraction failed:', error);
+    return res.status(500).json({ word: null });
   }
 });
 
