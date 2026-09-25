@@ -4,30 +4,28 @@ Camille is a practical spoken-Flemish conversation PWA with a six-month goal: he
 
 ## Current architecture
 
-- **Anam** handles microphone input, speech recognition, voice synthesis and the live avatar video.
-- **OpenAI** remains Camille's conversation brain when Anam can resolve the published persona's avatar and voice configuration.
-- The browser receives only a short-lived Anam session token; the Anam API key stays on Railway.
-- Camille streams OpenAI text into Anam's talk stream so the avatar can begin speaking before the whole response is finished.
-- Live Dutch subtitles come from Anam's speech events; concise English translation appears underneath.
+- **Anam** provides the live avatar, microphone input, speech recognition and voice.
+- A published Anam Persona ID is exchanged server-side for a short-lived session token.
+- **OpenAI** provides live English subtitle translation, vocabulary extraction, and the custom-LLM path when enabled.
+- API keys stay on Railway and are never exposed to the browser.
 
-## Learning approach
+## Learning experience
 
-- Current level: around A2
-- Target: confident practical communication in Flanders within six months
-- Spoken Belgian Dutch / Flemish, not textbook-heavy Dutch
-- Clear informal je/jij by default, with useful Flemish alternatives only when relevant
-- Short, high-frequency phrases and compact ways to get things done
-- One question at a time
-- One short useful correction when needed
-- English is accepted as a temporary bridge when Ulas is stuck, then Camille guides him back to Flemish
-- Camille proactively starts conversations and practical scenarios
-- Natural personal topics can include ING/IT work, Hondinn, padel, investing, Kapellen/Antwerp, business, cars and renovation
+- Default difficulty is **Level 2 / A2**.
+- A 1–5 horizontal level control changes how short, simple and slow Camille should speak.
+- The selected level is injected into the live Anam session with runtime context.
+- Level 1–2 strongly favor short clauses, common Flemish patterns, slower pacing and one question at a time.
+- English can be used as a temporary bridge when Ulas is stuck.
+- The live Dutch subtitle highlights the most recent spoken word/chunk.
+- English subtitles update during speech rather than only at the end.
+- One useful Dutch word is selected from each completed sentence and shown under the avatar with its English meaning.
 
-## Conversation modes
+## History and vocabulary
 
-- **Practical** — everyday spoken Flemish and useful scenarios
-- **Coach** — slightly more correction and natural alternatives
-- **Extra slow** — simpler wording and slower, shorter clauses
+- **History** stores conversation sessions by date and displays saved turns.
+- **Words** stores learned Dutch → English vocabulary.
+- Both are stored locally in the browser with `localStorage`, so they persist across normal app restarts on the same browser/device.
+- Stored history is capped to recent sessions and vocabulary to recent learned words to keep browser storage bounded.
 
 ## Railway environment variables
 
@@ -37,18 +35,12 @@ ANAM_API_KEY=...
 ANAM_PERSONA_ID=...
 ```
 
-Optional fallback when the supplied Anam ID is an avatar ID rather than a published persona ID:
-
-```text
-ANAM_VOICE_ID=...
-```
-
 Do not commit API keys to GitHub.
 
 ## Health checks
 
-- `/health` confirms OpenAI and Anam variables are configured.
-- `/anam-health` checks whether the published Anam persona can be resolved to an avatar and voice for custom-LLM mode.
+- `/health`
+- `/anam-health`
 
 ## Deployment
 

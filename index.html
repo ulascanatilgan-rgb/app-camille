@@ -30,6 +30,8 @@
       </div>
 
       <div class="header-status">
+        <button id="historyButton" class="nav-button" type="button">History</button>
+        <button id="wordsButton" class="nav-button" type="button">Words</button>
         <span id="status" class="status">Ready</span>
         <button id="installButton" class="text-button" hidden>Install</button>
         <button id="settingsButton" class="icon-button" aria-label="Settings">•••</button>
@@ -48,6 +50,15 @@
           <div class="stage-vignette"></div>
           <div id="voiceRing" class="voice-ring"></div>
 
+          <div id="wordCard" class="word-card" hidden>
+            <div class="word-card-label">NEW WORD</div>
+            <div class="word-card-pair">
+              <span id="wordNl" class="word-card-nl"></span>
+              <span class="word-card-arrow">→</span>
+              <span id="wordEn" class="word-card-en"></span>
+            </div>
+          </div>
+
           <div class="avatar-meta">
             <span id="avatarBadge" class="avatar-badge">Anam live avatar</span>
             <span class="avatar-goal">6 months · Flanders</span>
@@ -65,6 +76,8 @@
         </div>
 
         <section id="subtitlePanel" class="live-caption-card" aria-live="polite">
+          <div class="live-label">NOW</div>
+
           <div class="caption-block">
             <div class="caption-label dutch-label">NL</div>
             <div id="subtitleNl" class="subtitle-line dutch-line">Hey Ulas. Hoe is 't vandaag?</div>
@@ -78,13 +91,43 @@
           </div>
         </section>
 
-        <section id="messages" class="messages" aria-live="polite"></section>
+        <div class="conversation-separator">
+          <span>CONVERSATION HISTORY</span>
+        </div>
+
+        <section id="messages" class="messages" aria-live="polite">
+          <div class="history-empty-inline">Previous turns will appear here.</div>
+        </section>
 
         <section class="controls">
-          <div class="mode-row">
-            <button class="mode active" data-mode="natural">Practical</button>
-            <button class="mode" data-mode="tutor">Coach</button>
-            <button class="mode" data-mode="slow">Extra slow</button>
+          <div class="difficulty-control">
+            <div class="difficulty-head">
+              <div>
+                <span class="control-label">DUTCH LEVEL</span>
+                <span id="difficultyName" class="difficulty-name">A2 · Easy</span>
+              </div>
+              <div id="difficultyValue" class="difficulty-value">2</div>
+            </div>
+
+            <div class="range-wrap">
+              <input
+                id="difficultySlider"
+                class="difficulty-slider"
+                type="range"
+                min="1"
+                max="5"
+                step="1"
+                value="2"
+                aria-label="Dutch difficulty level"
+              />
+              <div class="range-numbers" aria-hidden="true">
+                <span>1</span>
+                <span>2</span>
+                <span>3</span>
+                <span>4</span>
+                <span>5</span>
+              </div>
+            </div>
           </div>
 
           <div class="action-row">
@@ -100,6 +143,38 @@
       </section>
     </section>
   </main>
+
+  <dialog id="historyDialog" class="archive-dialog">
+    <div class="archive-shell">
+      <div class="archive-header">
+        <div>
+          <div class="eyebrow">CAMILLE ARCHIVE</div>
+          <div class="archive-title-row">
+            <h2>History</h2>
+            <span id="historyCount" class="archive-count">0 sessions</span>
+          </div>
+        </div>
+        <button id="closeHistory" class="dialog-close" type="button" aria-label="Close history">×</button>
+      </div>
+      <div id="historyContent" class="archive-content"></div>
+    </div>
+  </dialog>
+
+  <dialog id="wordsDialog" class="archive-dialog words-dialog">
+    <div class="archive-shell">
+      <div class="archive-header">
+        <div>
+          <div class="eyebrow">VOCABULARY</div>
+          <div class="archive-title-row">
+            <h2>Words</h2>
+            <span id="wordsCount" class="archive-count">0 words</span>
+          </div>
+        </div>
+        <button id="closeWords" class="dialog-close" type="button" aria-label="Close words">×</button>
+      </div>
+      <div id="wordsContent" class="archive-content word-list"></div>
+    </div>
+  </dialog>
 
   <dialog id="installDialog">
     <div class="settings-card install-card">
