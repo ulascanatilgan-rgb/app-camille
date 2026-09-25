@@ -37,8 +37,8 @@ let currentMode = 'natural';
 let recognition;
 let lastUserTranscript = '';
 let currentAssistantMessage = null;
-let partialTranslationTimer = null;
 let partialTranslationSeq = 0;
+let lastPartialTranslationAt = 0;
 let simliStarted = false;
 let lastSubtitlePair = {
   fr: "Hey Ulas. Hoe is 't vandaag?",
@@ -53,7 +53,7 @@ function setAvatarLive(isLive) {
   portraitWrap.classList.toggle('avatar-live', isLive);
   avatarPlaceholder.classList.toggle('hidden', isLive);
   simliVideo.classList.toggle('visible', isLive);
-  avatarBadge.textContent = isLive ? 'Simli Live Avatar' : 'Simli Live Avatar';
+  avatarBadge.textContent = isLive ? 'LIVE' : 'LIVE AVATAR';
   if (!isLive && avatarPlaceholderText) {
     avatarPlaceholderText.textContent = "Camille's live avatar will appear here.";
   }
@@ -244,19 +244,19 @@ async function translateToEnglish(text) {
 }
 
 
-function schedulePartialTranslation(text) {
+async function schedulePartialTranslation(text) {
   const clean = (text || '').trim();
   if (!captionsToggle.checked || clean.length < 6) return;
 
-  clearTimeout(partialTranslationTimer);
+  const now = Date.now();
+  if (now - lastPartialTranslationAt < 1100) return;
+  lastPartialTranslationAt = now;
   const seq = ++partialTranslationSeq;
 
-  partialTranslationTimer = setTimeout(async () => {
-    const en = await translateToEnglish(clean);
-    if (seq === partialTranslationSeq && assistantDraft.trim() === clean && en) {
-      subtitleEn.textContent = en;
-    }
-  }, 850);
+  const en = await translateToEnglish(clean);
+  if (seq === partialTranslationSeq && assistantDraft.trim().startsWith(clean) && en) {
+    subtitleEn.textContent = en;
+  }
 }
 
 async function finalizeAssistantMessage(text) {
@@ -277,14 +277,14 @@ async function finalizeAssistantMessage(text) {
 }
 
 async function initializeSimli() {
-  setStatus('Checking Simli…');
-  avatarBadge.textContent = 'Checking Simli…';
+  setStatus('Preparing avatar…');
+  avatarBadge.textContent = 'PREPARING';
   if (avatarPlaceholderText) avatarPlaceholderText.textContent = 'Checking Simli connection…';
 
   await checkSimliHealth();
 
   setStatus('Connecting avatar…');
-  avatarBadge.textContent = 'Connecting avatar…';
+  avatarBadge.textContent = 'CONNECTING';
   if (avatarPlaceholderText) avatarPlaceholderText.textContent = 'Connecting live avatar…';
 
   const response = await fetch('/simli-session', {
@@ -355,7 +355,7 @@ function handleRealtimeEvent(event) {
   if (event.type === 'response.output_audio_transcript.delta') {
     if (!captionsToggle.checked) return;
     assistantDraft += event.delta || '';
-    setSubtitle(assistantDraft.trim(), subtitleEn.textContent || '…');
+    setSubtitle(assistantDraft.trim(), '…');
     schedulePartialTranslation(assistantDraft.trim());
 
     if (currentAssistantMessage) {
@@ -364,8 +364,8 @@ function handleRealtimeEvent(event) {
   }
 
   if (event.type === 'response.output_audio_transcript.done') {
-    clearTimeout(partialTranslationTimer);
     partialTranslationSeq += 1;
+    lastPartialTranslationAt = 0;
     const text = (event.transcript || assistantDraft || '').trim();
     assistantDraft = '';
     finalizeAssistantMessage(text);
@@ -462,7 +462,7 @@ async function connect() {
   } catch (error) {
     console.error(error);
     setStatus('Could not connect');
-    avatarBadge.textContent = 'Simli connection failed';
+    avatarBadge.textContent = 'AVATAR OFFLINE';
     if (avatarPlaceholderText) {
       avatarPlaceholderText.textContent = 'Simli could not connect. Check Railway variables and deploy status.';
     }
