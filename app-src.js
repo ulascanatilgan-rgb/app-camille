@@ -39,6 +39,9 @@ const closeWords = document.getElementById('closeWords');
 const wordCard = document.getElementById('wordCard');
 const wordNl = document.getElementById('wordNl');
 const wordEn = document.getElementById('wordEn');
+const lastUserPin = document.getElementById('lastUserPin');
+const lastUserPinText = document.getElementById('lastUserPinText');
+const successBalloon = document.getElementById('successBalloon');
 
 const HISTORY_KEY = 'camille.history.v2';
 const WORDS_KEY = 'camille.words.v2';
@@ -58,11 +61,14 @@ let lastPartialTranslationAt = 0;
 let activeSubtitleMessageId = null;
 let currentHistorySessionId = null;
 let runtimeContextApplied = false;
+let pinnedUserMessageId = null;
+let popAudioContext = null;
 
 const streamBuffers = new Map();
 const vocabProcessedIds = new Set();
 const vocabSentenceCounts = new Map();
 const translationByMessageId = new Map();
+const lengthInterruptedIds = new Set();
 let vocabQueue = Promise.resolve();
 
 let learnedWords = loadJson(WORDS_KEY, []);
@@ -74,11 +80,11 @@ let lastSubtitlePair = {
 };
 
 const difficultyMeta = {
-  1: { cefr: 'A1', name: 'Very easy', maxWords: 12, sentence: '4–6 words' },
-  2: { cefr: 'A2', name: 'Easy', maxWords: 18, sentence: '6–9 words' },
-  3: { cefr: 'B1', name: 'Everyday', maxWords: 28, sentence: '8–12 words' },
-  4: { cefr: 'B2', name: 'Natural', maxWords: 40, sentence: 'natural short phrases' },
-  5: { cefr: 'C1', name: 'Advanced', maxWords: 55, sentence: 'natural conversation' }
+  1: { cefr: 'A1', name: 'Very easy', maxWords: 10, sentence: 'very short' },
+  2: { cefr: 'A2', name: 'Easy', maxWords: 14, sentence: 'short' },
+  3: { cefr: 'B1', name: 'Everyday', maxWords: 16, sentence: 'short' },
+  4: { cefr: 'B2', name: 'Natural', maxWords: 18, sentence: 'short natural' },
+  5: { cefr: 'C1', name: 'Advanced', maxWords: 20, sentence: 'concise natural' }
 };
 
 function loadJson(key, fallback) {
@@ -122,6 +128,92 @@ function setSubtitle(nl = '', en = '') {
 
   subtitleNl.textContent = nl || '';
   subtitleEn.textContent = en || '';
+}
+
+function setLastUserPin(text, messageId = null) {
+  const clean = String(text || '').trim();
+
+  if (!clean) {
+    if (!lastUserPinText.textContent.trim()) lastUserPin.hidden = true;
+    return;
+  }
+
+  if (messageId) pinnedUserMessageId = messageId;
+  lastUserPinText.textContent = clean;
+  lastUserPin.hidden = false;
+}
+
+function countSpokenWords(text) {
+  return String(text || '').trim().match(/[\p{L}\p{N}][\p{L}\p{N}'’\-]*/gu)?.length || 0;
+}
+
+function limitCamilleReply(text) {
+  const original = String(text || '').trim();
+  if (!original) return { text: '', limited: false };
+
+  const words = original.split(/\s+/).filter(Boolean);
+  let limited = words.slice(0, 20).join(' ');
+
+  const sentenceEnds = [...limited.matchAll(/[.!?](?=\s|$)/g)];
+  if (sentenceEnds.length > 3) {
+    limited = limited.slice(0, sentenceEnds[2].index + 1).trim();
+  }
+
+  return {
+    text: limited,
+    limited: words.length > 20 || sentenceEnds.length > 3
+  };
+}
+
+function primePopAudio() {
+  try {
+    if (!popAudioContext) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      popAudioContext = new AudioCtx();
+    }
+
+    if (popAudioContext.state === 'suspended') {
+      popAudioContext.resume().catch(() => {});
+    }
+  } catch {}
+}
+
+function playTinyPop() {
+  try {
+    primePopAudio();
+    if (!popAudioContext) return;
+
+    const now = popAudioContext.currentTime;
+    const oscillator = popAudioContext.createOscillator();
+    const gain = popAudioContext.createGain();
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(760, now);
+    oscillator.frequency.exponentialRampToValueAtTime(460, now + 0.045);
+
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.018, now + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.055);
+
+    oscillator.connect(gain);
+    gain.connect(popAudioContext.destination);
+    oscillator.start(now);
+    oscillator.stop(now + 0.06);
+  } catch {}
+}
+
+function celebrateUserTurn() {
+  if (!successBalloon) return;
+
+  successBalloon.classList.remove('listening', 'pop');
+  void successBalloon.offsetWidth;
+  successBalloon.classList.add('pop');
+  playTinyPop();
+
+  window.setTimeout(() => {
+    successBalloon.classList.remove('pop');
+  }, 420);
 }
 
 function renderLiveDutch(text, activeChunk = '') {
@@ -196,6 +288,7 @@ function renderMessages(messages) {
   const recent = messages
     .filter(message => message?.content?.trim())
     .filter(message => !(activeSubtitleMessageId && message.id === activeSubtitleMessageId && message.role === 'persona'))
+    .filter(message => !(pinnedUserMessageId && message.id === pinnedUserMessageId && message.role === 'user'))
     .slice(-60);
 
   if (!recent.length) {
@@ -219,7 +312,7 @@ function renderMessages(messages) {
     } else {
       const nl = document.createElement('div');
       nl.className = 'assistant-fr';
-      nl.textContent = message.content.trim();
+      nl.textContent = limitCamilleReply(message.content).text;
       bubble.appendChild(nl);
 
       const english = translationByMessageId.get(message.id);
@@ -263,10 +356,10 @@ async function translateToEnglish(text) {
 
 async function schedulePartialTranslation(text, messageId) {
   const clean = (text || '').trim();
-  if (!captionsToggle.checked || clean.length < 5) return;
+  if (!captionsToggle.checked || clean.length < 2) return;
 
   const now = Date.now();
-  if (now - lastPartialTranslationAt < 600) return;
+  if (now - lastPartialTranslationAt < 160) return;
 
   lastPartialTranslationAt = now;
   const seq = ++partialTranslationSeq;
@@ -298,28 +391,30 @@ function buildRuntimeContext() {
   const meta = difficultyMeta[difficulty];
 
   const levelRules = {
-    1: 'Use very easy A1 Dutch. Speak very slowly. Sentences should usually be 4 to 6 words. Keep the whole reply under about 12 words.',
-    2: 'Use easy A2 practical Flemish. Speak noticeably slower than normal. Use short clear pauses. Sentences should usually be 6 to 9 words. Keep the whole reply under about 18 words.',
-    3: 'Use practical B1 Dutch. Speak calmly at a moderate pace. Sentences should usually be 8 to 12 words. Keep the whole reply under about 28 words.',
-    4: 'Use natural B2 Flemish. Speak clearly at a normal but calm pace. Keep replies under about 40 words.',
-    5: 'Use advanced natural Flemish at a normal adult pace, while still staying concise.'
+    1: 'Use very easy A1 Dutch. Speak slowly. Aim for 6–10 words total.',
+    2: 'Use easy A2 practical Flemish. Speak noticeably slower than normal. Aim for 10–14 words total.',
+    3: 'Use practical B1 Dutch. Speak calmly and clearly. Aim for 12–16 words total.',
+    4: 'Use natural B2 Flemish. Speak clearly at a calm natural pace. Aim for 14–18 words total.',
+    5: 'Use advanced natural Flemish, but stay concise. Never exceed 20 words total.'
   };
 
   return [
-    'SESSION LEARNING CONTEXT:',
+    'SESSION LEARNING CONTEXT — IMPORTANT:',
     'You are Camille, Ulas Atilgan’s Flemish conversation coach.',
-    'The goal is comfortable practical communication in Flanders within six months.',
+    'The goal is short back-and-forth conversation, not explanations.',
     `Current difficulty is level ${difficulty}/5 (${meta.cefr}, ${meta.name}).`,
     levelRules[difficulty],
-    'This brevity rule is important: do not give long explanations unless Ulas explicitly asks.',
-    'Usually give one short statement and ONE short question.',
-    'Use simple, reusable everyday sentence patterns and practical Belgian Dutch/Flemish.',
-    'Use clear pauses between short clauses so Ulas can follow.',
-    'Correct only one useful mistake at a time.',
-    'If Ulas uses English because he forgot a word, understand him, give the Dutch/Flemish expression briefly, then continue in Dutch.',
-    'If Ulas is quiet or stuck, take the lead with one easy topic or question.',
-    'Useful personal context: Ulas works at ING in IT, runs Hondinn dog hotel, plays padel, invests, lives around Kapellen/Antwerp, and likes business, cars and renovation.',
-    'Use those personal details naturally, one at a time, never as a list.'
+    'HARD LIMIT FOR EVERY REPLY: maximum 20 spoken words total and maximum 3 short sentences.',
+    'Prefer 1 or 2 short sentences. Use a third only if truly useful.',
+    'Never exceed 20 words, even for corrections, explanations, or advanced levels.',
+    'Usually give one short statement and one short question.',
+    'Use simple reusable Belgian Dutch/Flemish patterns.',
+    'Use clear pauses and speak slowly enough for an A2 learner to follow.',
+    'Correct only one useful mistake at a time and keep it inside the same 20-word limit.',
+    'If Ulas uses English because he forgot a word, give the Dutch/Flemish expression briefly, then continue in Dutch.',
+    'If Ulas is quiet or stuck, take the lead with one easy question.',
+    'Useful personal context: ING/IT, Hondinn, padel, investing, Kapellen/Antwerp, business, cars and renovation.',
+    'Use personal details naturally, one at a time.'
   ].join(' ');
 }
 
@@ -711,6 +806,19 @@ function handleStreamEvent(event) {
   const next = previous + event.content;
   streamBuffers.set(event.id, next);
 
+  if (event.role === 'user') {
+    setLastUserPin(next, event.id);
+
+    // The new utterance becomes the pinned line; the previous one naturally
+    // drops back into the independently scrollable history.
+    renderMessages(currentMessages);
+
+    if (event.endOfSpeech) {
+      streamBuffers.delete(event.id);
+    }
+    return;
+  }
+
   if (event.role === 'persona') {
     const isNewMessage = activeSubtitleMessageId !== event.id;
     activeSubtitleMessageId = event.id;
@@ -721,24 +829,35 @@ function handleStreamEvent(event) {
       if (captionsToggle.checked) subtitleEn.textContent = '…';
     }
 
-    if (captionsToggle.checked) {
-      renderLiveDutch(next.trim(), event.content);
-      schedulePartialTranslation(next, event.id);
+    const limited = limitCamilleReply(next);
+
+    if (limited.limited && !lengthInterruptedIds.has(event.id) && !event.endOfSpeech) {
+      lengthInterruptedIds.add(event.id);
+      try {
+        anamClient?.interruptPersona();
+      } catch (error) {
+        console.warn('Could not stop overlong Camille reply:', error);
+      }
     }
 
-    processVocabularyProgress(event.id, next, event.endOfSpeech);
+    if (captionsToggle.checked) {
+      renderLiveDutch(limited.text, event.content);
+      schedulePartialTranslation(limited.text, event.id);
+    }
+
+    processVocabularyProgress(event.id, limited.text, event.endOfSpeech);
     renderMessages(currentMessages);
 
-    if (event.endOfSpeech) {
+    if (event.endOfSpeech || limited.limited) {
       streamBuffers.delete(event.id);
       partialTranslationSeq += 1;
       lastPartialTranslationAt = 0;
-      finalizeSubtitle(next, event.id);
+      finalizeSubtitle(limited.text, event.id);
     }
-  }
 
-  if (event.endOfSpeech && event.role === 'user') {
-    streamBuffers.delete(event.id);
+    if (event.endOfSpeech) {
+      window.setTimeout(() => lengthInterruptedIds.delete(event.id), 12000);
+    }
   }
 }
 
@@ -769,6 +888,7 @@ function attachAnamListeners(client) {
   client.addListener(AnamEvent.USER_SPEECH_STARTED, () => {
     setStatus('Listening…');
     voiceRing.classList.add('active');
+    successBalloon?.classList.add('listening');
     activeSubtitleMessageId = null;
     setSubtitle('…', '');
     renderMessages(currentMessages);
@@ -781,6 +901,11 @@ function attachAnamListeners(client) {
   client.addListener(AnamEvent.USER_SPEECH_ENDED, () => {
     setStatus('Thinking…');
     voiceRing.classList.remove('active');
+    successBalloon?.classList.remove('listening');
+    celebrateUserTurn();
+
+    // Reinforce the short-dialog rules before Camille's next turn.
+    if (connected) pushLearningContext();
   });
 
   client.addListener(AnamEvent.TALK_STREAM_INTERRUPTED, () => {
@@ -883,7 +1008,12 @@ function resetUiAfterDisconnect() {
   isResponding = false;
   currentMessages = [];
   activeSubtitleMessageId = null;
+  pinnedUserMessageId = null;
+  lastUserPin.hidden = true;
+  lastUserPinText.textContent = '';
+  successBalloon?.classList.remove('listening', 'pop');
   streamBuffers.clear();
+  lengthInterruptedIds.clear();
   partialTranslationSeq += 1;
   lastPartialTranslationAt = 0;
 
@@ -920,6 +1050,7 @@ async function disconnect() {
 }
 
 micButton.addEventListener('click', () => {
+  primePopAudio();
   if (!connected && !connecting) connect();
 });
 
