@@ -755,3 +755,587 @@ dialog::backdrop {
 @media (display-mode: standalone) {
   .text-button { display: none !important; }
 }
+
+
+/* ---- Learning UI v13 ---- */
+
+.nav-button {
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 8px 4px;
+  font-size: 12px;
+  font-weight: 560;
+  letter-spacing: -.01em;
+}
+
+.nav-button:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.live-caption-card {
+  border-bottom: 0;
+}
+
+.live-label {
+  width: max-content;
+  margin: 0 0 14px 50px;
+  padding: 4px 7px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+.spoken-word {
+  display: inline-block;
+  font-weight: 820;
+  transform: scale(1.08);
+  transform-origin: center bottom;
+  background: linear-gradient(transparent 68%, rgba(240, 201, 65, .78) 68%);
+  padding: 0 .03em;
+  transition: transform .12s ease;
+}
+
+.conversation-separator {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  margin: 0;
+  border-top: 2px solid var(--anthracite);
+  border-bottom: 1px solid var(--line);
+  background: #f7f5f1;
+}
+
+.conversation-separator::before {
+  content: "";
+  width: 18px;
+  height: 4px;
+  background: var(--yellow);
+}
+
+.conversation-separator span {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .15em;
+  color: var(--muted);
+}
+
+.history-empty-inline {
+  color: var(--soft);
+  font-size: 12px;
+  padding: 2px 0 6px;
+}
+
+.word-card {
+  position: absolute;
+  z-index: 6;
+  left: 16px;
+  right: 16px;
+  bottom: 44px;
+  padding: 12px 14px 13px;
+  background: rgba(20,20,20,.91);
+  color: #fff;
+  border-left: 5px solid var(--yellow);
+  backdrop-filter: blur(8px);
+}
+
+.word-card[hidden] {
+  display: none;
+}
+
+.word-card-label {
+  margin-bottom: 5px;
+  color: var(--yellow);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .15em;
+}
+
+.word-card-pair {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.word-card-nl {
+  font-size: clamp(17px, 2vw, 25px);
+  font-weight: 720;
+  letter-spacing: -.025em;
+}
+
+.word-card-arrow {
+  color: #aaa69e;
+  font-size: 14px;
+}
+
+.word-card-en {
+  min-width: 0;
+  color: #eeeae2;
+  font-size: clamp(13px, 1.3vw, 17px);
+  line-height: 1.2;
+}
+
+.word-pop {
+  animation: wordPop .28s ease-out;
+}
+
+@keyframes wordPop {
+  from { transform: translateY(8px); opacity: .15; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.difficulty-control {
+  margin-bottom: 12px;
+  padding: 0 2px;
+}
+
+.difficulty-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 8px;
+}
+
+.control-label {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+.difficulty-name {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 570;
+}
+
+.difficulty-value {
+  min-width: 28px;
+  color: var(--ink);
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 620;
+  letter-spacing: -.05em;
+  text-align: right;
+}
+
+.range-wrap {
+  position: relative;
+}
+
+.difficulty-slider {
+  --level-progress: 25%;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.difficulty-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  background:
+    linear-gradient(to right,
+      var(--yellow) 0,
+      var(--yellow) var(--level-progress),
+      #d8d4cd var(--level-progress),
+      #d8d4cd 100%);
+}
+
+.difficulty-slider::-moz-range-track {
+  height: 4px;
+  background: #d8d4cd;
+}
+
+.difficulty-slider::-moz-range-progress {
+  height: 4px;
+  background: var(--yellow);
+}
+
+.difficulty-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 19px;
+  height: 19px;
+  margin-top: -7.5px;
+  border: 2px solid var(--paper);
+  border-radius: 50%;
+  background: var(--anthracite);
+  box-shadow: 0 0 0 1px var(--anthracite);
+}
+
+.difficulty-slider::-moz-range-thumb {
+  width: 17px;
+  height: 17px;
+  border: 2px solid var(--paper);
+  border-radius: 50%;
+  background: var(--anthracite);
+  box-shadow: 0 0 0 1px var(--anthracite);
+}
+
+.range-numbers {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 2px;
+  margin-top: -2px;
+  color: var(--soft);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.archive-dialog {
+  width: min(820px, calc(100vw - 28px));
+  max-width: none;
+  max-height: min(84dvh, 900px);
+  overflow: hidden;
+  border: 1px solid var(--line-dark);
+  border-radius: 2px;
+  background: var(--paper);
+}
+
+.archive-shell {
+  display: flex;
+  flex-direction: column;
+  max-height: min(84dvh, 900px);
+}
+
+.archive-header {
+  flex: 0 0 auto;
+  padding: 24px 26px 18px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 2px solid var(--anthracite);
+}
+
+.archive-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 5px;
+}
+
+.archive-title-row h2 {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 520;
+  letter-spacing: -.04em;
+}
+
+.archive-count {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.dialog-close {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line-dark);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.archive-content {
+  overflow-y: auto;
+  padding: 0 26px 30px;
+}
+
+.history-date {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 -26px;
+  padding: 12px 26px 9px;
+  background: rgba(244,242,237,.97);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.history-session {
+  padding: 18px 0 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.history-session-meta {
+  margin-bottom: 14px;
+  color: var(--soft);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: .04em;
+}
+
+.archive-message {
+  display: grid;
+  grid-template-columns: 64px minmax(0,1fr);
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.archive-role {
+  padding-top: 2px;
+  color: var(--soft);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .1em;
+}
+
+.archive-user .archive-body {
+  color: #55514b;
+}
+
+.archive-camille .archive-body {
+  color: var(--ink);
+  font-weight: 540;
+}
+
+.archive-body {
+  font-size: 15px;
+  line-height: 1.42;
+}
+
+.archive-english {
+  margin-top: 3px;
+  color: var(--english);
+  font-size: 13px;
+  font-weight: 430;
+}
+
+.empty-state {
+  padding: 36px 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.word-list {
+  padding-top: 8px;
+}
+
+.word-list-row {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.word-list-pair {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(120px, 220px) minmax(120px, 1fr);
+  gap: 20px;
+  align-items: baseline;
+}
+
+.word-list-nl {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.word-list-en {
+  color: var(--english);
+  font-size: 14px;
+}
+
+.word-list-date {
+  flex: 0 0 auto;
+  color: var(--soft);
+  font-size: 10px;
+}
+
+@media (max-width: 760px) {
+  .header-status {
+    gap: 8px;
+  }
+
+  .nav-button {
+    padding: 7px 2px;
+    font-size: 10px;
+  }
+
+  .uca-lab-logo {
+    left: 116px;
+    right: auto;
+    transform: translateY(-50%);
+  }
+
+  .uca-lab-logo img {
+    width: 52px;
+    max-height: 18px;
+  }
+
+  .icon-button {
+    padding-left: 3px;
+    font-size: 16px;
+  }
+
+  .live-label {
+    margin-left: 33px;
+    margin-bottom: 10px;
+    font-size: 7px;
+  }
+
+  .conversation-separator {
+    min-height: 34px;
+  }
+
+  .conversation-separator::before {
+    width: 12px;
+    height: 3px;
+  }
+
+  .conversation-separator span {
+    font-size: 7px;
+  }
+
+  .word-card {
+    left: 8px;
+    right: 8px;
+    bottom: 34px;
+    padding: 9px 9px 10px;
+  }
+
+  .word-card-label {
+    font-size: 7px;
+  }
+
+  .word-card-pair {
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+
+  .word-card-nl {
+    font-size: 14px;
+  }
+
+  .word-card-en {
+    font-size: 11px;
+  }
+
+  .difficulty-head {
+    margin-bottom: 5px;
+  }
+
+  .difficulty-name {
+    font-size: 11px;
+  }
+
+  .difficulty-value {
+    font-size: 20px;
+  }
+
+  .control-label {
+    font-size: 7px;
+  }
+
+  .difficulty-slider {
+    height: 20px;
+  }
+
+  .range-numbers {
+    font-size: 8px;
+  }
+
+  .archive-dialog {
+    width: calc(100vw - 16px);
+    max-height: 90dvh;
+  }
+
+  .archive-shell {
+    max-height: 90dvh;
+  }
+
+  .archive-header {
+    padding: 18px 16px 14px;
+  }
+
+  .archive-title-row h2 {
+    font-size: 28px;
+  }
+
+  .archive-content {
+    padding: 0 16px 22px;
+  }
+
+  .history-date {
+    margin: 0 -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .archive-message {
+    grid-template-columns: 48px minmax(0,1fr);
+    gap: 7px;
+  }
+
+  .archive-body {
+    font-size: 13px;
+  }
+
+  .archive-english {
+    font-size: 11px;
+  }
+
+  .word-list-pair {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .word-list-nl {
+    font-size: 14px;
+  }
+
+  .word-list-en {
+    font-size: 12px;
+  }
+
+  .word-list-date {
+    font-size: 8px;
+  }
+}
+
+@media (max-width: 430px) {
+  .header-status {
+    gap: 5px;
+  }
+
+  .nav-button {
+    font-size: 9px;
+  }
+
+  .uca-lab-logo {
+    left: 108px;
+  }
+
+  .uca-lab-logo img {
+    width: 44px;
+  }
+
+  .brand-mark {
+    width: 29px;
+    height: 29px;
+  }
+
+  .name {
+    font-size: 14px;
+  }
+}
