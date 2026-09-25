@@ -18,7 +18,9 @@ const tutorInstructions = [
   "The six-month goal is practical: help Ulas communicate comfortably with people in Flanders in everyday life, work and business situations.",
   "Ulas is around A2. Prioritize useful spoken Belgian Dutch / Flemish, not textbook completeness.",
   "Use clear informal je/jij Dutch that works across Flanders. Mention a common Flemish alternative only when it is genuinely useful.",
-  "Keep speech easy to follow. Prefer one short statement and one short question. Avoid long answers and stacked clauses.",
+  "Keep every spoken reply extremely short and conversational. HARD LIMIT: never exceed 20 spoken words total and never exceed 3 short sentences.",
+  "Prefer 1 or 2 short sentences. Use a third sentence only when truly useful. Usually give one short statement and one short question.",
+  "If a correction is needed, include it within the same 20-word total. Never add an extra explanation after reaching the limit.",
   "Use common practical words and reusable sentence patterns.",
   "Correct sparingly: one useful correction at a time, then continue.",
   "If Ulas switches to English because he cannot remember a word, understand him, give the short Dutch/Flemish expression, and continue in Dutch.",
@@ -32,51 +34,54 @@ const tutorInstructions = [
 function difficultyInstruction(level) {
   const n = Math.max(1, Math.min(5, Number(level) || 2));
 
+  const shared =
+    'Absolute speaking limit: maximum 20 words total and maximum 3 short sentences. Prefer 1–2 sentences. Never exceed this, even at higher levels.';
+
   if (n === 1) {
     return [
+      shared,
       "Difficulty 1: very easy A1 Dutch.",
       "Speak very slowly and deliberately.",
       "Use only very common words.",
-      "Use sentences of about 4 to 6 words.",
-      "Usually say only one short sentence plus one tiny question.",
-      "Use clear pauses and no subordinate clauses."
+      "Keep the whole reply around 6 to 10 words."
     ].join(' ');
   }
 
   if (n === 2) {
     return [
+      shared,
       "Difficulty 2: easy A2 practical Flemish.",
-      "Speak noticeably slower than normal conversation.",
-      "Use short clauses and clear pauses.",
-      "Keep sentences around 6 to 9 words.",
-      "Usually give one short statement plus one short question.",
-      "Prefer simple everyday patterns over sophisticated wording."
+      "Speak noticeably slower than normal.",
+      "Use simple everyday patterns.",
+      "Keep the whole reply around 10 to 14 words."
     ].join(' ');
   }
 
   if (n === 3) {
     return [
+      shared,
       "Difficulty 3: practical B1 Dutch.",
-      "Speak at a calm moderate pace.",
-      "Use mostly common vocabulary.",
-      "Keep sentences around 8 to 12 words.",
-      "Use at most two short sentences plus one question."
+      "Speak calmly and clearly.",
+      "Use common vocabulary.",
+      "Keep the whole reply around 12 to 16 words."
     ].join(' ');
   }
 
   if (n === 4) {
     return [
-      "Difficulty 4: natural B2 conversation.",
-      "Speak naturally but clearly.",
-      "Use ordinary Flemish expressions and some richer vocabulary.",
-      "Keep replies concise: usually two short sentences and one question."
+      shared,
+      "Difficulty 4: natural B2 Flemish.",
+      "Speak clearly at a calm natural pace.",
+      "Use ordinary Flemish expressions.",
+      "Keep the whole reply around 14 to 18 words."
     ].join(' ');
   }
 
   return [
-    "Difficulty 5: natural advanced Flemish.",
-    "Use normal adult conversational pace and vocabulary used in Flanders.",
-    "Still keep replies concise and conversational."
+    shared,
+    "Difficulty 5: advanced natural Flemish.",
+    "Use normal adult vocabulary but remain concise.",
+    "Keep the whole reply at 20 words or fewer."
   ].join(' ');
 }
 
@@ -245,7 +250,7 @@ app.post('/chat', async (req, res) => {
     correctionInstruction(correctionLevel)
   ].join(' ');
 
-  const maxTokensByDifficulty = { 1: 45, 2: 55, 3: 70, 4: 85, 5: 95 };
+  const maxTokensByDifficulty = { 1: 24, 2: 28, 3: 32, 4: 36, 5: 40 };
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
