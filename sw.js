@@ -1,4 +1,4 @@
-const CACHE = 'camille-pwa-flemish-v10';
+const CACHE = 'camille-pwa-anam-v11';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -32,7 +32,7 @@ self.addEventListener('fetch', event => {
 
   if (
     url.origin === self.location.origin &&
-    ['/session', '/simli-session', '/simli-health', '/translate', '/health'].includes(url.pathname)
+    ['/anam-session', '/anam-health', '/chat', '/translate', '/health'].includes(url.pathname)
   ) {
     return;
   }

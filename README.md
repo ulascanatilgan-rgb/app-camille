@@ -1,25 +1,31 @@
 # Camille — Flemish Agent for Ulas Atilgan
 
-A practical spoken-Flemish conversation PWA with a six-month goal: help Ulas communicate comfortably with people in Flanders in everyday life, work and business.
+Camille is a practical spoken-Flemish conversation PWA with a six-month goal: help Ulas communicate comfortably with people in Flanders in everyday life, work and business.
+
+## Current architecture
+
+- **Anam** handles microphone input, speech recognition, voice synthesis and the live avatar video.
+- **OpenAI** remains Camille's conversation brain when Anam can resolve the published persona's avatar and voice configuration.
+- The browser receives only a short-lived Anam session token; the Anam API key stays on Railway.
+- Camille streams OpenAI text into Anam's talk stream so the avatar can begin speaking before the whole response is finished.
+- Live Dutch subtitles come from Anam's speech events; concise English translation appears underneath.
 
 ## Learning approach
 
 - Current level: around A2
-- Target: confident practical conversation, progressing toward B1/B2-style speaking
-- Focus on Belgian Dutch / Flemish used in real life, not textbook-heavy Dutch
-- Clear informal `je/jij` as the default, with common Flemish alternatives introduced only when useful
+- Target: confident practical communication in Flanders within six months
+- Spoken Belgian Dutch / Flemish, not textbook-heavy Dutch
+- Clear informal je/jij by default, with useful Flemish alternatives only when relevant
 - Short, high-frequency phrases and compact ways to get things done
 - One question at a time
-- Short corrections: usually one useful point only
-- Occasional very short English explanation when it helps
-- Camille proactively starts conversations and introduces scenarios when Ulas is quiet or stuck
-- Personal topics can include ING/IT work, Hondinn, padel, investing, Kapellen/Antwerp, business, cars and renovation
-- Browser speech recognition uses `nl-BE`
-- English subtitles translate spoken Belgian Dutch/Flemish
+- One short useful correction when needed
+- English is accepted as a temporary bridge when Ulas is stuck, then Camille guides him back to Flemish
+- Camille proactively starts conversations and practical scenarios
+- Natural personal topics can include ING/IT work, Hondinn, padel, investing, Kapellen/Antwerp, business, cars and renovation
 
 ## Conversation modes
 
-- **Practical** — default; everyday spoken Flemish and useful scenarios
+- **Practical** — everyday spoken Flemish and useful scenarios
 - **Coach** — slightly more correction and natural alternatives
 - **Extra slow** — simpler wording and slower, shorter clauses
 
@@ -27,11 +33,22 @@ A practical spoken-Flemish conversation PWA with a six-month goal: help Ulas com
 
 ```text
 OPENAI_API_KEY=...
-SIMLI_API_KEY=...
-SIMLI_FACE_ID=...
+ANAM_API_KEY=...
+ANAM_PERSONA_ID=...
+```
+
+Optional fallback when the supplied Anam ID is an avatar ID rather than a published persona ID:
+
+```text
+ANAM_VOICE_ID=...
 ```
 
 Do not commit API keys to GitHub.
+
+## Health checks
+
+- `/health` confirms OpenAI and Anam variables are configured.
+- `/anam-health` checks whether the published Anam persona can be resolved to an avatar and voice for custom-LLM mode.
 
 ## Deployment
 
