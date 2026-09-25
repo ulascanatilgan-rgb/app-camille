@@ -1955,3 +1955,215 @@ dialog::backdrop {
     object-position: center 36%;
   }
 }
+
+
+/* ---- Short-dialog learning polish v16 ---- */
+
+.success-balloon {
+  position: absolute;
+  left: calc(50% + 78px);
+  top: 15px;
+  width: 22px;
+  height: 40px;
+  z-index: 22;
+  pointer-events: none;
+  transform-origin: 50% 35%;
+}
+
+.balloon-body {
+  position: absolute;
+  left: 5px;
+  top: 0;
+  width: 12px;
+  height: 15px;
+  border-radius: 52% 52% 48% 48%;
+  background: var(--yellow);
+  box-shadow: inset -2px -2px 0 rgba(0,0,0,.06);
+}
+
+.balloon-body::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 2px;
+  width: 3px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.38);
+}
+
+.balloon-knot {
+  position: absolute;
+  left: 9px;
+  top: 14px;
+  width: 4px;
+  height: 4px;
+  background: var(--yellow-deep);
+  transform: rotate(45deg);
+}
+
+.balloon-string {
+  position: absolute;
+  left: 10px;
+  top: 18px;
+  width: 1px;
+  height: 15px;
+  background: #9e998f;
+  transform: rotate(5deg);
+  transform-origin: top;
+}
+
+.balloon-spark {
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--yellow);
+  opacity: 0;
+}
+
+.success-balloon.listening {
+  animation: balloonListen 1.2s ease-in-out infinite;
+}
+
+.success-balloon.pop .balloon-body,
+.success-balloon.pop .balloon-knot {
+  animation: balloonPop .18s ease-out forwards;
+}
+
+.success-balloon.pop .balloon-string {
+  animation: stringFade .25s ease-out forwards;
+}
+
+.success-balloon.pop .balloon-spark-a {
+  animation: sparkA .28s ease-out forwards;
+}
+
+.success-balloon.pop .balloon-spark-b {
+  animation: sparkB .28s ease-out forwards;
+}
+
+.success-balloon.pop .balloon-spark-c {
+  animation: sparkC .28s ease-out forwards;
+}
+
+@keyframes balloonListen {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-2px) rotate(1deg); }
+}
+
+@keyframes balloonPop {
+  0% { transform: scale(1); opacity: 1; }
+  55% { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(.1); opacity: 0; }
+}
+
+@keyframes stringFade {
+  to { opacity: 0; transform: translateY(4px) rotate(8deg); }
+}
+
+@keyframes sparkA {
+  0% { opacity: 1; transform: translate(0,0) scale(1); }
+  100% { opacity: 0; transform: translate(-8px,-7px) scale(.3); }
+}
+
+@keyframes sparkB {
+  0% { opacity: 1; transform: translate(0,0) scale(1); }
+  100% { opacity: 0; transform: translate(8px,-5px) scale(.3); }
+}
+
+@keyframes sparkC {
+  0% { opacity: 1; transform: translate(0,0) scale(1); }
+  100% { opacity: 0; transform: translate(5px,8px) scale(.3); }
+}
+
+.last-user-pin {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  background: #fbfaf7;
+}
+
+.last-user-pin[hidden] {
+  display: none;
+}
+
+.last-user-label {
+  padding-top: 2px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.last-user-text {
+  color: var(--anthracite);
+  font-size: 14px;
+  line-height: 1.3;
+  font-weight: 560;
+}
+
+@media (max-width: 760px) {
+  .success-balloon {
+    left: calc(50% + 37px);
+    top: 9px;
+    width: 18px;
+    height: 33px;
+  }
+
+  .balloon-body {
+    left: 4px;
+    width: 10px;
+    height: 13px;
+  }
+
+  .balloon-knot {
+    left: 7px;
+    top: 12px;
+  }
+
+  .balloon-string {
+    left: 8px;
+    top: 16px;
+    height: 12px;
+  }
+
+  .last-user-pin {
+    grid-template-columns: 25px minmax(0, 1fr);
+    gap: 8px;
+    padding: 7px 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid #ece8e0;
+  }
+
+  .last-user-label {
+    font-size: 7px;
+  }
+
+  .last-user-text {
+    font-size: 12px;
+    line-height: 1.22;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .conversation-separator {
+    border-top-width: 1px;
+  }
+
+  .live-caption-card {
+    padding-bottom: 8px;
+  }
+
+  .english-line {
+    transition: opacity .12s ease;
+  }
+}
