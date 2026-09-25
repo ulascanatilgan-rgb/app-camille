@@ -29,6 +29,15 @@
         <img src="/uca-lab-logo.png" alt="UCA Lab" />
       </div>
 
+      <div id="successBalloon" class="success-balloon" aria-hidden="true">
+        <span class="balloon-body"></span>
+        <span class="balloon-knot"></span>
+        <span class="balloon-string"></span>
+        <span class="balloon-spark balloon-spark-a"></span>
+        <span class="balloon-spark balloon-spark-b"></span>
+        <span class="balloon-spark balloon-spark-c"></span>
+      </div>
+
       <div class="header-status">
         <button id="historyButton" class="nav-button" type="button">History</button>
         <button id="wordsButton" class="nav-button" type="button">Words</button>
@@ -90,6 +99,11 @@
             <div id="subtitleEn" class="subtitle-line english-line">Hey Ulas. How are you today?</div>
           </div>
         </section>
+
+        <div id="lastUserPin" class="last-user-pin" hidden>
+          <span class="last-user-label">YOU</span>
+          <div id="lastUserPinText" class="last-user-text"></div>
+        </div>
 
         <div class="conversation-separator">
           <span>CONVERSATION HISTORY</span>
