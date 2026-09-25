@@ -914,8 +914,14 @@ function attachAnamListeners(client) {
     successBalloon?.classList.remove('listening');
     celebrateUserTurn();
 
-    // Reinforce the short-dialog rules before Camille's next turn.
-    if (connected) pushLearningContext();
+    // Reinforce the hard brevity rule immediately before Camille's next turn.
+    if (connected) {
+      try {
+        anamClient?.addContext(
+          'NEXT REPLY RULE: maximum 20 spoken words total, maximum 3 short sentences. Prefer 1–2 sentences. Keep it simple, slow and conversational.'
+        );
+      } catch {}
+    }
   });
 
   client.addListener(AnamEvent.TALK_STREAM_INTERRUPTED, () => {
