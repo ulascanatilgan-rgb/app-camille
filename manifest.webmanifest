@@ -1,7 +1,7 @@
 {
-  "name": "Camille - French Agent for Ulas Atilgan",
+  "name": "Camille - Flemish Agent for Ulas Atilgan",
   "short_name": "Camille",
-  "description": "Natural French conversation practice with Camille.",
+  "description": "Practical spoken Flemish for everyday life, work and business in Flanders.",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
