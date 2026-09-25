@@ -471,7 +471,9 @@ function saveCurrentHistory() {
     .map(message => ({
       id: message.id,
       role: normalizedRole(message.role),
-      content: message.content.trim(),
+      content: normalizedRole(message.role) === 'persona'
+        ? limitCamilleReply(message.content).text
+        : message.content.trim(),
       en: translationByMessageId.get(message.id) || ''
     }));
 
@@ -805,6 +807,14 @@ function handleStreamEvent(event) {
   const previous = streamBuffers.get(event.id) || '';
   const next = previous + event.content;
   streamBuffers.set(event.id, next);
+
+  if (event.role === 'persona' && lengthInterruptedIds.has(event.id)) {
+    if (event.endOfSpeech) {
+      streamBuffers.delete(event.id);
+      window.setTimeout(() => lengthInterruptedIds.delete(event.id), 12000);
+    }
+    return;
+  }
 
   if (event.role === 'user') {
     setLastUserPin(next, event.id);
