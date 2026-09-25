@@ -5,6 +5,7 @@ const micLabel = document.getElementById('micLabel');
 const endButton = document.getElementById('endButton');
 const statusEl = document.getElementById('status');
 const messages = document.getElementById('messages');
+const conversationPane = document.getElementById('conversationPane');
 const portraitWrap = document.getElementById('portraitWrap');
 const voiceRing = document.getElementById('voiceRing');
 const settingsButton = document.getElementById('settingsButton');
@@ -36,6 +37,8 @@ let currentMode = 'natural';
 let recognition;
 let lastUserTranscript = '';
 let currentAssistantMessage = null;
+let partialTranslationSeq = 0;
+let lastPartialTranslationAt = 0;
 let simliStarted = false;
 let lastSubtitlePair = {
   fr: "Hey Ulas. Hoe is 't vandaag?",
@@ -50,7 +53,7 @@ function setAvatarLive(isLive) {
   portraitWrap.classList.toggle('avatar-live', isLive);
   avatarPlaceholder.classList.toggle('hidden', isLive);
   simliVideo.classList.toggle('visible', isLive);
-  avatarBadge.textContent = isLive ? 'Simli Live Avatar' : 'Simli Live Avatar';
+  avatarBadge.textContent = isLive ? 'LIVE' : 'LIVE AVATAR';
   if (!isLive && avatarPlaceholderText) {
     avatarPlaceholderText.textContent = "Camille's live avatar will appear here.";
   }
@@ -74,6 +77,17 @@ function setSubtitle(fr = '', en = '') {
   subtitleEn.textContent = en || '';
 }
 
+function trimMessages() {
+  const rows = [...messages.querySelectorAll('.message')];
+  rows.slice(0, Math.max(0, rows.length - 8)).forEach(row => row.remove());
+}
+
+function scrollConversationToBottom() {
+  if (conversationPane) {
+    conversationPane.scrollTo({ top: conversationPane.scrollHeight, behavior: 'smooth' });
+  }
+}
+
 function appendUserMessage(text) {
   if (!text?.trim()) return;
   const row = document.createElement('div');
@@ -83,7 +97,8 @@ function appendUserMessage(text) {
   bubble.textContent = text.trim();
   row.appendChild(bubble);
   messages.appendChild(row);
-  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  trimMessages();
+  scrollConversationToBottom();
 }
 
 function createAssistantMessage() {
@@ -99,7 +114,8 @@ function createAssistantMessage() {
   bubble.appendChild(en);
   row.appendChild(bubble);
   messages.appendChild(row);
-  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  trimMessages();
+  scrollConversationToBottom();
   return { row, fr, en };
 }
 
@@ -146,7 +162,11 @@ function sessionInstructions() {
     'Use these personal topics naturally and one at a time; do not recite his profile.',
     'Teach him to get things done with a few natural words rather than to produce perfect formal Dutch.',
     'When a phrase is useful, say it once clearly, give at most one easier or more Flemish alternative, then ask Ulas to use it.',
-    'If he asks in Turkish or English, answer briefly, then return to Flemish/Dutch.',
+    'If Ulas cannot remember a Dutch word and switches to English, understand him normally. Give the short Dutch/Flemish word or phrase he needs, then continue in Dutch.',
+    'If he asks a full question in English, use English only for a very short clarification when needed, then steer him back to Flemish/Dutch.',
+    'Treat English as a temporary bridge, never as the conversation language.',
+    'When useful, invite him to say it again in Flemish: "In het Vlaams kan je zeggen: ... Probeer eens." Keep this very short.',
+    'If he mixes English into a Dutch sentence, respond to the meaning first, supply the missing natural Dutch expression, and continue in Dutch.',
     'Avoid overly formal Netherlands-Dutch wording when a common Belgian Dutch expression would be more natural.',
     modeInstruction()
   ].join(' ');
@@ -223,6 +243,22 @@ async function translateToEnglish(text) {
   }
 }
 
+
+async function schedulePartialTranslation(text) {
+  const clean = (text || '').trim();
+  if (!captionsToggle.checked || clean.length < 6) return;
+
+  const now = Date.now();
+  if (now - lastPartialTranslationAt < 1100) return;
+  lastPartialTranslationAt = now;
+  const seq = ++partialTranslationSeq;
+
+  const en = await translateToEnglish(clean);
+  if (seq === partialTranslationSeq && assistantDraft.trim().startsWith(clean) && en) {
+    subtitleEn.textContent = en;
+  }
+}
+
 async function finalizeAssistantMessage(text) {
   const frText = (text || '').trim();
   if (!frText) return;
@@ -241,14 +277,14 @@ async function finalizeAssistantMessage(text) {
 }
 
 async function initializeSimli() {
-  setStatus('Checking Simli…');
-  avatarBadge.textContent = 'Checking Simli…';
+  setStatus('Preparing avatar…');
+  avatarBadge.textContent = 'PREPARING';
   if (avatarPlaceholderText) avatarPlaceholderText.textContent = 'Checking Simli connection…';
 
   await checkSimliHealth();
 
   setStatus('Connecting avatar…');
-  avatarBadge.textContent = 'Connecting avatar…';
+  avatarBadge.textContent = 'CONNECTING';
   if (avatarPlaceholderText) avatarPlaceholderText.textContent = 'Connecting live avatar…';
 
   const response = await fetch('/simli-session', {
@@ -320,6 +356,7 @@ function handleRealtimeEvent(event) {
     if (!captionsToggle.checked) return;
     assistantDraft += event.delta || '';
     setSubtitle(assistantDraft.trim(), '…');
+    schedulePartialTranslation(assistantDraft.trim());
 
     if (currentAssistantMessage) {
       currentAssistantMessage.fr.textContent = assistantDraft.trim();
@@ -327,6 +364,8 @@ function handleRealtimeEvent(event) {
   }
 
   if (event.type === 'response.output_audio_transcript.done') {
+    partialTranslationSeq += 1;
+    lastPartialTranslationAt = 0;
     const text = (event.transcript || assistantDraft || '').trim();
     assistantDraft = '';
     finalizeAssistantMessage(text);
@@ -423,7 +462,7 @@ async function connect() {
   } catch (error) {
     console.error(error);
     setStatus('Could not connect');
-    avatarBadge.textContent = 'Simli connection failed';
+    avatarBadge.textContent = 'AVATAR OFFLINE';
     if (avatarPlaceholderText) {
       avatarPlaceholderText.textContent = 'Simli could not connect. Check Railway variables and deploy status.';
     }
