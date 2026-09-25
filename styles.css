@@ -1556,3 +1556,402 @@ dialog::backdrop {
     object-position: center 42%;
   }
 }
+
+
+/* ---- Mobile learning layout v15 ---- */
+.difficulty-toggle {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .topbar {
+    height: 56px;
+    padding: 0 11px;
+  }
+
+  .brand-block {
+    min-width: 34px;
+  }
+
+  .brand-block > div:last-child {
+    display: none;
+  }
+
+  .brand-mark {
+    width: 29px;
+    height: 29px;
+    font-size: 15px;
+  }
+
+  .uca-lab-logo {
+    left: 50%;
+    right: auto;
+    top: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .uca-lab-logo img {
+    width: 58px;
+    max-height: 21px;
+  }
+
+  .header-status {
+    margin-left: auto;
+    gap: 6px;
+  }
+
+  .nav-button {
+    padding: 6px 1px;
+    font-size: 9px;
+  }
+
+  .icon-button {
+    padding: 5px 0 5px 2px;
+    font-size: 14px;
+  }
+
+  .status,
+  .text-button {
+    display: none !important;
+  }
+
+  .workspace {
+    height: calc(100dvh - 56px);
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 40%) minmax(0, 60%);
+    grid-template-areas:
+      "avatar"
+      "conversation";
+    overflow: hidden;
+  }
+
+  .avatar-column {
+    grid-area: avatar;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: var(--bg);
+  }
+
+  .portrait-wrap {
+    position: relative;
+    top: auto;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-bottom: 2px solid var(--anthracite);
+  }
+
+  .anam-video {
+    object-fit: cover;
+    object-position: center 38%;
+  }
+
+  .avatar-meta {
+    left: 10px;
+    right: 10px;
+    bottom: 8px;
+  }
+
+  .avatar-badge,
+  .avatar-goal {
+    font-size: 7px;
+  }
+
+  .word-card {
+    left: 10px;
+    right: 10px;
+    bottom: 28px;
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 7px 9px 8px;
+  }
+
+  .word-card-label {
+    margin-bottom: 3px;
+    font-size: 6px;
+  }
+
+  .word-card-nl {
+    font-size: 14px;
+  }
+
+  .word-card-en {
+    font-size: 10px;
+  }
+
+  .conversation-column {
+    grid-area: conversation;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    padding: 0 11px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--paper);
+  }
+
+  .conversation-head {
+    display: none;
+  }
+
+  .live-caption-card {
+    position: relative;
+    top: auto;
+    z-index: 6;
+    flex: 0 0 auto;
+    padding: 10px 0 10px;
+    background: var(--paper);
+    backdrop-filter: none;
+    border-bottom: 0;
+  }
+
+  .live-label {
+    margin: 0 0 6px 33px;
+    padding: 3px 6px;
+    font-size: 7px;
+  }
+
+  .caption-block {
+    grid-template-columns: 25px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .caption-divider {
+    margin: 8px 0;
+  }
+
+  .caption-label {
+    font-size: 7px;
+  }
+
+  .dutch-line {
+    font-size: clamp(19px, 5.4vw, 25px);
+    line-height: 1.17;
+  }
+
+  .english-line {
+    font-size: clamp(13px, 3.75vw, 17px);
+    line-height: 1.2;
+  }
+
+  .spoken-word {
+    transform: scale(1.06);
+  }
+
+  .conversation-separator {
+    flex: 0 0 auto;
+    min-height: 27px;
+    margin: 0 -11px;
+    padding: 0 11px;
+    border-top: 2px solid var(--anthracite);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .conversation-separator::before {
+    width: 12px;
+    height: 3px;
+  }
+
+  .conversation-separator span {
+    font-size: 7px;
+  }
+
+  .messages {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 9px 0 10px;
+    gap: 9px;
+    scrollbar-width: thin;
+  }
+
+  .bubble {
+    max-width: 94%;
+  }
+
+  .assistant-fr {
+    font-size: 13px;
+  }
+
+  .assistant-en,
+  .message.user .bubble {
+    font-size: 11px;
+  }
+
+  .history-empty-inline {
+    font-size: 10px;
+  }
+
+  .controls {
+    position: relative;
+    bottom: auto;
+    z-index: 9;
+    flex: 0 0 auto;
+    margin: 0 -11px;
+    padding: 6px 11px calc(7px + env(safe-area-inset-bottom));
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(255,255,255,.99);
+    border-top: 1px solid var(--line);
+    backdrop-filter: none;
+  }
+
+  .difficulty-control {
+    position: relative;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0;
+  }
+
+  .difficulty-panel {
+    min-width: 210px;
+  }
+
+  .difficulty-head {
+    margin-bottom: 3px;
+  }
+
+  .difficulty-name {
+    font-size: 10px;
+  }
+
+  .difficulty-value {
+    font-size: 17px;
+  }
+
+  .control-label {
+    font-size: 6px;
+  }
+
+  .difficulty-slider {
+    height: 15px;
+  }
+
+  .range-numbers {
+    display: none;
+  }
+
+  .action-row {
+    margin-left: auto;
+    display: flex;
+    gap: 5px;
+  }
+
+  .mic-button,
+  .end-button {
+    flex: 0 0 auto;
+    min-height: 32px;
+    height: 32px;
+    border-radius: 2px;
+    padding: 0 10px;
+    font-size: 10px;
+  }
+
+  .mic-button {
+    min-width: 62px;
+  }
+
+  .end-button {
+    min-width: 42px;
+  }
+
+  #micLabel {
+    font-size: 0;
+  }
+
+  #micLabel::after {
+    content: "Start";
+    font-size: 10px;
+  }
+
+  .mic-button.live #micLabel::after {
+    content: "Live";
+  }
+
+  .mic-icon {
+    font-size: 7px;
+  }
+
+  .hint {
+    display: none;
+  }
+
+  body.conversation-live .difficulty-panel {
+    display: none;
+  }
+
+  body.conversation-live .difficulty-toggle {
+    width: 38px;
+    height: 32px;
+    border: 1px solid var(--line-dark);
+    background: var(--paper);
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 0;
+    font-size: 9px;
+    font-weight: 650;
+  }
+
+  body.conversation-live .difficulty-toggle strong {
+    font-size: 13px;
+    font-weight: 720;
+  }
+
+  body.conversation-live.level-expanded .difficulty-panel {
+    position: absolute;
+    left: 0;
+    bottom: 39px;
+    display: block;
+    width: min(260px, calc(100vw - 24px));
+    min-width: 0;
+    padding: 10px 11px 9px;
+    background: var(--paper);
+    border: 1px solid var(--line-dark);
+    box-shadow: 0 10px 28px rgba(0,0,0,.1);
+  }
+
+  body.conversation-live.level-expanded .difficulty-head {
+    display: flex;
+  }
+
+  body.conversation-live.level-expanded .range-wrap {
+    display: block;
+  }
+}
+
+@media (max-width: 430px) {
+  .workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 40%) minmax(0, 60%);
+  }
+
+  .uca-lab-logo {
+    left: 50%;
+  }
+
+  .uca-lab-logo img {
+    width: 54px;
+  }
+
+  .nav-button {
+    font-size: 8px;
+  }
+
+  .header-status {
+    gap: 4px;
+  }
+
+  .anam-video {
+    object-position: center 36%;
+  }
+}
