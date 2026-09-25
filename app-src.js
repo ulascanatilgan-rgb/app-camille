@@ -166,6 +166,14 @@ function renderLiveDutch(text, activeChunk = '') {
 }
 
 function scrollConversationToBottom() {
+  if (window.matchMedia('(max-width: 760px)').matches && messagesEl) {
+    messagesEl.scrollTo({
+      top: messagesEl.scrollHeight,
+      behavior: 'smooth'
+    });
+    return;
+  }
+
   if (!conversationPane) return;
   conversationPane.scrollTo({
     top: conversationPane.scrollHeight,
@@ -178,12 +186,17 @@ function normalizedRole(role) {
 }
 
 function renderMessages(messages) {
+  const isMobile = window.matchMedia('(max-width: 760px)').matches;
+  const previousTop = messagesEl.scrollTop;
+  const distanceFromBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+  const shouldFollowLatest = !isMobile || distanceFromBottom < 72 || messagesEl.scrollHeight <= messagesEl.clientHeight + 8;
+
   messagesEl.innerHTML = '';
 
   const recent = messages
     .filter(message => message?.content?.trim())
     .filter(message => !(activeSubtitleMessageId && message.id === activeSubtitleMessageId && message.role === 'persona'))
-    .slice(-8);
+    .slice(-60);
 
   if (!recent.length) {
     const empty = document.createElement('div');
@@ -222,7 +235,11 @@ function renderMessages(messages) {
     messagesEl.appendChild(row);
   }
 
-  scrollConversationToBottom();
+  if (shouldFollowLatest) {
+    scrollConversationToBottom();
+  } else if (isMobile) {
+    messagesEl.scrollTop = previousTop;
+  }
 }
 
 async function translateToEnglish(text) {
