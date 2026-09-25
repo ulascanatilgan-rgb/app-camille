@@ -1,4 +1,4 @@
-const CACHE = 'camille-pwa-mobile-v15';
+const CACHE = 'camille-pwa-dialog-v16';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
