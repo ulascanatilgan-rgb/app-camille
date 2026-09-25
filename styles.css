@@ -10,7 +10,9 @@
   --line-dark: #b9b4ab;
   --english: #8a6f56;
   --control: #1d1e1f;
-  --control-text: #ffffff;
+  --control-text: #141414;
+  --yellow: #f0c941;
+  --yellow-deep: #dfb631;
 }
 
 * { box-sizing: border-box; }
@@ -56,6 +58,25 @@ video { display: block; }
   align-items: center;
 }
 
+.uca-lab-logo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  user-select: none;
+}
+
+.uca-lab-logo img {
+  display: block;
+  width: 124px;
+  height: auto;
+  max-height: 34px;
+  object-fit: contain;
+}
+
 .brand-block { gap: 13px; }
 .header-status { gap: 14px; }
 
@@ -88,6 +109,18 @@ video { display: block; }
   font-size: 12px;
   color: var(--muted);
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  background: var(--yellow);
+  border-radius: 50%;
+  flex: 0 0 auto;
 }
 
 .text-button,
@@ -251,6 +284,20 @@ video { display: block; }
   gap: 24px;
 }
 
+.conversation-head .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.conversation-head .eyebrow::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  background: var(--yellow);
+  flex: 0 0 auto;
+}
+
 .conversation-head h1 {
   margin: 7px 0 0;
   font-size: clamp(30px, 4vw, 54px);
@@ -397,6 +444,7 @@ video { display: block; }
   color: var(--paper);
   background: var(--anthracite);
   border-color: var(--anthracite);
+  box-shadow: inset 0 -3px 0 var(--yellow);
 }
 
 .action-row {
@@ -413,8 +461,8 @@ video { display: block; }
 
 .mic-button {
   flex: 1;
-  border: 1px solid var(--control);
-  background: var(--control);
+  border: 1px solid var(--yellow);
+  background: var(--yellow);
   color: var(--control-text);
   display: flex;
   justify-content: center;
@@ -422,8 +470,14 @@ video { display: block; }
   gap: 9px;
 }
 
+.mic-button:hover {
+  background: var(--yellow-deep);
+  border-color: var(--yellow-deep);
+}
+
 .mic-button.live {
-  background: #3a3b3c;
+  background: var(--yellow);
+  border-color: var(--yellow);
 }
 
 .mic-icon {
@@ -528,7 +582,21 @@ dialog::backdrop {
 
   .name { font-size: 15px; }
   .brand-block .eyebrow { display: none; }
-  .status { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+
+  .uca-lab-logo {
+    left: auto;
+    right: 49px;
+    transform: translateY(-50%);
+  }
+
+  .uca-lab-logo img {
+    width: 78px;
+    max-height: 24px;
+  }
+
+  .status {
+    display: none;
+  }
 
   .workspace {
     height: calc(100dvh - 64px);

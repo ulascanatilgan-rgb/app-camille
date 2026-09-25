@@ -1,4 +1,4 @@
-const CACHE = 'camille-pwa-flemish-v8';
+const CACHE = 'camille-pwa-flemish-v10';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -8,7 +8,8 @@ const STATIC_ASSETS = [
   '/icon-192.png',
   '/icon-512.png',
   '/apple-touch-icon.png',
-  '/favicon-64.png'
+  '/favicon-64.png',
+  '/uca-lab-logo.png'
 ];
 
 self.addEventListener('install', event => {
