@@ -22,6 +22,8 @@ const avatarBadge = document.getElementById('avatarBadge');
 const difficultySlider = document.getElementById('difficultySlider');
 const difficultyValue = document.getElementById('difficultyValue');
 const difficultyName = document.getElementById('difficultyName');
+const difficultyToggle = document.getElementById('difficultyToggle');
+const difficultyToggleValue = document.getElementById('difficultyToggleValue');
 
 const historyButton = document.getElementById('historyButton');
 const wordsButton = document.getElementById('wordsButton');
@@ -319,6 +321,7 @@ function updateDifficultyUi() {
   const meta = difficultyMeta[difficulty];
   difficultySlider.value = String(difficulty);
   difficultyValue.textContent = String(difficulty);
+  if (difficultyToggleValue) difficultyToggleValue.textContent = String(difficulty);
   difficultyName.textContent = `${meta.cefr} · ${meta.name}`;
   difficultySlider.style.setProperty('--level-progress', `${((difficulty - 1) / 4) * 100}%`);
 }
@@ -726,6 +729,8 @@ function attachAnamListeners(client) {
   client.addListener(AnamEvent.CONNECTION_ESTABLISHED, () => {
     connected = true;
     connecting = false;
+    document.body.classList.add('conversation-live');
+    document.body.classList.remove('level-expanded');
     micButton.disabled = false;
     micButton.classList.add('live');
     micLabel.textContent = 'Camille connected';
@@ -819,6 +824,8 @@ async function connect() {
     if (!connected) {
       connected = true;
       connecting = false;
+      document.body.classList.add('conversation-live');
+      document.body.classList.remove('level-expanded');
       micButton.disabled = false;
       micButton.classList.add('live');
       micLabel.textContent = 'Camille connected';
@@ -852,6 +859,7 @@ async function connect() {
 function resetUiAfterDisconnect() {
   connected = false;
   connecting = false;
+  document.body.classList.remove('conversation-live', 'level-expanded');
   customLlmMode = false;
   runtimeContextApplied = false;
   lastProcessedUserMessageId = null;
@@ -923,6 +931,11 @@ difficultySlider.addEventListener('change', () => {
   updateDifficultyUi();
   saveCurrentHistory();
   if (connected) pushLearningContext();
+  document.body.classList.remove('level-expanded');
+});
+
+difficultyToggle?.addEventListener('click', () => {
+  document.body.classList.toggle('level-expanded');
 });
 
 historyButton.addEventListener('click', () => {
