@@ -1338,3 +1338,221 @@ dialog::backdrop {
     font-size: 14px;
   }
 }
+
+
+/* ---- Mobile split layout v14: conversation top, avatar bottom ---- */
+@media (max-width: 760px) {
+  body {
+    overflow: hidden;
+  }
+
+  .workspace {
+    height: calc(100dvh - 64px);
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 50%) minmax(0, 50%);
+    grid-template-areas:
+      "conversation"
+      "avatar";
+    background: var(--paper);
+  }
+
+  .conversation-column {
+    grid-area: conversation;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    overflow-y: auto;
+    padding: 10px 14px 0;
+    border-bottom: 2px solid var(--anthracite);
+    background: var(--paper);
+  }
+
+  .avatar-column {
+    grid-area: avatar;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    padding: 0;
+    border-right: 0;
+    border-top: 0;
+    background: var(--bg);
+  }
+
+  .portrait-wrap {
+    position: relative;
+    top: auto;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-top: 1px solid var(--line-dark);
+  }
+
+  .anam-video {
+    object-fit: cover;
+    object-position: center center;
+  }
+
+  .conversation-head {
+    padding: 0 0 8px;
+    margin: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .conversation-head .eyebrow {
+    display: none;
+  }
+
+  .conversation-head h1 {
+    margin: 0;
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .conversation-head p {
+    display: none;
+  }
+
+  .live-caption-card {
+    position: relative;
+    top: auto;
+    padding: 10px 0 10px;
+    backdrop-filter: none;
+    background: var(--paper);
+  }
+
+  .live-label {
+    margin: 0 0 7px 33px;
+    padding: 3px 6px;
+  }
+
+  .caption-block {
+    grid-template-columns: 25px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .caption-divider {
+    margin: 9px 0;
+  }
+
+  .dutch-line {
+    font-size: clamp(18px, 5.3vw, 24px);
+    line-height: 1.18;
+  }
+
+  .english-line {
+    font-size: clamp(13px, 3.8vw, 17px);
+    line-height: 1.22;
+  }
+
+  .conversation-separator {
+    min-height: 28px;
+    margin: 0 -14px;
+    padding: 0 14px;
+  }
+
+  .messages {
+    flex: 0 0 auto;
+    padding: 10px 0 12px;
+    gap: 9px;
+  }
+
+  .assistant-fr {
+    font-size: 13px;
+  }
+
+  .assistant-en,
+  .message.user .bubble {
+    font-size: 11px;
+  }
+
+  .controls {
+    position: sticky;
+    bottom: 0;
+    margin: 0 -14px;
+    padding: 8px 14px calc(9px + env(safe-area-inset-bottom));
+    background: rgba(255,255,255,.98);
+  }
+
+  .difficulty-control {
+    margin-bottom: 7px;
+  }
+
+  .difficulty-head {
+    margin-bottom: 2px;
+  }
+
+  .difficulty-value {
+    font-size: 18px;
+  }
+
+  .difficulty-slider {
+    height: 16px;
+  }
+
+  .range-numbers {
+    display: none;
+  }
+
+  .action-row {
+    gap: 6px;
+  }
+
+  .mic-button,
+  .end-button {
+    min-height: 38px;
+    font-size: 11px;
+  }
+
+  .hint {
+    display: none;
+  }
+
+  .word-card {
+    left: 12px;
+    right: 12px;
+    bottom: 34px;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+
+  .avatar-meta {
+    left: 12px;
+    right: 12px;
+    bottom: 10px;
+  }
+
+  .avatar-goal {
+    display: inline;
+  }
+}
+
+@media (max-width: 430px) {
+  .workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 50%) minmax(0, 50%);
+  }
+
+  .conversation-column {
+    padding-left: 11px;
+    padding-right: 11px;
+  }
+
+  .conversation-separator {
+    margin-left: -11px;
+    margin-right: -11px;
+    padding-left: 11px;
+    padding-right: 11px;
+  }
+
+  .controls {
+    margin-left: -11px;
+    margin-right: -11px;
+    padding-left: 11px;
+    padding-right: 11px;
+  }
+
+  .anam-video {
+    object-position: center 42%;
+  }
+}
