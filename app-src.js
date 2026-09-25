@@ -59,7 +59,9 @@ let runtimeContextApplied = false;
 
 const streamBuffers = new Map();
 const vocabProcessedIds = new Set();
+const vocabSentenceCounts = new Map();
 const translationByMessageId = new Map();
+let vocabQueue = Promise.resolve();
 
 let learnedWords = loadJson(WORDS_KEY, []);
 let difficulty = clampLevel(Number(localStorage.getItem(LEVEL_KEY) || 2));
@@ -491,9 +493,9 @@ function showWordCard(word) {
   requestAnimationFrame(() => wordCard.classList.add('word-pop'));
 }
 
-async function captureVocabulary(text, messageId) {
-  if (!text?.trim() || !messageId || vocabProcessedIds.has(messageId)) return;
-  vocabProcessedIds.add(messageId);
+async function captureVocabulary(text, vocabularyId) {
+  if (!text?.trim() || !vocabularyId || vocabProcessedIds.has(vocabularyId)) return;
+  vocabProcessedIds.add(vocabularyId);
 
   const knownWords = learnedWords.map(item => item.nl).slice(-120);
 
@@ -528,6 +530,42 @@ async function captureVocabulary(text, messageId) {
     showWordCard(learned);
   } catch (error) {
     console.warn('Vocabulary capture failed:', error);
+  }
+}
+
+function completedSentences(text, includeRemainder = false) {
+  const clean = String(text || '').trim();
+  if (!clean) return [];
+
+  const completed = clean.match(/[^.!?]+[.!?]+/g) || [];
+  const consumed = completed.join('').length;
+  const remainder = clean.slice(consumed).trim();
+
+  if (includeRemainder && remainder) completed.push(remainder);
+  return completed.map(sentence => sentence.trim()).filter(Boolean);
+}
+
+function processVocabularyProgress(messageId, text, endOfSpeech = false) {
+  if (!messageId || !text?.trim()) return;
+
+  const sentences = completedSentences(text, endOfSpeech);
+  const alreadyQueued = vocabSentenceCounts.get(messageId) || 0;
+
+  if (sentences.length <= alreadyQueued) return;
+
+  for (let index = alreadyQueued; index < sentences.length; index += 1) {
+    const sentence = sentences[index];
+    const vocabularyId = `${messageId}:sentence:${index}`;
+
+    vocabQueue = vocabQueue
+      .then(() => captureVocabulary(sentence, vocabularyId))
+      .catch(error => console.warn('Vocabulary queue failed:', error));
+  }
+
+  vocabSentenceCounts.set(messageId, sentences.length);
+
+  if (endOfSpeech) {
+    setTimeout(() => vocabSentenceCounts.delete(messageId), 15000);
   }
 }
 
@@ -654,16 +692,21 @@ function handleStreamEvent(event) {
   streamBuffers.set(event.id, next);
 
   if (event.role === 'persona') {
+    const isNewMessage = activeSubtitleMessageId !== event.id;
     activeSubtitleMessageId = event.id;
+
+    if (isNewMessage) {
+      partialTranslationSeq += 1;
+      lastPartialTranslationAt = 0;
+      if (captionsToggle.checked) subtitleEn.textContent = '…';
+    }
 
     if (captionsToggle.checked) {
       renderLiveDutch(next.trim(), event.content);
-      if (!subtitleEn.textContent || subtitleEn.textContent === '…') {
-        subtitleEn.textContent = '…';
-      }
       schedulePartialTranslation(next, event.id);
     }
 
+    processVocabularyProgress(event.id, next, event.endOfSpeech);
     renderMessages(currentMessages);
 
     if (event.endOfSpeech) {
@@ -671,7 +714,6 @@ function handleStreamEvent(event) {
       partialTranslationSeq += 1;
       lastPartialTranslationAt = 0;
       finalizeSubtitle(next, event.id);
-      captureVocabulary(next, event.id);
     }
   }
 
@@ -786,6 +828,7 @@ async function connect() {
     }
 
     beginHistorySession();
+    saveCurrentHistory();
     setTimeout(pushLearningContext, 180);
 
     if (customLlmMode) {
