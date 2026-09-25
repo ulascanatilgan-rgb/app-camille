@@ -65,33 +65,17 @@ video { display: block; }
   transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
-  gap: 4px;
-  color: var(--ink);
-  white-space: nowrap;
   pointer-events: none;
   user-select: none;
 }
 
-.uca-arrow {
-  width: 19px;
-  height: 19px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.4;
-  stroke-linecap: square;
-  stroke-linejoin: miter;
-  margin-right: 2px;
+.uca-lab-logo img {
+  display: block;
+  width: 124px;
+  height: auto;
+  max-height: 34px;
+  object-fit: contain;
 }
-
-.uca-main,
-.uca-lab {
-  font-size: 19px;
-  line-height: 1;
-  letter-spacing: -.055em;
-}
-
-.uca-main { font-weight: 800; }
-.uca-lab { font-weight: 500; }
 
 .brand-block { gap: 13px; }
 .header-status { gap: 14px; }
@@ -601,20 +585,13 @@ dialog::backdrop {
 
   .uca-lab-logo {
     left: auto;
-    right: 52px;
+    right: 49px;
     transform: translateY(-50%);
-    gap: 2px;
   }
 
-  .uca-arrow {
-    width: 14px;
-    height: 14px;
-    margin-right: 1px;
-  }
-
-  .uca-main,
-  .uca-lab {
-    font-size: 13px;
+  .uca-lab-logo img {
+    width: 78px;
+    max-height: 24px;
   }
 
   .status {
