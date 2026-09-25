@@ -326,7 +326,8 @@ async function connect() {
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.sessionToken) {
-      throw new Error(data.error || 'Could not create Anam session.');
+      const detail = data.anamMessage ? `${data.error || 'Anam error'} — ${data.anamMessage}` : (data.error || 'Could not create Anam session.');
+      throw new Error(detail);
     }
 
     customLlmMode = data.mode === 'custom-llm';
@@ -365,7 +366,8 @@ async function connect() {
     micLabel.textContent = 'Try again';
     endButton.disabled = true;
     avatarBadge.textContent = 'AVATAR OFFLINE';
-    avatarPlaceholderText.textContent = 'Camille could not connect to Anam.';
+    const message = String(error?.message || 'Camille could not connect to Anam.').slice(0, 180);
+    avatarPlaceholderText.textContent = message;
     setStatus('Could not connect');
   }
 }

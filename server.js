@@ -189,68 +189,38 @@ async function requestAnamSessionToken(apiKey, personaConfig) {
 }
 
 async function buildAnamSession(apiKey, personaId) {
-  const published = await resolvePublishedPersona(apiKey, personaId);
-
-  if (published?.avatarId && published?.voiceId) {
-    const sessionToken = await requestAnamSessionToken(apiKey, {
-      name: published.name || 'Camille',
-      avatarId: published.avatarId,
-      voiceId: published.voiceId,
-      llmId: 'CUSTOMER_CLIENT_V1',
-      languageCode: 'nl-BE',
-      directorNotes: {
-        customStylePrompt: 'Calm, composed, attentive, natural eye contact, subtle facial movement, understated confidence.',
-        expressivity: 0.28
-      }
-    });
-
-    return {
-      sessionToken,
-      mode: 'custom-llm',
-      source: 'published-persona-resolved'
-    };
-  }
-
-  try {
-    const sessionToken = await requestAnamSessionToken(apiKey, {
-      personaId,
-      llmId: 'CUSTOMER_CLIENT_V1'
-    });
-
-    return {
-      sessionToken,
-      mode: 'custom-llm',
-      source: 'published-persona-override'
-    };
-  } catch (error) {
-    console.warn('Anam persona custom-LLM override was not accepted:', error?.message || error);
-  }
-
-  if (process.env.ANAM_VOICE_ID) {
-    try {
-      const sessionToken = await requestAnamSessionToken(apiKey, {
-        name: 'Camille',
-        avatarId: personaId,
-        voiceId: process.env.ANAM_VOICE_ID,
-        llmId: 'CUSTOMER_CLIENT_V1',
-        languageCode: 'nl-BE'
-      });
-
-      return {
-        sessionToken,
-        mode: 'custom-llm',
-        source: 'avatar-id-with-voice-env'
-      };
-    } catch (error) {
-      console.warn('Anam avatar-id fallback was not accepted:', error?.message || error);
-    }
-  }
-
+  // The ID supplied by Ulas is a published Anam Persona ID.
+  // Use the official published-persona flow first: personaConfig: { personaId }.
   const sessionToken = await requestAnamSessionToken(apiKey, { personaId });
+
   return {
     sessionToken,
     mode: 'published-persona',
-    source: 'published-persona-default'
+    source: 'published-persona-id'
+  };
+}
+
+function safeAnamError(error) {
+  let message = 'Unknown Anam error';
+
+  if (typeof error?.detail === 'string' && error.detail.trim()) {
+    try {
+      const parsed = JSON.parse(error.detail);
+      message =
+        parsed?.message ||
+        parsed?.error ||
+        parsed?.detail ||
+        message;
+    } catch {
+      message = error.detail.slice(0, 300);
+    }
+  } else if (error?.message) {
+    message = error.message;
+  }
+
+  return {
+    status: Number(error?.status) || 500,
+    message: String(message).slice(0, 300)
   };
 }
 
@@ -269,9 +239,12 @@ app.post('/anam-session', async (_req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     return res.json(session);
   } catch (error) {
+    const safe = safeAnamError(error);
     console.error('Anam session error:', error?.detail || error);
-    return res.status(error?.status || 500).json({
-      error: 'Could not create the Anam session.'
+    return res.status(safe.status).json({
+      error: 'Could not create the Anam session.',
+      anamStatus: safe.status,
+      anamMessage: safe.message
     });
   }
 });
@@ -284,27 +257,33 @@ app.get('/anam-health', async (_req, res) => {
     return res.status(500).json({
       ok: false,
       configured: false,
-      apiKey: Boolean(apiKey),
-      personaId: Boolean(personaId)
+      apiKeyConfigured: Boolean(apiKey),
+      personaIdConfigured: Boolean(personaId)
     });
   }
 
   try {
-    const published = await resolvePublishedPersona(apiKey, personaId);
+    // This performs the same official token request the app uses,
+    // but never returns the token itself.
+    await requestAnamSessionToken(apiKey, { personaId });
+
     return res.json({
       ok: true,
       configured: true,
-      personaResolved: Boolean(published),
-      avatarResolved: Boolean(published?.avatarId),
-      voiceResolved: Boolean(published?.voiceId),
-      customLlmReady: Boolean(published?.avatarId && published?.voiceId)
+      personaIdAccepted: true,
+      sessionTokenReady: true
     });
   } catch (error) {
-    console.error('Anam health error:', error);
-    return res.status(502).json({
+    const safe = safeAnamError(error);
+    console.error('Anam health token error:', error?.detail || error);
+
+    return res.status(safe.status).json({
       ok: false,
       configured: true,
-      apiReachable: false
+      personaIdAccepted: safe.status !== 400 && safe.status !== 404,
+      sessionTokenReady: false,
+      anamStatus: safe.status,
+      anamMessage: safe.message
     });
   }
 });
