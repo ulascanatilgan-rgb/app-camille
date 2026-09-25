@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#0d0d0f" />
+  <meta name="theme-color" content="#f4f2ed" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Camille" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -17,71 +17,91 @@
 <body>
   <main class="app-shell">
     <header class="topbar">
-      <div class="identity">
-        <div class="mini-avatar">C</div>
+      <div class="brand-block">
+        <div class="brand-mark">C</div>
         <div>
-          <div class="name">Camille - Flemish Agent for Ulas Atilgan</div>
-          <div id="status" class="status">Ready</div>
+          <div class="eyebrow">FLEMISH CONVERSATION</div>
+          <div class="name">Camille</div>
         </div>
       </div>
-      <div class="top-actions">
-        <button id="installButton" class="install-button" hidden>Install</button>
+
+      <div class="header-status">
+        <span id="status" class="status">Ready</span>
+        <button id="installButton" class="text-button" hidden>Install</button>
         <button id="settingsButton" class="icon-button" aria-label="Settings">•••</button>
       </div>
     </header>
 
-    <section class="stage-card">
-      <div id="portraitWrap" class="portrait-wrap">
-        <div id="avatarPlaceholder" class="avatar-placeholder">
-          <div class="placeholder-monogram">C</div>
-          <div id="avatarPlaceholderText" class="placeholder-text">Camille's live avatar will appear here.</div>
-        </div>
-        <video id="simliVideo" class="simli-video" autoplay playsinline muted></video>
-        <audio id="simliAudio" autoplay></audio>
-        <div class="stage-vignette"></div>
-        <div id="voiceRing" class="voice-ring"></div>
-        <div id="avatarBadge" class="avatar-badge">Simli Live Avatar · v6</div>
-
-        <div id="subtitlePanel" class="subtitle-panel">
-          <div class="caption-row fr-row">
-            <span class="lang-pill fr-pill">VL</span>
-            <div id="subtitleFr" class="subtitle-line fr-line">Hey Ulas. Hoe is 't vandaag?</div>
+    <section class="workspace">
+      <section class="avatar-column" aria-label="Camille live avatar">
+        <div id="portraitWrap" class="portrait-wrap">
+          <div id="avatarPlaceholder" class="avatar-placeholder">
+            <div class="placeholder-monogram">C</div>
+            <div id="avatarPlaceholderText" class="placeholder-text">Camille's live avatar will appear here.</div>
           </div>
-          <div class="caption-row en-row">
-            <span class="lang-pill en-pill">EN</span>
-            <div id="subtitleEn" class="subtitle-line en-line">Hey Ulas. How are you today?</div>
+
+          <video id="simliVideo" class="simli-video" autoplay playsinline muted></video>
+          <audio id="simliAudio" autoplay></audio>
+          <div class="stage-vignette"></div>
+          <div id="voiceRing" class="voice-ring"></div>
+
+          <div class="avatar-meta">
+            <span id="avatarBadge" class="avatar-badge">Live avatar</span>
+            <span class="avatar-goal">6 months · Flanders</span>
           </div>
         </div>
-      </div>
-      <div class="stage-copy">
-        <h1>Talk with Camille</h1>
-        <p id="subtitle">Practical Flemish for Flanders. Short, natural conversations and brief corrections.</p>
-      </div>
-    </section>
+      </section>
 
-    <section id="messages" class="messages" aria-live="polite"></section>
+      <section id="conversationPane" class="conversation-column">
+        <div class="conversation-head">
+          <div>
+            <div class="eyebrow">PRACTICAL FLEMISH</div>
+            <h1>Praat gewoon.</h1>
+          </div>
+          <p>Short, useful Flemish for daily life, work and business.</p>
+        </div>
 
-    <section class="controls">
-      <div class="mode-row">
-        <button class="mode active" data-mode="natural">Practical</button>
-        <button class="mode" data-mode="tutor">Coach</button>
-        <button class="mode" data-mode="slow">Extra slow</button>
-      </div>
+        <section id="subtitlePanel" class="live-caption-card" aria-live="polite">
+          <div class="caption-block">
+            <div class="caption-label dutch-label">NL</div>
+            <div id="subtitleFr" class="subtitle-line dutch-line">Hey Ulas. Hoe is 't vandaag?</div>
+          </div>
 
-      <div class="action-row">
-        <button id="micButton" class="mic-button" aria-label="Start conversation">
-          <span class="mic-icon">◉</span>
-          <span id="micLabel">Start conversation</span>
-        </button>
-        <button id="endButton" class="end-button" disabled>End</button>
-      </div>
-      <div class="hint">Press start. Camille will start a practical Flemish conversation.</div>
+          <div class="caption-divider"></div>
+
+          <div class="caption-block">
+            <div class="caption-label english-label">EN</div>
+            <div id="subtitleEn" class="subtitle-line english-line">Hey Ulas. How are you today?</div>
+          </div>
+        </section>
+
+        <section id="messages" class="messages" aria-live="polite"></section>
+
+        <section class="controls">
+          <div class="mode-row">
+            <button class="mode active" data-mode="natural">Practical</button>
+            <button class="mode" data-mode="tutor">Coach</button>
+            <button class="mode" data-mode="slow">Extra slow</button>
+          </div>
+
+          <div class="action-row">
+            <button id="micButton" class="mic-button" aria-label="Start conversation">
+              <span class="mic-icon">●</span>
+              <span id="micLabel">Start conversation</span>
+            </button>
+            <button id="endButton" class="end-button" disabled>End</button>
+          </div>
+
+          <div class="hint">English is fine when you're stuck. Camille will guide you back to Flemish.</div>
+        </section>
+      </section>
     </section>
   </main>
 
   <dialog id="installDialog">
     <div class="settings-card install-card">
-      <h2>Install Camille on your phone</h2>
+      <div class="eyebrow">INSTALL</div>
+      <h2>Camille on your phone</h2>
       <div id="iosInstallHelp" class="install-help">
         <p><strong>iPhone / iPad:</strong></p>
         <p>In Safari: Share → <strong>Add to Home Screen</strong> → Add.</p>
@@ -95,6 +115,7 @@
 
   <dialog id="settingsDialog">
     <form method="dialog" class="settings-card">
+      <div class="eyebrow">SETTINGS</div>
       <h2>Camille</h2>
       <label>
         Correction level
