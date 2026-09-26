@@ -289,7 +289,7 @@ function renderMessages(messages) {
     .filter(message => message?.content?.trim())
     .filter(message => !(activeSubtitleMessageId && message.id === activeSubtitleMessageId && message.role === 'persona'))
     .filter(message => !(pinnedUserMessageId && message.id === pinnedUserMessageId && message.role === 'user'))
-    .slice(-60);
+    .slice(-8);
 
   if (!recent.length) {
     const empty = document.createElement('div');
@@ -392,7 +392,7 @@ function buildRuntimeContext() {
 
   const levelRules = {
     1: 'Use very easy A1 Dutch. Speak slowly. Aim for 6–10 words total.',
-    2: 'Use easy A2 practical Flemish. Speak noticeably slower than normal. Aim for 10–14 words total.',
+    2: 'Use only very common A1–A2 practical Flemish. Avoid rare words, idioms and long compounds. Speak slowly. Aim for 8–12 words total.',
     3: 'Use practical B1 Dutch. Speak calmly and clearly. Aim for 12–16 words total.',
     4: 'Use natural B2 Flemish. Speak clearly at a calm natural pace. Aim for 14–18 words total.',
     5: 'Use advanced natural Flemish, but stay concise. Never exceed 20 words total.'
@@ -409,10 +409,10 @@ function buildRuntimeContext() {
     'When Ulas switches to English because he does not know a Dutch word or sentence, understand him and immediately give the short natural Dutch/Flemish expression.',
     'If he asks in English how to say something, answer with the Dutch phrase directly and invite him to try it.',
     'Use English only as a very short bridge, then return to Dutch.',
-    'Use simple, high-frequency Belgian Dutch/Flemish.',
+    'Use only simple, high-frequency Belgian Dutch/Flemish. Prefer the easiest common word over a more precise or advanced synonym.',
     'Prioritize common verbs and patterns such as gaan, komen, doen, maken, willen, kunnen, moeten, mogen, hebben, zijn, weten, zoeken, nemen, krijgen and vragen.',
     'Practice questions and negatives naturally: Kan ik...?, Mag ik...?, Wil je...?, Ik wil..., Ik kan niet..., Ik heb geen..., Waar is...?, Hoe kan ik...?, Wat moet ik...?',
-    'Do not lecture about grammar. Give one practical phrase and let Ulas use it.',
+    'Keep one idea per reply. Do not lecture about grammar. Give one practical phrase and let Ulas use it.',
     'Actively guide him with short real-life scenarios: doctor, pharmacy, café, restaurant, supermarket, neighbour, delivery, tradesperson, phone call, appointment, municipality, work, train, parking, police or traffic stop.',
     'For a scenario, give the exact short phrase he could say there, then ask him to repeat or answer.',
     'If he is stuck, give him the beginning of the sentence so he can finish it.',
@@ -902,8 +902,10 @@ function attachAnamListeners(client) {
     setStatus('Listening…');
     voiceRing.classList.add('active');
     successBalloon?.classList.add('listening');
-    activeSubtitleMessageId = null;
-    setSubtitle('…', '');
+
+    // Keep Camille's last complete sentence visible while Ulas is speaking.
+    // The user's live transcript appears separately in the pinned YOU line.
+    setLastUserPin(lastUserPinText.textContent || 'Listening…', pinnedUserMessageId);
     renderMessages(currentMessages);
 
     if (isResponding) {
@@ -921,7 +923,7 @@ function attachAnamListeners(client) {
     if (connected) {
       try {
         anamClient?.addContext(
-          'NEXT REPLY RULE: maximum 20 spoken words total, maximum 3 short sentences. Prefer 1–2 sentences. Keep it simple, slow and conversational.'
+          'NEXT REPLY RULE: maximum 20 spoken words total, preferably 8–12 at level 2. Use only very common A1–A2 words. One idea at a time. No difficult synonyms or idioms.'
         );
       } catch {}
     }
