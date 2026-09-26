@@ -84,34 +84,32 @@
           <p>Short, useful Flemish for daily life, work and business.</p>
         </div>
 
-        <section id="subtitlePanel" class="live-caption-card" aria-live="polite">
-          <div class="live-label">CAMILLE · LAST / NOW</div>
+        <section id="subtitlePanel" class="live-exchange-card" aria-live="polite">
+          <div class="live-exchange-label">LIVE CONVERSATION</div>
 
-          <div class="caption-block">
-            <div class="caption-label dutch-label">NL</div>
-            <div id="subtitleNl" class="subtitle-line dutch-line">Hey Ulas. Hoe is 't vandaag?</div>
+          <div class="live-speaker live-camille">
+            <div class="live-speaker-label">CAMILLE</div>
+            <div class="live-speaker-body">
+              <div id="subtitleNl" class="subtitle-line dutch-line">Hey Ulas. Hoe is 't vandaag?</div>
+              <div id="subtitleEn" class="subtitle-line english-line">Hey Ulas. How are you today?</div>
+            </div>
           </div>
 
-          <div class="caption-divider"></div>
-
-          <div class="caption-block">
-            <div class="caption-label english-label">EN</div>
-            <div id="subtitleEn" class="subtitle-line english-line">Hey Ulas. How are you today?</div>
+          <div id="lastUserPin" class="live-speaker live-user" hidden aria-live="polite">
+            <div class="live-speaker-label">YOU</div>
+            <div id="lastUserPinText" class="last-user-text"></div>
           </div>
         </section>
 
-        <div id="lastUserPin" class="last-user-pin" hidden aria-live="polite">
-          <span class="last-user-label">YOU · LIVE</span>
-          <div id="lastUserPinText" class="last-user-text"></div>
-        </div>
+        <div class="history-zone">
+          <div class="conversation-separator">
+            <span>HISTORY</span>
+          </div>
 
-        <div class="conversation-separator">
-          <span>RECENT TURNS</span>
+          <section id="messages" class="messages" aria-live="polite">
+            <div class="history-empty-inline">Previous turns will appear here.</div>
+          </section>
         </div>
-
-        <section id="messages" class="messages" aria-live="polite">
-          <div class="history-empty-inline">Previous turns will appear here.</div>
-        </section>
 
         <section class="controls">
           <div class="difficulty-control">
