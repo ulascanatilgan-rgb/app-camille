@@ -44,6 +44,8 @@ const lastUserPinText = document.getElementById('lastUserPinText');
 const successBalloon = document.getElementById('successBalloon');
 const avatarToggle = document.getElementById('avatarToggle');
 const avatarToggleLabel = document.getElementById('avatarToggleLabel');
+const textModeForm = document.getElementById('textModeForm');
+const textModeInput = document.getElementById('textModeInput');
 
 const HISTORY_KEY = 'camille.history.v2';
 const WORDS_KEY = 'camille.words.v2';
@@ -1170,6 +1172,12 @@ async function connect() {
     });
 
     const data = await response.json().catch(() => ({}));
+
+    if (!avatarEnabled) {
+      connecting = false;
+      return;
+    }
+
     if (!response.ok || !data.sessionToken) {
       const detail = data.anamMessage
         ? `${data.error || 'Anam error'} — ${data.anamMessage}`
@@ -1323,6 +1331,17 @@ avatarToggle?.addEventListener('click', async () => {
   }
 
   updateAvatarToggleUi();
+});
+
+textModeForm?.addEventListener('submit', event => {
+  event.preventDefault();
+  if (!textModeActive || isResponding) return;
+
+  const text = textModeInput?.value?.trim() || '';
+  if (!text) return;
+
+  textModeInput.value = '';
+  sendTextModeTurn(text);
 });
 
 endButton.addEventListener('click', disconnect);
