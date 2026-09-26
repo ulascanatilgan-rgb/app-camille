@@ -2499,3 +2499,64 @@ body.avatar-disabled .placeholder-text {
     font-size: 10px;
   }
 }
+
+
+.text-mode-form {
+  display: none;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+body.avatar-disabled .text-mode-form {
+  display: grid;
+}
+
+.text-mode-form input {
+  min-width: 0;
+  min-height: 42px;
+  border: 1px solid var(--line-dark);
+  background: #fff;
+  color: var(--ink);
+  padding: 9px 11px;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.text-mode-form input:focus {
+  border-color: var(--anthracite);
+  box-shadow: inset 0 -2px 0 var(--yellow);
+}
+
+.text-mode-form button {
+  min-height: 42px;
+  border: 1px solid var(--anthracite);
+  background: var(--anthracite);
+  color: #fff;
+  padding: 0 16px;
+  font-weight: 650;
+}
+
+body.avatar-disabled .mic-button {
+  border-color: #d5d2ca;
+  background: #eeece7;
+  color: var(--ink);
+}
+
+@media (max-width: 760px) {
+  .text-mode-form {
+    gap: 5px;
+    margin-bottom: 7px;
+  }
+
+  .text-mode-form input,
+  .text-mode-form button {
+    min-height: 34px;
+    font-size: 11px;
+  }
+
+  .text-mode-form button {
+    padding: 0 10px;
+  }
+}
