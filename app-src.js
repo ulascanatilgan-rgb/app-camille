@@ -42,6 +42,8 @@ const wordEn = document.getElementById('wordEn');
 const lastUserPin = document.getElementById('lastUserPin');
 const lastUserPinText = document.getElementById('lastUserPinText');
 const successBalloon = document.getElementById('successBalloon');
+const avatarToggle = document.getElementById('avatarToggle');
+const avatarToggleLabel = document.getElementById('avatarToggleLabel');
 
 const HISTORY_KEY = 'camille.history.v2';
 const WORDS_KEY = 'camille.words.v2';
@@ -63,6 +65,11 @@ let currentHistorySessionId = null;
 let runtimeContextApplied = false;
 let pinnedUserMessageId = null;
 let popAudioContext = null;
+let avatarEnabled = localStorage.getItem('camille.avatarEnabled.v1') !== 'false';
+let textModeActive = false;
+let webRecognition = null;
+let textModeListening = false;
+let textModeTurnId = 0;
 
 const streamBuffers = new Map();
 const vocabProcessedIds = new Set();
@@ -106,6 +113,196 @@ function saveJson(key, value) {
 
 function clampLevel(value) {
   return Math.max(1, Math.min(5, Number(value) || 2));
+}
+
+function updateAvatarToggleUi() {
+  avatarToggle?.setAttribute('aria-pressed', avatarEnabled ? 'true' : 'false');
+  if (avatarToggleLabel) avatarToggleLabel.textContent = avatarEnabled ? 'Avatar ON' : 'Avatar OFF';
+  document.body.classList.toggle('avatar-disabled', !avatarEnabled);
+
+  if (!avatarEnabled) {
+    avatarBadge.textContent = 'AVATAR OFF';
+    avatarPlaceholderText.textContent = 'Avatar off — voice + text mode. No Anam session.';
+    avatarPlaceholder.classList.remove('hidden');
+    avatarVideo.classList.remove('visible');
+  } else if (!connected) {
+    avatarBadge.textContent = 'LIVE AVATAR';
+    avatarPlaceholderText.textContent = "Camille's Anam avatar will appear here.";
+  }
+}
+
+function createWebRecognition() {
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Recognition) return null;
+
+  const recognition = new Recognition();
+  recognition.lang = 'nl-BE';
+  recognition.continuous = false;
+  recognition.interimResults = true;
+
+  recognition.onstart = () => {
+    textModeListening = true;
+    setStatus('Listening…');
+    voiceRing.classList.add('active');
+    successBalloon?.classList.add('listening');
+    if (!lastUserPinText.textContent.trim()) {
+      lastUserPinText.textContent = 'Listening…';
+      lastUserPin.hidden = false;
+    }
+  };
+
+  recognition.onresult = event => {
+    let interim = '';
+    let finalText = '';
+
+    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      const piece = event.results[i][0]?.transcript || '';
+      if (event.results[i].isFinal) finalText += piece;
+      else interim += piece;
+    }
+
+    const liveText = (finalText || interim).trim();
+    if (liveText) setLastUserPin(liveText, `local-user-${textModeTurnId}`);
+
+    if (finalText.trim()) {
+      webRecognition?.stop();
+      sendTextModeTurn(finalText.trim());
+    }
+  };
+
+  recognition.onerror = event => {
+    textModeListening = false;
+    voiceRing.classList.remove('active');
+    successBalloon?.classList.remove('listening');
+    if (event.error === 'not-allowed') setStatus('Microphone permission needed');
+    else setStatus('Ready — tap Start');
+  };
+
+  recognition.onend = () => {
+    textModeListening = false;
+    voiceRing.classList.remove('active');
+    successBalloon?.classList.remove('listening');
+    if (textModeActive && !isResponding) setStatus('Ready — tap Start');
+  };
+
+  return recognition;
+}
+
+function speakTextMode(text) {
+  if (!('speechSynthesis' in window) || !text?.trim()) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'nl-BE';
+  utterance.rate = 0.9;
+  utterance.pitch = 0.95;
+  window.speechSynthesis.speak(utterance);
+}
+
+async function sendTextModeTurn(userText) {
+  if (!userText || isResponding) return;
+
+  celebrateUserTurn();
+  const userId = `local-user-${++textModeTurnId}`;
+  pinnedUserMessageId = userId;
+  setLastUserPin(userText, userId);
+
+  const prior = currentMessages.filter(m => m?.content?.trim());
+  currentMessages = [...prior, { id: userId, role: 'user', content: userText }];
+  saveCurrentHistory();
+  renderMessages(currentMessages);
+
+  isResponding = true;
+  setStatus('Camille denkt…');
+  activeChatAbort = new AbortController();
+
+  const personaId = `local-persona-${textModeTurnId}`;
+  activeSubtitleMessageId = personaId;
+  let full = '';
+
+  try {
+    const response = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: activeChatAbort.signal,
+      body: JSON.stringify({
+        messages: currentMessages,
+        kickoff: false,
+        difficulty,
+        correctionLevel: correctionLevel.value || 'medium'
+      })
+    });
+
+    if (!response.ok || !response.body) throw new Error(await response.text());
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      full += decoder.decode(value, { stream: true });
+      const limited = limitCamilleReply(full);
+      renderLiveDutch(limited.text, '');
+      schedulePartialTranslation(limited.text, personaId);
+    }
+
+    full = limitCamilleReply(full).text;
+    const english = await translateToEnglish(full);
+    if (english) translationByMessageId.set(personaId, english);
+    setSubtitle(full, english);
+
+    currentMessages = [...currentMessages, { id: personaId, role: 'persona', content: full }];
+    saveCurrentHistory();
+    renderMessages(currentMessages);
+    processVocabularyProgress(personaId, full, true);
+    speakTextMode(full);
+  } catch (error) {
+    if (error?.name !== 'AbortError') {
+      console.error('Text mode response error:', error);
+      setStatus('Response error');
+    }
+  } finally {
+    activeChatAbort = null;
+    isResponding = false;
+    if (textModeActive) setStatus('Ready — tap Start');
+  }
+}
+
+function startTextMode() {
+  textModeActive = true;
+  connected = true;
+  customLlmMode = false;
+  document.body.classList.add('conversation-live', 'avatar-disabled');
+  micButton.disabled = false;
+  micButton.classList.remove('live');
+  micLabel.textContent = 'Speak';
+  endButton.disabled = false;
+  avatarBadge.textContent = 'AVATAR OFF';
+  avatarPlaceholderText.textContent = 'Avatar off — voice + text mode. No Anam session.';
+  avatarPlaceholder.classList.remove('hidden');
+  avatarVideo.classList.remove('visible');
+  if (!webRecognition) webRecognition = createWebRecognition();
+  beginHistorySession();
+  setStatus(webRecognition ? 'Ready — tap Speak' : 'Voice input not supported in this browser');
+}
+
+async function stopAnamOnly() {
+  try { await anamClient?.stopStreaming(); } catch {}
+  anamClient = null;
+  connected = false;
+  connecting = false;
+  runtimeContextApplied = false;
+  avatarVideo.srcObject = null;
+  setAvatarLive(false);
+}
+
+function stopTextMode() {
+  try { webRecognition?.stop(); } catch {}
+  try { window.speechSynthesis?.cancel(); } catch {}
+  textModeActive = false;
+  textModeListening = false;
+  connected = false;
+  voiceRing.classList.remove('active');
 }
 
 function setStatus(text) {
@@ -950,6 +1147,11 @@ function attachAnamListeners(client) {
 async function connect() {
   if (connected || connecting) return;
 
+  if (!avatarEnabled) {
+    startTextMode();
+    return;
+  }
+
   connecting = true;
   runtimeContextApplied = false;
   micButton.disabled = true;
@@ -1062,6 +1264,8 @@ async function disconnect() {
   endHistorySession();
 
   try { activeChatAbort?.abort(); } catch {}
+  try { window.speechSynthesis?.cancel(); } catch {}
+  try { webRecognition?.stop(); } catch {}
 
   try {
     await anamClient?.stopStreaming();
@@ -1070,12 +1274,55 @@ async function disconnect() {
   }
 
   anamClient = null;
+  textModeActive = false;
   resetUiAfterDisconnect();
+  updateAvatarToggleUi();
 }
 
 micButton.addEventListener('click', () => {
   primePopAudio();
-  if (!connected && !connecting) connect();
+
+  if (!connected && !connecting) {
+    connect();
+    return;
+  }
+
+  if (textModeActive && !isResponding && !textModeListening) {
+    if (!webRecognition) webRecognition = createWebRecognition();
+    if (!webRecognition) {
+      setStatus('Voice input not supported in this browser');
+      return;
+    }
+
+    try {
+      textModeTurnId += 1;
+      lastUserPinText.textContent = 'Listening…';
+      lastUserPin.hidden = false;
+      webRecognition.start();
+    } catch {}
+  }
+});
+
+avatarToggle?.addEventListener('click', async () => {
+  avatarEnabled = !avatarEnabled;
+  localStorage.setItem('camille.avatarEnabled.v1', String(avatarEnabled));
+
+  if (!avatarEnabled) {
+    if (anamClient || connecting) {
+      try { await stopAnamOnly(); } catch {}
+    }
+    startTextMode();
+  } else {
+    if (textModeActive) stopTextMode();
+    connected = false;
+    connecting = false;
+    updateAvatarToggleUi();
+    setStatus('Ready — avatar mode');
+    micLabel.textContent = 'Start conversation';
+    endButton.disabled = true;
+  }
+
+  updateAvatarToggleUi();
 });
 
 endButton.addEventListener('click', disconnect);
@@ -1141,6 +1388,7 @@ window.addEventListener('unhandledrejection', event => {
 
 updateDifficultyUi();
 setAvatarLive(false);
+updateAvatarToggleUi();
 
 // ---- PWA install support ----
 const installButton = document.getElementById('installButton');
