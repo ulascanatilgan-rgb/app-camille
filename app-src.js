@@ -289,7 +289,7 @@ function renderMessages(messages) {
     .filter(message => message?.content?.trim())
     .filter(message => !(activeSubtitleMessageId && message.id === activeSubtitleMessageId && message.role === 'persona'))
     .filter(message => !(pinnedUserMessageId && message.id === pinnedUserMessageId && message.role === 'user'))
-    .slice(-8);
+    .slice(-6);
 
   if (!recent.length) {
     const empty = document.createElement('div');
@@ -903,9 +903,12 @@ function attachAnamListeners(client) {
     voiceRing.classList.add('active');
     successBalloon?.classList.add('listening');
 
-    // Keep Camille's last complete sentence visible while Ulas is speaking.
-    // The user's live transcript appears separately in the pinned YOU line.
-    setLastUserPin(lastUserPinText.textContent || 'Listening…', pinnedUserMessageId);
+    // Keep Camille's last sentence visible while Ulas speaks.
+    // Keep the current user's sentence in the same live exchange card.
+    if (!lastUserPinText.textContent.trim()) {
+      lastUserPinText.textContent = 'Listening…';
+      lastUserPin.hidden = false;
+    }
     renderMessages(currentMessages);
 
     if (isResponding) {
