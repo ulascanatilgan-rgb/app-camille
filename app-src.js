@@ -41,6 +41,7 @@ const wordNl = document.getElementById('wordNl');
 const wordEn = document.getElementById('wordEn');
 const lastUserPin = document.getElementById('lastUserPin');
 const lastUserPinText = document.getElementById('lastUserPinText');
+const lastUserPinEn = document.getElementById('lastUserPinEn');
 const successBalloon = document.getElementById('successBalloon');
 const typeToggle = document.getElementById('typeToggle');
 const typeComposer = document.getElementById('typeComposer');
@@ -66,6 +67,8 @@ let currentHistorySessionId = null;
 let runtimeContextApplied = false;
 let pinnedUserMessageId = null;
 let popAudioContext = null;
+let userTranslationSeq = 0;
+let lastUserTranslationAt = 0;
 
 const streamBuffers = new Map();
 const vocabProcessedIds = new Set();
@@ -133,7 +136,7 @@ function setSubtitle(nl = '', en = '') {
   subtitleEn.textContent = en || '';
 }
 
-function setLastUserPin(text, messageId = null) {
+function setLastUserPin(text, messageId = null, english = null) {
   const clean = String(text || '').trim();
 
   if (!clean) {
@@ -141,8 +144,15 @@ function setLastUserPin(text, messageId = null) {
     return;
   }
 
-  if (messageId) pinnedUserMessageId = messageId;
+  if (messageId && pinnedUserMessageId !== messageId) {
+    pinnedUserMessageId = messageId;
+    userTranslationSeq += 1;
+    lastUserTranslationAt = 0;
+    if (lastUserPinEn) lastUserPinEn.textContent = '';
+  }
+
   lastUserPinText.textContent = clean;
+  if (english !== null && lastUserPinEn) lastUserPinEn.textContent = english || '';
   lastUserPin.hidden = false;
 }
 
@@ -338,6 +348,34 @@ function renderMessages(messages) {
   }
 }
 
+async function scheduleUserTranslation(text, messageId) {
+  const clean = String(text || '').trim();
+  if (!clean || !lastUserPinEn) return;
+
+  const now = Date.now();
+  if (now - lastUserTranslationAt < 220) return;
+  lastUserTranslationAt = now;
+
+  const seq = ++userTranslationSeq;
+  const english = await translateToEnglish(clean);
+
+  if (seq === userTranslationSeq && pinnedUserMessageId === messageId && english) {
+    lastUserPinEn.textContent = english;
+  }
+}
+
+async function finalizeUserTranslation(text, messageId) {
+  const clean = String(text || '').trim();
+  if (!clean || !lastUserPinEn) return;
+
+  const seq = ++userTranslationSeq;
+  const english = await translateToEnglish(clean);
+
+  if (seq === userTranslationSeq && pinnedUserMessageId === messageId) {
+    lastUserPinEn.textContent = english || '';
+  }
+}
+
 async function translateToEnglish(text) {
   const clean = (text || '').trim();
   if (!clean) return '';
@@ -419,7 +457,7 @@ function buildRuntimeContext() {
     'Actively guide him with short real-life scenarios and conversation topics: doctor, pharmacy, café, restaurant, supermarket, neighbour, work, football, architecture, lifestyle, fashion, places in Belgium, transport and daily life.',
     'If the conversation stalls, propose one simple topic or situation and ask one easy question. Never invent current news, new venues or regulations unless they are verified in the conversation.',
     'If he is stuck, give him the beginning of the sentence so he can finish it.',
-    'On every user turn, first briefly validate or correct his sentence into natural spoken Dutch, then answer his question. Keep both inside the same 20-word limit.',
+    'On every user turn, first restate the ENTIRE intended sentence in natural spoken Dutch, not just the wrong word. Then answer immediately. Keep both inside the same 20-word limit.',
     'Useful personal context: ING/IT, Hondinn, padel, investing, Kapellen/Antwerp, business, cars and renovation.'
   ].join(' ');
 }
@@ -747,6 +785,7 @@ async function sendTypedTurn(text) {
 
   pinnedUserMessageId = userId;
   setLastUserPin(clean, userId);
+  finalizeUserTranslation(clean, userId);
 
   currentMessages = [
     ...currentMessages.filter(message => message?.content?.trim()),
@@ -915,13 +954,14 @@ function handleStreamEvent(event) {
 
   if (event.role === 'user') {
     setLastUserPin(next, event.id);
+    scheduleUserTranslation(next, event.id);
 
-    // The new utterance becomes the pinned line; the previous one naturally
-    // drops back into the independently scrollable history.
+    // Keep this complete user turn visible while Camille answers.
     renderMessages(currentMessages);
 
     if (event.endOfSpeech) {
       streamBuffers.delete(event.id);
+      finalizeUserTranslation(next, event.id);
     }
     return;
   }
@@ -1020,7 +1060,7 @@ function attachAnamListeners(client) {
     if (connected) {
       try {
         anamClient?.addContext(
-          'NEXT REPLY RULE: Dutch only. First briefly correct or validate Ulas\'s sentence, then answer. Maximum 20 words total, preferably 8–12. Use modern everyday Flemish, no difficult words.'
+          'NEXT REPLY RULE: Dutch only. First give Ulas\'s FULL corrected sentence, not a single-word correction, then answer immediately. Maximum 20 words total. Use simple everyday Flemish.'
         );
       } catch {}
     }
@@ -1129,6 +1169,7 @@ function resetUiAfterDisconnect() {
   pinnedUserMessageId = null;
   lastUserPin.hidden = true;
   lastUserPinText.textContent = '';
+  if (lastUserPinEn) lastUserPinEn.textContent = '';
   successBalloon?.classList.remove('listening', 'pop');
   streamBuffers.clear();
   lengthInterruptedIds.clear();

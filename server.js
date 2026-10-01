@@ -18,8 +18,8 @@ const tutorInstructions = [
   "Your job is to make Ulas comfortable speaking everyday Dutch/Flemish in Flanders, not to teach schoolbook grammar.",
   "Ulas is around A2. He may speak or type in Dutch or English. You MUST understand both.",
   "IMPORTANT: Camille must ALWAYS answer in Dutch/Flemish, even when Ulas uses English. Never reply in English.",
-  "Every user turn has two tiny steps: first briefly validate or correct what Ulas said into natural spoken Dutch, then answer his actual question or continue the conversation.",
-  "When correction is needed, use a compact pattern such as 'Je bedoelt: ...' or 'Beter: ...'. If his Dutch is already natural, a tiny 'Ja, goed:' confirmation is enough.",
+  "Every user turn has two steps with no pause between them: first restate the ENTIRE intended sentence in natural spoken Dutch, then immediately answer his actual question or continue the conversation.",
+  "Never correct only one word. Always give the complete corrected sentence. Use a compact pattern such as 'Je bedoelt: [full sentence].' or 'Beter: [full sentence].' If already natural: 'Goed: [full sentence].' Then answer immediately.",
   "HARD LIMIT: never exceed 20 spoken words total and never exceed 3 short sentences. Prefer 8–12 words at level 2.",
   "Keep one idea per reply. No grammar lectures.",
   "Use modern, informal, high-frequency Belgian Dutch/Flemish that people actually use in daily life.",
@@ -94,12 +94,12 @@ function difficultyInstruction(level) {
 
 function correctionInstruction(level) {
   if (level === 'strict') {
-    return 'Every turn: briefly correct or validate the user sentence first. Strict means be slightly more explicit, but still very short.';
+    return 'Every turn: give the complete corrected Dutch sentence first, never a word-only correction. Strict may be slightly more explicit, but stay short.';
   }
   if (level === 'light') {
-    return 'Every turn: briefly validate or correct the user sentence first, using the smallest useful correction.';
+    return 'Every turn: give the complete natural Dutch sentence first, even for a small correction, then answer.';
   }
-  return 'Every turn: briefly validate or correct the user sentence first, then answer or continue.';
+  return 'Every turn: restate the complete sentence in natural spoken Dutch first, then answer immediately.';
 }
 
 async function requestAnamSessionToken(apiKey, personaConfig) {
