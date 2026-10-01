@@ -17,32 +17,19 @@
 <body>
   <main class="app-shell">
     <header class="topbar">
-      <div class="brand-block">
-        <div class="brand-mark">C</div>
-        <div>
-          <div class="eyebrow">FLEMISH CONVERSATION</div>
-          <div class="name">Camille</div>
-        </div>
-      </div>
-
-      <div class="uca-lab-logo" aria-label="UCA Lab">
+      <div class="uca-lab-logo header-uca" aria-label="UCA Lab">
         <img src="/uca-lab-logo.png" alt="UCA Lab" />
       </div>
 
-      <div id="successBalloon" class="success-balloon" aria-hidden="true">
-        <span class="balloon-body"></span>
-        <span class="balloon-knot"></span>
-        <span class="balloon-string"></span>
-        <span class="balloon-spark balloon-spark-a"></span>
-        <span class="balloon-spark balloon-spark-b"></span>
-        <span class="balloon-spark balloon-spark-c"></span>
+      <div class="center-brand" aria-label="Camille">
+        <span>Camille</span>
       </div>
 
       <div class="header-status">
         <button id="historyButton" class="nav-button" type="button">History</button>
         <button id="wordsButton" class="nav-button" type="button">Words</button>
         <span id="status" class="status">Ready</span>
-        <button id="installButton" class="text-button" hidden>Install</button>
+        <button id="installButton" class="text-button" type="button" hidden>Install</button>
         <button id="settingsButton" class="icon-button" aria-label="Settings">•••</button>
       </div>
     </header>
@@ -58,6 +45,15 @@
           <video id="avatarVideo" class="anam-video" autoplay playsinline></video>
           <div class="stage-vignette"></div>
           <div id="voiceRing" class="voice-ring"></div>
+
+          <div id="successBalloon" class="success-balloon avatar-balloon" aria-hidden="true">
+            <span class="balloon-body"></span>
+            <span class="balloon-knot"></span>
+            <span class="balloon-string"></span>
+            <span class="balloon-spark balloon-spark-a"></span>
+            <span class="balloon-spark balloon-spark-b"></span>
+            <span class="balloon-spark balloon-spark-c"></span>
+          </div>
 
           <div id="wordCard" class="word-card" hidden>
             <div class="word-card-label">NEW WORD</div>
@@ -155,7 +151,16 @@
             <button id="endButton" class="end-button" disabled>End</button>
           </div>
 
-          <div class="hint">English is fine when you're stuck. Camille will guide you back to Flemish.</div>
+          <div class="hint">Speak or type in Dutch or English. Camille always answers in Dutch.</div>
+
+          <form id="typeComposer" class="type-composer" hidden>
+            <input id="typeInput" type="text" autocomplete="off" placeholder="Write in Dutch or English…" aria-label="Write to Camille" />
+            <button id="typeSend" type="submit">Send</button>
+          </form>
+
+          <div class="type-row">
+            <button id="typeToggle" class="type-toggle" type="button" aria-expanded="false">Type</button>
+          </div>
         </section>
       </section>
     </section>

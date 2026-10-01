@@ -42,6 +42,9 @@ const wordEn = document.getElementById('wordEn');
 const lastUserPin = document.getElementById('lastUserPin');
 const lastUserPinText = document.getElementById('lastUserPinText');
 const successBalloon = document.getElementById('successBalloon');
+const typeToggle = document.getElementById('typeToggle');
+const typeComposer = document.getElementById('typeComposer');
+const typeInput = document.getElementById('typeInput');
 
 const HISTORY_KEY = 'camille.history.v2';
 const WORDS_KEY = 'camille.words.v2';
@@ -405,18 +408,18 @@ function buildRuntimeContext() {
     `Current difficulty is level ${difficulty}/5 (${meta.cefr}, ${meta.name}).`,
     levelRules[difficulty],
     'HARD LIMIT: maximum 20 spoken words total and maximum 3 short sentences. Prefer 1–2 sentences.',
-    'You MUST understand English normally.',
+    'You MUST understand English normally, whether Ulas speaks it or types it. Camille must still answer in Dutch/Flemish only.',
     'When Ulas switches to English because he does not know a Dutch word or sentence, understand him and immediately give the short natural Dutch/Flemish expression.',
     'If he asks in English how to say something, answer with the Dutch phrase directly and invite him to try it.',
-    'Use English only as a very short bridge, then return to Dutch.',
-    'Use only simple, high-frequency Belgian Dutch/Flemish. Prefer the easiest common word over a more precise or advanced synonym.',
+    'Do not answer in English. Use English only internally to understand him, then respond in Dutch/Flemish.',
+    'Use simple modern spoken Belgian Dutch/Flemish, not schoolbook Dutch. Prefer short informal daily phrasing with je/jij, natural omissions and common contractions, but avoid heavy dialect that an A2 learner cannot reuse.',
     'Prioritize common verbs and patterns such as gaan, komen, doen, maken, willen, kunnen, moeten, mogen, hebben, zijn, weten, zoeken, nemen, krijgen and vragen.',
     'Practice questions and negatives naturally: Kan ik...?, Mag ik...?, Wil je...?, Ik wil..., Ik kan niet..., Ik heb geen..., Waar is...?, Hoe kan ik...?, Wat moet ik...?',
     'Keep one idea per reply. Do not lecture about grammar. Give one practical phrase and let Ulas use it.',
-    'Actively guide him with short real-life scenarios: doctor, pharmacy, café, restaurant, supermarket, neighbour, delivery, tradesperson, phone call, appointment, municipality, work, train, parking, police or traffic stop.',
-    'For a scenario, give the exact short phrase he could say there, then ask him to repeat or answer.',
+    'Actively guide him with short real-life scenarios and conversation topics: doctor, pharmacy, café, restaurant, supermarket, neighbour, work, football, architecture, lifestyle, fashion, places in Belgium, transport and daily life.',
+    'If the conversation stalls, propose one simple topic or situation and ask one easy question. Never invent current news, new venues or regulations unless they are verified in the conversation.',
     'If he is stuck, give him the beginning of the sentence so he can finish it.',
-    'Correct only one useful mistake at a time and keep it inside the same 20-word limit.',
+    'On every user turn, first briefly validate or correct his sentence into natural spoken Dutch, then answer his question. Keep both inside the same 20-word limit.',
     'Useful personal context: ING/IT, Hondinn, padel, investing, Kapellen/Antwerp, business, cars and renovation.'
   ].join(' ');
 }
@@ -733,6 +736,97 @@ function renderWordsDialog() {
   }
 }
 
+async function sendTypedTurn(text) {
+  const clean = String(text || '').trim();
+  if (!clean || !anamClient || !connected || isResponding) return;
+
+  celebrateUserTurn();
+
+  const userId = `typed-user-${Date.now()}`;
+  const personaId = `typed-persona-${Date.now()}`;
+
+  pinnedUserMessageId = userId;
+  setLastUserPin(clean, userId);
+
+  currentMessages = [
+    ...currentMessages.filter(message => message?.content?.trim()),
+    { id: userId, role: 'user', content: clean }
+  ];
+
+  saveCurrentHistory();
+  renderMessages(currentMessages);
+
+  isResponding = true;
+  setStatus('Camille denkt…');
+  activeChatAbort = new AbortController();
+  activeSubtitleMessageId = personaId;
+
+  let full = '';
+  let talkStream = null;
+
+  try {
+    const response = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: activeChatAbort.signal,
+      body: JSON.stringify({
+        messages: currentMessages,
+        kickoff: false,
+        difficulty,
+        correctionLevel: correctionLevel.value || 'medium'
+      })
+    });
+
+    if (!response.ok || !response.body) {
+      throw new Error(await response.text());
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    talkStream = anamClient.createTalkMessageStream();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      if (!chunk) continue;
+
+      full += chunk;
+      const limited = limitCamilleReply(full);
+      renderLiveDutch(limited.text, chunk);
+      schedulePartialTranslation(limited.text, personaId);
+      await talkStream.streamMessageChunk(chunk, false);
+    }
+
+    await talkStream.endMessage();
+
+    full = limitCamilleReply(full).text;
+    const english = await translateToEnglish(full);
+    if (english) translationByMessageId.set(personaId, english);
+
+    setSubtitle(full, english);
+
+    currentMessages = [
+      ...currentMessages,
+      { id: personaId, role: 'persona', content: full }
+    ];
+
+    processVocabularyProgress(personaId, full, true);
+    saveCurrentHistory();
+    renderMessages(currentMessages);
+  } catch (error) {
+    if (error?.name !== 'AbortError') {
+      console.error('Typed Camille response error:', error);
+      setStatus('Response error');
+    }
+  } finally {
+    activeChatAbort = null;
+    isResponding = false;
+    if (connected) setStatus('Ready — spreek Vlaams');
+  }
+}
+
 async function streamCamilleResponse(messages = currentMessages, kickoff = false) {
   if (!anamClient || !customLlmMode || isResponding) return;
 
@@ -926,7 +1020,7 @@ function attachAnamListeners(client) {
     if (connected) {
       try {
         anamClient?.addContext(
-          'NEXT REPLY RULE: maximum 20 spoken words total, preferably 8–12 at level 2. Use only very common A1–A2 words. One idea at a time. No difficult synonyms or idioms.'
+          'NEXT REPLY RULE: Dutch only. First briefly correct or validate Ulas\'s sentence, then answer. Maximum 20 words total, preferably 8–12. Use modern everyday Flemish, no difficult words.'
         );
       } catch {}
     }
@@ -1076,6 +1170,29 @@ async function disconnect() {
 micButton.addEventListener('click', () => {
   primePopAudio();
   if (!connected && !connecting) connect();
+});
+
+typeToggle?.addEventListener('click', () => {
+  const open = typeToggle.getAttribute('aria-expanded') !== 'true';
+  typeToggle.setAttribute('aria-expanded', String(open));
+  typeComposer.hidden = !open;
+  if (open) setTimeout(() => typeInput?.focus(), 0);
+});
+
+typeComposer?.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (isResponding) return;
+
+  const text = typeInput?.value?.trim() || '';
+  if (!text) return;
+
+  if (!connected) {
+    setStatus('Start Camille first');
+    return;
+  }
+
+  typeInput.value = '';
+  sendTypedTurn(text);
 });
 
 endButton.addEventListener('click', disconnect);

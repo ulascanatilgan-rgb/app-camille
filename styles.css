@@ -2390,3 +2390,178 @@ dialog::backdrop {
     padding: 4px 6px;
   }
 }
+
+
+/* ---- Camille centered header + avatar balloon + typed turn v20 ---- */
+.topbar {
+  justify-content: flex-end;
+}
+
+.header-uca {
+  position: static;
+  transform: none;
+  margin-right: auto;
+  pointer-events: none;
+}
+
+.header-uca img {
+  width: 102px;
+  max-height: 30px;
+}
+
+.center-brand {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 118px;
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--ink);
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 620;
+  letter-spacing: -.02em;
+}
+
+.brand-block {
+  display: none !important;
+}
+
+.success-balloon.avatar-balloon {
+  left: 14px;
+  top: 14px;
+  z-index: 8;
+  width: 20px;
+  height: 29px;
+}
+
+.avatar-balloon .balloon-body {
+  left: 4px;
+  width: 12px;
+  height: 15px;
+}
+
+.avatar-balloon .balloon-knot {
+  left: 8px;
+  top: 14px;
+}
+
+.avatar-balloon .balloon-string {
+  left: 9px;
+  top: 17px;
+  height: 8px;
+}
+
+.type-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.type-toggle {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 4px 0;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: .02em;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.type-toggle[aria-expanded="true"] {
+  color: var(--ink);
+}
+
+.type-composer {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.type-composer[hidden] {
+  display: none;
+}
+
+.type-composer input {
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid var(--line-dark);
+  background: #fff;
+  color: var(--ink);
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.type-composer input:focus {
+  border-color: var(--anthracite);
+  box-shadow: inset 0 -2px 0 var(--yellow);
+}
+
+.type-composer button {
+  min-height: 38px;
+  border: 1px solid var(--anthracite);
+  background: var(--anthracite);
+  color: #fff;
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .header-uca img {
+    width: 58px;
+    max-height: 22px;
+  }
+
+  .center-brand {
+    min-width: 88px;
+    height: 32px;
+    padding: 0 10px;
+    font-size: 14px;
+  }
+
+  .success-balloon.avatar-balloon {
+    left: 9px;
+    top: 9px;
+    width: 18px;
+    height: 25px;
+  }
+
+  .avatar-balloon .balloon-string {
+    top: 15px;
+    height: 7px;
+  }
+
+  .type-row {
+    margin-top: 4px;
+  }
+
+  .type-toggle {
+    font-size: 9px;
+    padding: 2px 0;
+  }
+
+  .type-composer {
+    gap: 5px;
+    margin-top: 5px;
+  }
+
+  .type-composer input,
+  .type-composer button {
+    min-height: 32px;
+    font-size: 10px;
+  }
+
+  .type-composer button {
+    padding: 0 9px;
+  }
+}
