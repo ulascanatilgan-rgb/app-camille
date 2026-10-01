@@ -1179,12 +1179,17 @@ typeToggle?.addEventListener('click', () => {
   if (open) setTimeout(() => typeInput?.focus(), 0);
 });
 
-typeComposer?.addEventListener('submit', event => {
+typeComposer?.addEventListener('submit', async event => {
   event.preventDefault();
-  if (!connected || isResponding) return;
+  if (isResponding) return;
 
   const text = typeInput?.value?.trim() || '';
   if (!text) return;
+
+  if (!connected) {
+    setStatus('Start Camille first');
+    return;
+  }
 
   typeInput.value = '';
   sendTypedTurn(text);
