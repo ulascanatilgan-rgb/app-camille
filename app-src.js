@@ -722,7 +722,7 @@ function renderHistoryDialog() {
 function normalizeWord(word) {
   return String(word || '')
     .trim()
-    .toLocaleLowerCase('nl-BE')
+    .toLocaleLowerCase(languageConfig().locale)
     .replace(/[.!?,;:]+$/g, '');
 }
 
@@ -746,7 +746,7 @@ async function captureVocabulary(text, vocabularyId) {
     const response = await fetch('/vocab', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, knownWords })
+      body: JSON.stringify({ text, knownWords, targetLanguage })
     });
 
     if (!response.ok) return;
@@ -1360,8 +1360,6 @@ languageToggle?.addEventListener('click', () => {
 
   // Keep the same level, teaching method and session; only switch target language.
   updateLanguageUi(true);
-  learnedWords = [];
-  saveJson(WORDS_KEY, learnedWords);
   renderWordsDialog();
 
   if (connected) {
