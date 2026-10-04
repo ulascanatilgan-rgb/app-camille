@@ -2640,3 +2640,49 @@ dialog::backdrop {
     font-size: clamp(10px, 2.9vw, 12px);
   }
 }
+
+
+/* ---- Dutch / French language switch v22 ---- */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: auto;
+}
+
+.header-left .header-uca {
+  margin-right: 0;
+}
+
+.language-toggle {
+  min-width: 32px;
+  height: 26px;
+  padding: 0 7px;
+  border: 1px solid var(--line-dark);
+  background: #fff;
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.language-toggle:hover {
+  background: #f4f2ed;
+}
+
+.language-toggle:active {
+  transform: translateY(1px);
+}
+
+@media (max-width: 760px) {
+  .header-left {
+    gap: 6px;
+  }
+
+  .language-toggle {
+    min-width: 28px;
+    height: 24px;
+    padding: 0 5px;
+    font-size: 8px;
+  }
+}

@@ -17,8 +17,13 @@
 <body>
   <main class="app-shell">
     <header class="topbar">
-      <div class="uca-lab-logo header-uca" aria-label="UCA Lab">
-        <img src="/uca-lab-logo.png" alt="UCA Lab" />
+      <div class="header-left">
+        <div class="uca-lab-logo header-uca" aria-label="UCA Lab">
+          <img src="/uca-lab-logo.png" alt="UCA Lab" />
+        </div>
+        <button id="languageToggle" class="language-toggle" type="button" aria-label="Switch learning language">
+          <span id="languageToggleLabel">NL</span>
+        </button>
       </div>
 
       <div class="center-brand" aria-label="Camille">
@@ -66,7 +71,7 @@
 
           <div class="avatar-meta">
             <span id="avatarBadge" class="avatar-badge">Anam live avatar</span>
-            <span class="avatar-goal">6 months · Flanders</span>
+            <span id="avatarGoal" class="avatar-goal">6 months · Flanders</span>
           </div>
         </div>
       </section>
@@ -74,10 +79,10 @@
       <section id="conversationPane" class="conversation-column">
         <div class="conversation-head">
           <div>
-            <div class="eyebrow">PRACTICAL FLEMISH</div>
-            <h1>Praat gewoon.</h1>
+            <div id="practiceEyebrow" class="eyebrow">PRACTICAL FLEMISH</div>
+            <h1 id="practiceTitle">Praat gewoon.</h1>
           </div>
-          <p>Short, useful Flemish for daily life, work and business.</p>
+          <p id="practiceDescription">Short, useful Flemish for daily life, work and business.</p>
         </div>
 
         <section id="subtitlePanel" class="live-exchange-card" aria-live="polite">
@@ -112,13 +117,13 @@
 
         <section class="controls">
           <div class="difficulty-control">
-            <button id="difficultyToggle" class="difficulty-toggle" type="button" aria-label="Change Dutch level">
+            <button id="difficultyToggle" class="difficulty-toggle" type="button" aria-label="Change language level">
               <span>L</span><strong id="difficultyToggleValue">2</strong>
             </button>
             <div class="difficulty-panel">
             <div class="difficulty-head">
               <div>
-                <span class="control-label">DUTCH LEVEL</span>
+                <span id="levelLabel" class="control-label">DUTCH LEVEL</span>
                 <span id="difficultyName" class="difficulty-name">A2 · Easy</span>
               </div>
               <div id="difficultyValue" class="difficulty-value">2</div>
@@ -154,7 +159,7 @@
             <button id="endButton" class="end-button" disabled>End</button>
           </div>
 
-          <div class="hint">Speak or type in Dutch or English. Camille always answers in Dutch.</div>
+          <div id="modeHint" class="hint">Speak or type in Dutch or English. Camille always answers in Dutch.</div>
 
           <form id="typeComposer" class="type-composer" hidden>
             <input id="typeInput" type="text" autocomplete="off" placeholder="Write in Dutch or English…" aria-label="Write to Camille" />
