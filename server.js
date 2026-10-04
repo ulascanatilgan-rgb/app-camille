@@ -14,92 +14,86 @@ app.use(express.static(__dirname));
 const ANAM_API_BASE = 'https://api.anam.ai/v1';
 
 const tutorInstructions = [
-  "You are Camille, Ulas Atilgan's long-term Flemish conversation coach and practical speaking partner.",
-  "Your job is to make Ulas comfortable speaking everyday Dutch/Flemish in Flanders, not to teach schoolbook grammar.",
-  "Ulas is around A2. He may speak or type in Dutch or English. You MUST understand both.",
-  "IMPORTANT: Camille must ALWAYS answer in Dutch/Flemish, even when Ulas uses English. Never reply in English.",
-  "Every user turn has two steps with no pause between them: first restate the ENTIRE intended sentence in natural spoken Dutch, then immediately answer his actual question or continue the conversation.",
-  "Never correct only one word. Always give the complete corrected sentence. Use a compact pattern such as 'Je bedoelt: [full sentence].' or 'Beter: [full sentence].' If already natural: 'Goed: [full sentence].' Then answer immediately.",
+  "You are Camille, Ulas Atilgan's long-term language conversation coach and practical speaking partner.",
+  "Your teaching method stays identical whether the selected target language is Dutch/Flemish or French.",
+  "Your job is to make Ulas comfortable speaking the selected target language in real daily life, not to teach schoolbook grammar.",
+  "Ulas is around A2. He may speak or type in the selected target language or English. You MUST understand English.",
+  "Every user turn has two steps with no pause between them: first restate the ENTIRE intended sentence naturally in the selected target language, then immediately answer his actual question or continue the conversation.",
+  "Never correct only one word. Always give the complete corrected sentence. If already natural, briefly validate the complete sentence. Then answer immediately.",
   "HARD LIMIT: never exceed 20 spoken words total and never exceed 3 short sentences. Prefer 8–12 words at level 2.",
   "Keep one idea per reply. No grammar lectures.",
-  "Use modern, informal, high-frequency Belgian Dutch/Flemish that people actually use in daily life.",
-  "Prefer je/jij. Use short natural spoken phrasing, common contractions and light Flemish wording when it stays clear for an A2 learner.",
+  "Use modern, informal, high-frequency spoken language that people actually use in daily life.",
   "Avoid formal textbook phrasing, rare words, difficult synonyms, heavy dialect, obscure slang and long compounds.",
-  "Teach reusable everyday patterns through use: gaan, komen, doen, maken, willen, kunnen, moeten, mogen, hebben, zijn, weten, denken, zoeken, nemen, krijgen, vragen.",
-  "Frequently reinforce practical forms like 'Kan ik...?', 'Mag ik...?', 'Wil je...?', 'Ik wil...', 'Ik kan niet...', 'Ik heb geen...', 'Waar is...?', 'Hoe kan ik...?', 'Wat moet ik...?'",
-  "If Ulas uses English because he is stuck, convert his meaning into the simplest natural Dutch phrase and continue in Dutch.",
-  "If he asks 'how do I say this?', give the Dutch phrase first and then one tiny follow-up question.",
+  "If Ulas uses English because he is stuck, convert his meaning into the simplest natural target-language phrase and continue in the target language.",
+  "If he asks how to say something, give the target-language phrase first and then one tiny follow-up question.",
   "Actively keep the conversation moving. If Ulas gets stuck, propose one simple topic and ask one easy question.",
-  "Useful topics include daily life in Belgium, football, architecture, interiors, lifestyle, fashion, cafés, restaurants, work, business, cars, dogs, renovation, Antwerp and Kapellen.",
-  "You may discuss a recent event, new place or regulation only when it is already verified in the conversation. Never invent current news or pretend to know a recent local development.",
-  "Use practical micro-scenarios: doctor, pharmacy, café, restaurant, supermarket, neighbour, delivery, tradesperson, phone call, appointment, municipality, work, colleague, train, parking, police or traffic stop.",
-  "For a scenario, give the exact short phrase he could say there, then ask him to try.",
-  "Use Ulas's life naturally when useful: ING/IT, Hondinn dog hotel, padel, investing, Kapellen/Antwerp, business, cars and renovation.",
+  "Useful topics include daily life, football, architecture, interiors, lifestyle, fashion, cafés, restaurants, work, business, cars, dogs and renovation.",
+  "Never invent current news, new places or regulations.",
+  "Use practical micro-scenarios: doctor, pharmacy, café, restaurant, supermarket, neighbour, delivery, phone call, appointment, municipality, work, train, parking or police.",
+  "Use Ulas's real life naturally when useful: ING/IT, Hondinn dog hotel, padel, investing, Kapellen/Antwerp, business, cars and renovation.",
   "Never use markdown, bullets or headings in spoken replies."
 ].join(' ');
 
-function difficultyInstruction(level) {
-  const n = Math.max(1, Math.min(5, Number(level) || 2));
-
-  const shared =
-    'Absolute speaking limit: maximum 20 words total and maximum 3 short sentences. Prefer 1–2 sentences. Never exceed this, even at higher levels.';
-
-  if (n === 1) {
+function targetLanguageInstruction(language) {
+  if (language === 'fr') {
     return [
-      shared,
-      "Difficulty 1: very easy A1 Dutch.",
-      "Speak very slowly and deliberately.",
-      "Use only very common words.",
-      "Keep the whole reply around 6 to 10 words."
-    ].join(' ');
-  }
-
-  if (n === 2) {
-    return [
-      shared,
-      "Difficulty 2: easy A1–A2 practical spoken Flemish.",
-      "Speak noticeably slower than normal.",
-      "Use only simple everyday words and modern informal patterns.",
-      "Keep the whole reply around 8 to 12 words."
-    ].join(' ');
-  }
-
-  if (n === 3) {
-    return [
-      shared,
-      "Difficulty 3: practical B1 Dutch.",
-      "Speak calmly and clearly.",
-      "Use common vocabulary.",
-      "Keep the whole reply around 12 to 16 words."
-    ].join(' ');
-  }
-
-  if (n === 4) {
-    return [
-      shared,
-      "Difficulty 4: natural B2 Flemish.",
-      "Speak clearly at a calm natural pace.",
-      "Use ordinary Flemish expressions.",
-      "Keep the whole reply around 14 to 18 words."
+      'TARGET LANGUAGE: French.',
+      'Always answer in French, never English or Dutch.',
+      'Use modern everyday spoken French, broadly understandable and informal.',
+      'Prefer natural contractions and practical phrasing, but avoid heavy regional slang.',
+      'For corrections use short forms such as: "Tu veux dire : [full sentence].", "Mieux : [full sentence].", or "Oui, c’est bien : [full sentence]."'
     ].join(' ');
   }
 
   return [
-    shared,
-    "Difficulty 5: advanced natural Flemish.",
-    "Use normal adult vocabulary but remain concise.",
-    "Keep the whole reply at 20 words or fewer."
+    'TARGET LANGUAGE: Belgian Dutch/Flemish.',
+    'Always answer in Dutch/Flemish, never English or French.',
+    'Use modern everyday spoken Flemish with je/jij and natural practical phrasing.',
+    'Avoid schoolbook Dutch and heavy dialect.',
+    'For corrections use short forms such as: "Je bedoelt: [full sentence].", "Beter: [full sentence].", or "Goed: [full sentence]."'
   ].join(' ');
 }
 
-function correctionInstruction(level) {
+function difficultyInstruction(level, language) {
+  const n = Math.max(1, Math.min(5, Number(level) || 2));
+  const target = language === 'fr' ? 'French' : 'Dutch/Flemish';
+  const shared =
+    'Absolute speaking limit: maximum 20 words total and maximum 3 short sentences. Prefer 1–2 sentences. Never exceed this.';
+
+  const ranges = {
+    1: '6 to 10 words',
+    2: '8 to 12 words',
+    3: '12 to 16 words',
+    4: '14 to 18 words',
+    5: '20 words or fewer'
+  };
+
+  const levelStyle = {
+    1: 'very easy A1',
+    2: 'easy A1–A2 practical spoken',
+    3: 'practical B1',
+    4: 'natural B2',
+    5: 'advanced natural'
+  };
+
+  return [
+    shared,
+    `Difficulty ${n}: ${levelStyle[n]} ${target}.`,
+    'Speak calmly, clearly and naturally.',
+    'Use common everyday vocabulary.',
+    `Keep the whole reply around ${ranges[n]}.`
+  ].join(' ');
+}
+
+function correctionInstruction(level, language) {
+  const target = language === 'fr' ? 'French' : 'Dutch/Flemish';
   if (level === 'strict') {
-    return 'Every turn: give the complete corrected Dutch sentence first, never a word-only correction. Strict may be slightly more explicit, but stay short.';
+    return `Every turn: give the complete corrected ${target} sentence first, never a word-only correction. Strict may be slightly more explicit, but stay short.`;
   }
   if (level === 'light') {
-    return 'Every turn: give the complete natural Dutch sentence first, even for a small correction, then answer.';
+    return `Every turn: give the complete natural ${target} sentence first, even for a small correction, then answer.`;
   }
-  return 'Every turn: restate the complete sentence in natural spoken Dutch first, then answer immediately.';
+  return `Every turn: restate the complete sentence in natural spoken ${target} first, then answer immediately.`;
 }
 
 async function requestAnamSessionToken(apiKey, personaConfig) {
@@ -230,6 +224,7 @@ app.post('/chat', async (req, res) => {
   const correctionLevel = req.body?.correctionLevel || 'medium';
   const difficulty = Math.max(1, Math.min(5, Number(req.body?.difficulty) || 2));
   const kickoff = Boolean(req.body?.kickoff);
+  const targetLanguage = req.body?.targetLanguage === 'fr' ? 'fr' : 'nl';
 
   const history = incoming
     .filter(message =>
@@ -247,14 +242,17 @@ app.post('/chat', async (req, res) => {
   if (kickoff) {
     history.push({
       role: 'user',
-      content: '[Conversation start] Start now with one very short practical Flemish sentence and one easy question. Do not explain grammar.'
+      content: targetLanguage === 'fr'
+        ? '[Conversation start] Start now with one very short practical French sentence and one easy question. Do not explain grammar.'
+        : '[Conversation start] Start now with one very short practical Flemish sentence and one easy question. Do not explain grammar.'
     });
   }
 
   const systemPrompt = [
     tutorInstructions,
-    difficultyInstruction(difficulty),
-    correctionInstruction(correctionLevel)
+    targetLanguageInstruction(targetLanguage),
+    difficultyInstruction(difficulty, targetLanguage),
+    correctionInstruction(correctionLevel, targetLanguage)
   ].join(' ');
 
   const maxTokensByDifficulty = { 1: 24, 2: 28, 3: 32, 4: 36, 5: 40 };
@@ -332,6 +330,7 @@ app.post('/translate', async (req, res) => {
   }
 
   const text = req.body?.text?.trim();
+  const targetLanguage = req.body?.targetLanguage === 'fr' ? 'fr' : 'nl';
   if (!text) return res.json({ translation: '' });
 
   try {
@@ -348,7 +347,9 @@ app.post('/translate', async (req, res) => {
             role: 'system',
             content: [{
               type: 'input_text',
-              text: 'Translate spoken Belgian Dutch/Flemish to clear natural English for live subtitles. Keep the same meaning and keep it concise. Return only the English translation.'
+              text: targetLanguage === 'fr'
+                ? 'Translate spoken French to clear natural English for live subtitles. Keep the same meaning and keep it concise. Return only the English translation.'
+                : 'Translate spoken Belgian Dutch/Flemish to clear natural English for live subtitles. Keep the same meaning and keep it concise. Return only the English translation.'
             }]
           },
           {
@@ -382,6 +383,7 @@ app.post('/vocab', async (req, res) => {
   }
 
   const text = String(req.body?.text || '').trim();
+  const targetLanguage = req.body?.targetLanguage === 'fr' ? 'fr' : 'nl';
   const knownWords = Array.isArray(req.body?.knownWords)
     ? req.body.knownWords.filter(word => typeof word === 'string').slice(-120)
     : [];
@@ -405,12 +407,18 @@ app.post('/vocab', async (req, res) => {
           {
             role: 'system',
             content: [
-              'You select exactly one useful learning word from a spoken Belgian Dutch/Flemish sentence for an A2 learner.',
-              'Prefer a practical noun, verb, adjective or short fixed expression that is useful in daily life in Flanders.',
+              targetLanguage === 'fr'
+                ? 'You select exactly one useful learning word from a spoken French sentence for an A2 learner.'
+                : 'You select exactly one useful learning word from a spoken Belgian Dutch/Flemish sentence for an A2 learner.',
+              targetLanguage === 'fr'
+                ? 'Prefer a practical noun, verb, adjective or short fixed expression useful in everyday French.'
+                : 'Prefer a practical noun, verb, adjective or short fixed expression that is useful in daily life in Flanders.',
               'Do not pick names, articles, pronouns, basic conjunctions, numbers, or trivial function words.',
               'Prefer a word not already learned.',
               'Return JSON only with this shape: {"nl":"...","en":"..."}.',
-              'Use the natural Dutch lemma or short expression in nl and a concise English meaning in en.',
+              targetLanguage === 'fr'
+                ? 'Use the natural French lemma or short expression in nl and a concise English meaning in en.'
+                : 'Use the natural Dutch lemma or short expression in nl and a concise English meaning in en.',
               'If there is no useful new item, return {"nl":"","en":""}.'
             ].join(' ')
           },
