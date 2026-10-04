@@ -46,10 +46,19 @@ const successBalloon = document.getElementById('successBalloon');
 const typeToggle = document.getElementById('typeToggle');
 const typeComposer = document.getElementById('typeComposer');
 const typeInput = document.getElementById('typeInput');
+const languageToggle = document.getElementById('languageToggle');
+const languageToggleLabel = document.getElementById('languageToggleLabel');
+const practiceEyebrow = document.getElementById('practiceEyebrow');
+const practiceTitle = document.getElementById('practiceTitle');
+const practiceDescription = document.getElementById('practiceDescription');
+const avatarGoal = document.getElementById('avatarGoal');
+const levelLabel = document.getElementById('levelLabel');
+const modeHint = document.getElementById('modeHint');
 
 const HISTORY_KEY = 'camille.history.v2';
 const WORDS_KEY = 'camille.words.v2';
 const LEVEL_KEY = 'camille.difficulty.v1';
+const LANGUAGE_KEY = 'camille.targetLanguage.v1';
 
 let anamClient = null;
 let connected = false;
@@ -79,6 +88,7 @@ let vocabQueue = Promise.resolve();
 
 let learnedWords = loadJson(WORDS_KEY, []);
 let difficulty = clampLevel(Number(localStorage.getItem(LEVEL_KEY) || 2));
+let targetLanguage = localStorage.getItem(LANGUAGE_KEY) === 'fr' ? 'fr' : 'nl';
 
 let lastSubtitlePair = {
   nl: "Hey Ulas. Hoe is 't vandaag?",
@@ -92,6 +102,65 @@ const difficultyMeta = {
   4: { cefr: 'B2', name: 'Natural', maxWords: 18, sentence: 'short natural' },
   5: { cefr: 'C1', name: 'Advanced', maxWords: 20, sentence: 'concise natural' }
 };
+
+const languageUi = {
+  nl: {
+    short: 'NL',
+    name: 'Dutch',
+    coach: 'Flemish',
+    locale: 'nl-BE',
+    eyebrow: 'PRACTICAL FLEMISH',
+    title: 'Praat gewoon.',
+    description: 'Short, useful Flemish for daily life, work and business.',
+    goal: '6 months · Flanders',
+    level: 'DUTCH LEVEL',
+    hint: 'Speak or type in Dutch or English. Camille always answers in Dutch.',
+    placeholder: 'Write in Dutch or English…',
+    greeting: "Hey Ulas. Hoe is 't vandaag?",
+    greetingEn: 'Hey Ulas. How are you today?',
+    ready: 'Ready — spreek Vlaams'
+  },
+  fr: {
+    short: 'FR',
+    name: 'French',
+    coach: 'French',
+    locale: 'fr-FR',
+    eyebrow: 'PRACTICAL FRENCH',
+    title: 'Parle simplement.',
+    description: 'Short, useful French for daily life, work and real conversations.',
+    goal: '6 months · French',
+    level: 'FRENCH LEVEL',
+    hint: 'Speak or type in French or English. Camille always answers in French.',
+    placeholder: 'Write in French or English…',
+    greeting: 'Salut Ulas. Ça va aujourd’hui ?',
+    greetingEn: 'Hi Ulas. How are you today?',
+    ready: 'Ready — parle français'
+  }
+};
+
+function languageConfig() {
+  return languageUi[targetLanguage] || languageUi.nl;
+}
+
+function updateLanguageUi(resetSubtitle = false) {
+  const cfg = languageConfig();
+  languageToggleLabel.textContent = cfg.short;
+  languageToggle.title = targetLanguage === 'nl' ? 'Switch to French' : 'Switch to Dutch';
+  practiceEyebrow.textContent = cfg.eyebrow;
+  practiceTitle.textContent = cfg.title;
+  practiceDescription.textContent = cfg.description;
+  avatarGoal.textContent = cfg.goal;
+  levelLabel.textContent = cfg.level;
+  modeHint.textContent = cfg.hint;
+  typeInput.placeholder = cfg.placeholder;
+  difficultyName.textContent = `${difficultyMeta[difficulty].cefr} · ${difficultyMeta[difficulty].name}`;
+
+  if (resetSubtitle) {
+    lastSubtitlePair = { nl: cfg.greeting, en: cfg.greetingEn };
+    setSubtitle(cfg.greeting, cfg.greetingEn);
+    if (lastUserPinEn) lastUserPinEn.textContent = '';
+  }
+}
 
 function loadJson(key, fallback) {
   try {
@@ -245,8 +314,8 @@ function renderLiveDutch(text, activeChunk = '') {
     return;
   }
 
-  const lower = clean.toLocaleLowerCase('nl-BE');
-  const target = activeWord.toLocaleLowerCase('nl-BE');
+  const lower = clean.toLocaleLowerCase(languageConfig().locale);
+  const target = activeWord.toLocaleLowerCase(languageConfig().locale);
   const index = lower.lastIndexOf(target);
 
   if (index < 0) {
@@ -384,7 +453,7 @@ async function translateToEnglish(text) {
     const response = await fetch('/translate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: clean })
+      body: JSON.stringify({ text: clean, targetLanguage })
     });
 
     if (!response.ok) return '';
@@ -430,35 +499,47 @@ async function finalizeSubtitle(nlText, messageId) {
 
 function buildRuntimeContext() {
   const meta = difficultyMeta[difficulty];
+  const isFrench = targetLanguage === 'fr';
+  const target = isFrench ? 'French' : 'Dutch/Flemish';
 
-  const levelRules = {
-    1: 'Use very easy A1 Dutch. Speak slowly. Aim for 6–10 words total.',
-    2: 'Use only very common A1–A2 practical Flemish. Avoid rare words, idioms and long compounds. Speak slowly. Aim for 8–12 words total.',
-    3: 'Use practical B1 Dutch. Speak calmly and clearly. Aim for 12–16 words total.',
-    4: 'Use natural B2 Flemish. Speak clearly at a calm natural pace. Aim for 14–18 words total.',
-    5: 'Use advanced natural Flemish, but stay concise. Never exceed 20 words total.'
-  };
+  const levelRules = isFrench
+    ? {
+        1: 'Use very easy A1 French. Speak slowly. Aim for 6–10 words total.',
+        2: 'Use only very common A1–A2 practical spoken French. Speak slowly. Aim for 8–12 words total.',
+        3: 'Use practical B1 French. Speak calmly and clearly. Aim for 12–16 words total.',
+        4: 'Use natural B2 French. Speak clearly at a calm natural pace. Aim for 14–18 words total.',
+        5: 'Use advanced natural French, but stay concise. Never exceed 20 words total.'
+      }
+    : {
+        1: 'Use very easy A1 Dutch. Speak slowly. Aim for 6–10 words total.',
+        2: 'Use only very common A1–A2 practical Flemish. Avoid rare words, idioms and long compounds. Speak slowly. Aim for 8–12 words total.',
+        3: 'Use practical B1 Dutch. Speak calmly and clearly. Aim for 12–16 words total.',
+        4: 'Use natural B2 Flemish. Speak clearly at a calm natural pace. Aim for 14–18 words total.',
+        5: 'Use advanced natural Flemish, but stay concise. Never exceed 20 words total.'
+      };
+
+  const styleRule = isFrench
+    ? 'Use simple modern spoken French, not schoolbook French. Prefer natural everyday phrasing, common contractions and informal but broadly understandable usage. Avoid heavy regional slang.'
+    : 'Use simple modern spoken Belgian Dutch/Flemish, not schoolbook Dutch. Prefer short informal daily phrasing with je/jij, natural omissions and common contractions, but avoid heavy dialect that an A2 learner cannot reuse.';
 
   return [
     'SESSION LEARNING CONTEXT — IMPORTANT:',
-    'You are Camille, Ulas Atilgan’s practical Flemish conversation coach.',
-    'The goal is short, useful, real-life speaking in Flanders — not grammar study.',
+    `You are Camille, Ulas Atilgan’s practical ${target} conversation coach.`,
+    `The goal is short, useful, real-life speaking in ${target} — not grammar study.`,
     `Current difficulty is level ${difficulty}/5 (${meta.cefr}, ${meta.name}).`,
     levelRules[difficulty],
     'HARD LIMIT: maximum 20 spoken words total and maximum 3 short sentences. Prefer 1–2 sentences.',
-    'You MUST understand English normally, whether Ulas speaks it or types it. Camille must still answer in Dutch/Flemish only.',
-    'When Ulas switches to English because he does not know a Dutch word or sentence, understand him and immediately give the short natural Dutch/Flemish expression.',
-    'If he asks in English how to say something, answer with the Dutch phrase directly and invite him to try it.',
-    'Do not answer in English. Use English only internally to understand him, then respond in Dutch/Flemish.',
-    'Use simple modern spoken Belgian Dutch/Flemish, not schoolbook Dutch. Prefer short informal daily phrasing with je/jij, natural omissions and common contractions, but avoid heavy dialect that an A2 learner cannot reuse.',
-    'Prioritize common verbs and patterns such as gaan, komen, doen, maken, willen, kunnen, moeten, mogen, hebben, zijn, weten, zoeken, nemen, krijgen and vragen.',
-    'Practice questions and negatives naturally: Kan ik...?, Mag ik...?, Wil je...?, Ik wil..., Ik kan niet..., Ik heb geen..., Waar is...?, Hoe kan ik...?, Wat moet ik...?',
-    'Keep one idea per reply. Do not lecture about grammar. Give one practical phrase and let Ulas use it.',
-    'Actively guide him with short real-life scenarios and conversation topics: doctor, pharmacy, café, restaurant, supermarket, neighbour, work, football, architecture, lifestyle, fashion, places in Belgium, transport and daily life.',
+    `You MUST understand English normally, whether Ulas speaks it or types it. Camille must still answer in ${target} only.`,
+    `When Ulas switches to English because he is stuck, understand him and immediately give the short natural ${target} expression.`,
+    `If he asks in English how to say something, answer with the ${target} phrase directly and invite him to try it.`,
+    `Do not answer in English. Use English only internally to understand him, then respond in ${target}.`,
+    styleRule,
+    'Keep one idea per reply. Do not lecture about grammar.',
+    'Actively guide him with short real-life scenarios and conversation topics: doctor, pharmacy, café, restaurant, supermarket, neighbour, work, football, architecture, lifestyle, fashion, transport and daily life.',
     'If the conversation stalls, propose one simple topic or situation and ask one easy question. Never invent current news, new venues or regulations unless they are verified in the conversation.',
     'If he is stuck, give him the beginning of the sentence so he can finish it.',
-    'On every user turn, first restate the ENTIRE intended sentence in natural spoken Dutch, not just the wrong word. Then answer immediately. Keep both inside the same 20-word limit.',
-    'Useful personal context: ING/IT, Hondinn, padel, investing, Kapellen/Antwerp, business, cars and renovation.'
+    `On every user turn, first restate the ENTIRE intended sentence in natural spoken ${target}, not just the wrong word. Then answer immediately. Keep both inside the same 20-word limit.`,
+    'Use his real life naturally when useful: ING/IT, Hondinn, padel, investing, Kapellen/Antwerp, business, cars and renovation.'
   ].join(' ');
 }
 
@@ -479,6 +560,7 @@ function updateDifficultyUi() {
   difficultyValue.textContent = String(difficulty);
   if (difficultyToggleValue) difficultyToggleValue.textContent = String(difficulty);
   difficultyName.textContent = `${meta.cefr} · ${meta.name}`;
+  if (levelLabel) levelLabel.textContent = languageConfig().level;
   difficultySlider.style.setProperty('--level-progress', `${((difficulty - 1) / 4) * 100}%`);
 }
 
@@ -812,7 +894,8 @@ async function sendTypedTurn(text) {
         messages: currentMessages,
         kickoff: false,
         difficulty,
-        correctionLevel: correctionLevel.value || 'medium'
+        correctionLevel: correctionLevel.value || 'medium',
+        targetLanguage
       })
     });
 
@@ -862,7 +945,7 @@ async function sendTypedTurn(text) {
   } finally {
     activeChatAbort = null;
     isResponding = false;
-    if (connected) setStatus('Ready — spreek Vlaams');
+    if (connected) setStatus(languageConfig().ready);
   }
 }
 
@@ -882,7 +965,8 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
         messages,
         kickoff,
         difficulty,
-        correctionLevel: correctionLevel.value || 'medium'
+        correctionLevel: correctionLevel.value || 'medium',
+        targetLanguage
       })
     });
 
@@ -915,7 +999,7 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
     activeTalkStream = null;
     isResponding = false;
 
-    if (connected) setStatus('Ready — spreek Vlaams');
+    if (connected) setStatus(languageConfig().ready);
   }
 }
 
@@ -1019,7 +1103,7 @@ function attachAnamListeners(client) {
     micLabel.textContent = 'Camille connected';
     endButton.disabled = false;
     setAvatarLive(true);
-    setStatus('Ready — spreek Vlaams');
+    setStatus(languageConfig().ready);
   });
 
   client.addListener(AnamEvent.VIDEO_PLAY_STARTED, () => {
@@ -1060,7 +1144,9 @@ function attachAnamListeners(client) {
     if (connected) {
       try {
         anamClient?.addContext(
-          'NEXT REPLY RULE: Dutch only. First give Ulas\'s FULL corrected sentence, not a single-word correction, then answer immediately. Maximum 20 words total. Use simple everyday Flemish.'
+          targetLanguage === 'fr'
+            ? 'NEXT REPLY RULE: French only. First give Ulas\'s FULL corrected sentence, not a single-word correction, then answer immediately. Maximum 20 words total. Use simple everyday French.'
+            : 'NEXT REPLY RULE: Dutch/Flemish only. First give Ulas\'s FULL corrected sentence, not a single-word correction, then answer immediately. Maximum 20 words total. Use simple everyday Flemish.'
         );
       } catch {}
     }
@@ -1131,7 +1217,7 @@ async function connect() {
       micLabel.textContent = 'Camille connected';
       endButton.disabled = false;
       setAvatarLive(true);
-      setStatus('Ready — spreek Vlaams');
+      setStatus(languageConfig().ready);
     }
 
     beginHistorySession();
@@ -1268,6 +1354,29 @@ difficultyToggle?.addEventListener('click', () => {
   document.body.classList.toggle('level-expanded');
 });
 
+languageToggle?.addEventListener('click', () => {
+  targetLanguage = targetLanguage === 'nl' ? 'fr' : 'nl';
+  localStorage.setItem(LANGUAGE_KEY, targetLanguage);
+
+  // Keep the same level, teaching method and session; only switch target language.
+  updateLanguageUi(true);
+  learnedWords = [];
+  saveJson(WORDS_KEY, learnedWords);
+  renderWordsDialog();
+
+  if (connected) {
+    pushLearningContext();
+    try {
+      anamClient?.addContext(
+        targetLanguage === 'fr'
+          ? 'LANGUAGE SWITCH: from now on speak ONLY French. Keep exactly the same coaching method, full-sentence correction, brevity and practical style.'
+          : 'LANGUAGE SWITCH: from now on speak ONLY Belgian Dutch/Flemish. Keep exactly the same coaching method, full-sentence correction, brevity and practical style.'
+      );
+    } catch {}
+    setStatus(languageConfig().ready);
+  }
+});
+
 historyButton.addEventListener('click', () => {
   renderHistoryDialog();
   historyDialog.showModal();
@@ -1298,6 +1407,7 @@ window.addEventListener('unhandledrejection', event => {
 });
 
 updateDifficultyUi();
+updateLanguageUi(true);
 setAvatarLive(false);
 
 // ---- PWA install support ----
