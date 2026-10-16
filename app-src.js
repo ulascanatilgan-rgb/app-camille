@@ -1183,8 +1183,8 @@ function attachAnamListeners(client) {
       try {
         anamClient?.addContext(
           targetLanguage === 'fr'
-            ? 'NEXT REPLY RULE: French only. First give Ulas\'s FULL corrected sentence, not a single-word correction, then answer immediately. Maximum 20 words total. Use simple everyday French.'
-            : 'NEXT REPLY RULE: Dutch/Flemish only. First give Ulas\'s FULL corrected sentence, not a single-word correction, then answer immediately. Maximum 20 words total. Use simple everyday Flemish.'
+            ? 'NEXT REPLY RULE: French only. First give the FULL corrected sentence, then answer. Stay under 20 words. Be proactive: when possible teach one useful work/daily phrase or verb.'
+            : 'NEXT REPLY RULE: Dutch/Flemish only. First give the FULL corrected sentence, then answer. Stay under 20 words. Be proactive: when possible teach one useful work/daily phrase or verb.'
         );
       } catch {}
     }
