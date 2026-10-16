@@ -55,8 +55,10 @@ const avatarGoal = document.getElementById('avatarGoal');
 const levelLabel = document.getElementById('levelLabel');
 const modeHint = document.getElementById('modeHint');
 
-const HISTORY_KEY = 'camille.history.v2';
-const WORDS_KEY = 'camille.words.v2';
+const LEGACY_HISTORY_KEY = 'camille.history.v2';
+const LEGACY_WORDS_KEY = 'camille.words.v2';
+const HISTORY_BASE_KEY = 'camille.history.v3';
+const WORDS_BASE_KEY = 'camille.words.v3';
 const LEVEL_KEY = 'camille.difficulty.v1';
 const LANGUAGE_KEY = 'camille.targetLanguage.v1';
 
@@ -86,9 +88,9 @@ const translationByMessageId = new Map();
 const lengthInterruptedIds = new Set();
 let vocabQueue = Promise.resolve();
 
-let learnedWords = loadJson(WORDS_KEY, []);
 let difficulty = clampLevel(Number(localStorage.getItem(LEVEL_KEY) || 2));
 let targetLanguage = localStorage.getItem(LANGUAGE_KEY) === 'fr' ? 'fr' : 'nl';
+let learnedWords = [];
 
 let lastSubtitlePair = {
   nl: "Hey Ulas. Hoe is 't vandaag?",
@@ -111,7 +113,7 @@ const languageUi = {
     locale: 'nl-BE',
     eyebrow: 'PRACTICAL FLEMISH',
     title: 'Praat gewoon.',
-    description: 'Short, useful Flemish for daily life, work and business.',
+    description: 'Practical spoken Flemish for work, daily life and real conversations.',
     goal: '6 months · Flanders',
     level: 'DUTCH LEVEL',
     hint: 'Speak or type in Dutch or English. Camille always answers in Dutch.',
@@ -127,7 +129,7 @@ const languageUi = {
     locale: 'fr-FR',
     eyebrow: 'PRACTICAL FRENCH',
     title: 'Parle simplement.',
-    description: 'Short, useful French for daily life, work and real conversations.',
+    description: 'Practical spoken French for work, daily life and real conversations.',
     goal: '6 months · French',
     level: 'FRENCH LEVEL',
     hint: 'Speak or type in French or English. Camille always answers in French.',
@@ -159,6 +161,36 @@ function updateLanguageUi(resetSubtitle = false) {
     lastSubtitlePair = { nl: cfg.greeting, en: cfg.greetingEn };
     setSubtitle(cfg.greeting, cfg.greetingEn);
     if (lastUserPinEn) lastUserPinEn.textContent = '';
+  }
+}
+
+function historyKey(language = targetLanguage) {
+  return `${HISTORY_BASE_KEY}.${language === 'fr' ? 'fr' : 'nl'}`;
+}
+
+function wordsKey(language = targetLanguage) {
+  return `${WORDS_BASE_KEY}.${language === 'fr' ? 'fr' : 'nl'}`;
+}
+
+function migrateLanguageStores() {
+  const dutchHistoryKey = historyKey('nl');
+  const dutchWordsKey = wordsKey('nl');
+
+  if (!localStorage.getItem(dutchHistoryKey)) {
+    const legacyHistory = loadJson(LEGACY_HISTORY_KEY, []);
+    if (Array.isArray(legacyHistory) && legacyHistory.length) {
+      saveJson(
+        dutchHistoryKey,
+        legacyHistory.map(session => ({ ...session, language: 'nl' }))
+      );
+    }
+  }
+
+  if (!localStorage.getItem(dutchWordsKey)) {
+    const legacyWords = loadJson(LEGACY_WORDS_KEY, []);
+    if (Array.isArray(legacyWords) && legacyWords.length) {
+      saveJson(dutchWordsKey, legacyWords);
+    }
   }
 }
 
@@ -534,10 +566,15 @@ function buildRuntimeContext() {
     `If he asks in English how to say something, answer with the ${target} phrase directly and invite him to try it.`,
     `Do not answer in English. Use English only internally to understand him, then respond in ${target}.`,
     styleRule,
-    'Keep one idea per reply. Do not lecture about grammar.',
-    'Actively guide him with short real-life scenarios and conversation topics: doctor, pharmacy, café, restaurant, supermarket, neighbour, work, football, architecture, lifestyle, fashion, transport and daily life.',
-    'If the conversation stalls, propose one simple topic or situation and ask one easy question. Never invent current news, new venues or regulations unless they are verified in the conversation.',
+    'Keep one idea per reply. Do not lecture about grammar. Teach through short examples, prompts and repetition.',
+    'Be proactive like a personal language teacher. Do not wait for Ulas to choose every topic. Regularly introduce one useful phrase, verb, question pattern or negative/positive pattern and ask him to use it.',
+    'Give high priority to work and project-follow-up language: project updates, emails, status, progress, blockers, ownership, meetings, deadlines, planning, changes, decisions and asking colleagues for clarification.',
+    isFrench
+      ? 'Useful work examples to teach naturally: "Tu as envoyé ce mail ?", "Quel est le statut actuel ?", "On est dans les temps ?", "On va tenir la deadline ?", "Tu prévois un changement bientôt ?", "Tu peux me faire un point ?"'
+      : 'Useful work examples to teach naturally: "Heb je die mail al gestuurd?", "Wat is de huidige status?", "Liggen we nog op schema?", "Halen we de deadline?", "Plan je binnenkort een wijziging?", "Kun je me even een update geven?"',
+    'Also teach daily-life street language: appointments, doctor, café, neighbours, shopping, transport, phone calls and practical requests.',
     'If he is stuck, give him the beginning of the sentence so he can finish it.',
+    'Every few turns, proactively say a compact equivalent of: "You can also say it like this" or "This verb is very common", then give one short reusable example.',
     `On every user turn, first restate the ENTIRE intended sentence in natural spoken ${target}, not just the wrong word. Then answer immediately. Keep both inside the same 20-word limit.`,
     'Use his real life naturally when useful: ING/IT, Hondinn, padel, investing, Kapellen/Antwerp, business, cars and renovation.'
   ].join(' ');
@@ -571,22 +608,23 @@ function beginHistorySession() {
     globalThis.crypto?.randomUUID?.() ||
     `session-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-  const history = loadJson(HISTORY_KEY, []);
+  const history = loadJson(historyKey(), []);
   history.push({
     id: currentHistorySessionId,
     startedAt: new Date().toISOString(),
     endedAt: null,
     difficulty,
+    language: targetLanguage,
     messages: []
   });
 
-  saveJson(HISTORY_KEY, history.slice(-180));
+  saveJson(historyKey(), history.slice(-180));
 }
 
 function saveCurrentHistory() {
   if (!currentHistorySessionId) return;
 
-  const history = loadJson(HISTORY_KEY, []);
+  const history = loadJson(historyKey(), []);
   const session = history.find(item => item.id === currentHistorySessionId);
   if (!session) return;
 
@@ -603,19 +641,19 @@ function saveCurrentHistory() {
       en: translationByMessageId.get(message.id) || ''
     }));
 
-  saveJson(HISTORY_KEY, history.slice(-180));
+  saveJson(historyKey(), history.slice(-180));
 }
 
 function endHistorySession() {
   if (!currentHistorySessionId) return;
 
   saveCurrentHistory();
-  const history = loadJson(HISTORY_KEY, []);
+  const history = loadJson(historyKey(), []);
   const session = history.find(item => item.id === currentHistorySessionId);
 
   if (session) {
     session.endedAt = new Date().toISOString();
-    saveJson(HISTORY_KEY, history.slice(-180));
+    saveJson(historyKey(), history.slice(-180));
   }
 
   currentHistorySessionId = null;
@@ -648,13 +686,13 @@ function formatTime(iso) {
 
 function renderHistoryDialog() {
   saveCurrentHistory();
-  const history = loadJson(HISTORY_KEY, [])
+  const history = loadJson(historyKey(), [])
     .filter(session => Array.isArray(session.messages) && session.messages.length)
     .slice()
     .reverse();
 
   historyContent.innerHTML = '';
-  historyCount.textContent = `${history.length} sessions`;
+  historyCount.textContent = `${history.length} ${languageConfig().name} sessions`;
 
   if (!history.length) {
     const empty = document.createElement('div');
@@ -769,7 +807,7 @@ async function captureVocabulary(text, vocabularyId) {
 
     learnedWords.push(learned);
     learnedWords = learnedWords.slice(-800);
-    saveJson(WORDS_KEY, learnedWords);
+    saveJson(wordsKey(), learnedWords);
     showWordCard(learned);
   } catch (error) {
     console.warn('Vocabulary capture failed:', error);
@@ -813,9 +851,9 @@ function processVocabularyProgress(messageId, text, endOfSpeech = false) {
 }
 
 function renderWordsDialog() {
-  learnedWords = loadJson(WORDS_KEY, []);
+  learnedWords = loadJson(wordsKey(), []);
   wordsContent.innerHTML = '';
-  wordsCount.textContent = `${learnedWords.length} words`;
+  wordsCount.textContent = `${learnedWords.length} ${languageConfig().name} words`;
 
   if (!learnedWords.length) {
     const empty = document.createElement('div');
@@ -1145,8 +1183,8 @@ function attachAnamListeners(client) {
       try {
         anamClient?.addContext(
           targetLanguage === 'fr'
-            ? 'NEXT REPLY RULE: French only. First give Ulas\'s FULL corrected sentence, not a single-word correction, then answer immediately. Maximum 20 words total. Use simple everyday French.'
-            : 'NEXT REPLY RULE: Dutch/Flemish only. First give Ulas\'s FULL corrected sentence, not a single-word correction, then answer immediately. Maximum 20 words total. Use simple everyday Flemish.'
+            ? 'NEXT REPLY RULE: French only. First give the FULL corrected sentence, then answer. Stay under 20 words. Be proactive: when possible teach one useful work/daily phrase or verb.'
+            : 'NEXT REPLY RULE: Dutch/Flemish only. First give the FULL corrected sentence, then answer. Stay under 20 words. Be proactive: when possible teach one useful work/daily phrase or verb.'
         );
       } catch {}
     }
@@ -1355,20 +1393,38 @@ difficultyToggle?.addEventListener('click', () => {
 });
 
 languageToggle?.addEventListener('click', () => {
+  // Close the current language session before switching so archives never mix.
+  if (currentHistorySessionId) endHistorySession();
+
   targetLanguage = targetLanguage === 'nl' ? 'fr' : 'nl';
   localStorage.setItem(LANGUAGE_KEY, targetLanguage);
 
-  // Keep the same level, teaching method and session; only switch target language.
+  learnedWords = loadJson(wordsKey(), []);
+  currentMessages = [];
+  translationByMessageId.clear();
+  streamBuffers.clear();
+  vocabProcessedIds.clear();
+  vocabSentenceCounts.clear();
+  activeSubtitleMessageId = null;
+  pinnedUserMessageId = null;
+  lastProcessedUserMessageId = null;
+  lastUserPin.hidden = true;
+  lastUserPinText.textContent = '';
+  if (lastUserPinEn) lastUserPinEn.textContent = '';
+  messagesEl.innerHTML = '';
+
   updateLanguageUi(true);
   renderWordsDialog();
+  renderHistoryDialog();
 
   if (connected) {
+    beginHistorySession();
     pushLearningContext();
     try {
       anamClient?.addContext(
         targetLanguage === 'fr'
-          ? 'LANGUAGE SWITCH: from now on speak ONLY French. Keep exactly the same coaching method, full-sentence correction, brevity and practical style.'
-          : 'LANGUAGE SWITCH: from now on speak ONLY Belgian Dutch/Flemish. Keep exactly the same coaching method, full-sentence correction, brevity and practical style.'
+          ? 'LANGUAGE SWITCH: from now on speak ONLY French. Same correction method, but be more proactive: teach useful work/project phrases and daily spoken patterns without waiting for Ulas.'
+          : 'LANGUAGE SWITCH: from now on speak ONLY Belgian Dutch/Flemish. Same correction method, but be more proactive: teach useful work/project phrases and daily spoken patterns without waiting for Ulas.'
       );
     } catch {}
     setStatus(languageConfig().ready);
@@ -1404,6 +1460,8 @@ window.addEventListener('unhandledrejection', event => {
   console.error('Unhandled error:', event.reason);
 });
 
+migrateLanguageStores();
+learnedWords = loadJson(wordsKey(), []);
 updateDifficultyUi();
 updateLanguageUi(true);
 setAvatarLive(false);
