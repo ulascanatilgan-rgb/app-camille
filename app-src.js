@@ -106,6 +106,14 @@ const difficultyMeta = {
   5: { cefr: 'C1', name: 'Advanced', maxWords: 20, sentence: 'concise natural' }
 };
 
+const englishDifficultyMeta = {
+  1: { cefr: 'B1', name: 'Clear' },
+  2: { cefr: 'B2', name: 'Professional' },
+  3: { cefr: 'B2+', name: 'Fluent' },
+  4: { cefr: 'C1', name: 'Polished' },
+  5: { cefr: 'C1+', name: 'Executive' }
+};
+
 const languageUi = {
   nl: {
     short: 'NL',
@@ -173,7 +181,8 @@ function updateLanguageUi(resetSubtitle = false) {
   levelLabel.textContent = cfg.level;
   modeHint.textContent = cfg.hint;
   typeInput.placeholder = cfg.placeholder;
-  difficultyName.textContent = `${difficultyMeta[difficulty].cefr} · ${difficultyMeta[difficulty].name}`;
+  const displayMeta = targetLanguage === 'en' ? englishDifficultyMeta[difficulty] : difficultyMeta[difficulty];
+  difficultyName.textContent = `${displayMeta.cefr} · ${displayMeta.name}`;
 
   if (resetSubtitle) {
     lastSubtitlePair = { nl: cfg.greeting, en: cfg.greetingEn };
