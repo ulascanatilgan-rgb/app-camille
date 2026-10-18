@@ -134,7 +134,7 @@ function difficultyInstruction(level, language) {
 }
 
 function correctionInstruction(level, language) {
-  const target = language === 'fr' ? 'French' : 'Dutch/Flemish';
+  const target = language === 'en' ? 'English' : language === 'fr' ? 'French' : 'Dutch/Flemish';
   if (level === 'strict') {
     return `Every turn: give the complete corrected ${target} sentence first, never a word-only correction. Strict may be slightly more explicit, but stay short.`;
   }
