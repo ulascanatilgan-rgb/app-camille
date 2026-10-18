@@ -89,7 +89,8 @@ const lengthInterruptedIds = new Set();
 let vocabQueue = Promise.resolve();
 
 let difficulty = clampLevel(Number(localStorage.getItem(LEVEL_KEY) || 2));
-let targetLanguage = localStorage.getItem(LANGUAGE_KEY) === 'fr' ? 'fr' : 'nl';
+const savedLanguage = localStorage.getItem(LANGUAGE_KEY);
+let targetLanguage = ['nl', 'fr', 'en'].includes(savedLanguage) ? savedLanguage : 'nl';
 let learnedWords = [];
 
 let lastSubtitlePair = {
@@ -103,6 +104,14 @@ const difficultyMeta = {
   3: { cefr: 'B1', name: 'Everyday', maxWords: 16, sentence: 'short' },
   4: { cefr: 'B2', name: 'Natural', maxWords: 18, sentence: 'short natural' },
   5: { cefr: 'C1', name: 'Advanced', maxWords: 20, sentence: 'concise natural' }
+};
+
+const englishDifficultyMeta = {
+  1: { cefr: 'B1', name: 'Clear' },
+  2: { cefr: 'B2', name: 'Professional' },
+  3: { cefr: 'B2+', name: 'Fluent' },
+  4: { cefr: 'C1', name: 'Polished' },
+  5: { cefr: 'C1+', name: 'Executive' }
 };
 
 const languageUi = {
@@ -137,6 +146,22 @@ const languageUi = {
     greeting: 'Salut Ulas. Ça va aujourd’hui ?',
     greetingEn: 'Hi Ulas. How are you today?',
     ready: 'Ready — parle français'
+  },
+  en: {
+    short: 'EN',
+    name: 'English',
+    coach: 'Professional English',
+    locale: 'en-GB',
+    eyebrow: 'PROFESSIONAL ENGLISH',
+    title: 'Speak with impact.',
+    description: 'Fluent, polished English for meetings, stakeholders, interviews and international work.',
+    goal: 'Professional · Global',
+    level: 'ENGLISH LEVEL',
+    hint: 'Speak or type in English. Camille improves clarity, fluency and professional impact.',
+    placeholder: 'Write in English…',
+    greeting: 'Hi Ulas. What are you working on today?',
+    greetingEn: '',
+    ready: 'Ready — professional English'
   }
 };
 
@@ -147,7 +172,8 @@ function languageConfig() {
 function updateLanguageUi(resetSubtitle = false) {
   const cfg = languageConfig();
   languageToggleLabel.textContent = cfg.short;
-  languageToggle.title = targetLanguage === 'nl' ? 'Switch to French' : 'Switch to Dutch';
+  const nextLanguage = targetLanguage === 'nl' ? 'French' : targetLanguage === 'fr' ? 'English' : 'Dutch';
+  languageToggle.title = `Switch to ${nextLanguage}`;
   practiceEyebrow.textContent = cfg.eyebrow;
   practiceTitle.textContent = cfg.title;
   practiceDescription.textContent = cfg.description;
@@ -155,7 +181,8 @@ function updateLanguageUi(resetSubtitle = false) {
   levelLabel.textContent = cfg.level;
   modeHint.textContent = cfg.hint;
   typeInput.placeholder = cfg.placeholder;
-  difficultyName.textContent = `${difficultyMeta[difficulty].cefr} · ${difficultyMeta[difficulty].name}`;
+  const displayMeta = targetLanguage === 'en' ? englishDifficultyMeta[difficulty] : difficultyMeta[difficulty];
+  difficultyName.textContent = `${displayMeta.cefr} · ${displayMeta.name}`;
 
   if (resetSubtitle) {
     lastSubtitlePair = { nl: cfg.greeting, en: cfg.greetingEn };
@@ -164,12 +191,16 @@ function updateLanguageUi(resetSubtitle = false) {
   }
 }
 
+function languageStoreSuffix(language = targetLanguage) {
+  return ['nl', 'fr', 'en'].includes(language) ? language : 'nl';
+}
+
 function historyKey(language = targetLanguage) {
-  return `${HISTORY_BASE_KEY}.${language === 'fr' ? 'fr' : 'nl'}`;
+  return `${HISTORY_BASE_KEY}.${languageStoreSuffix(language)}`;
 }
 
 function wordsKey(language = targetLanguage) {
-  return `${WORDS_BASE_KEY}.${language === 'fr' ? 'fr' : 'nl'}`;
+  return `${WORDS_BASE_KEY}.${languageStoreSuffix(language)}`;
 }
 
 function migrateLanguageStores() {
@@ -266,7 +297,8 @@ function limitCamilleReply(text) {
   if (!original) return { text: '', limited: false };
 
   const words = original.split(/\s+/).filter(Boolean);
-  let limited = words.slice(0, 20).join(' ');
+  const maxWords = targetLanguage === 'en' ? 28 : 20;
+  let limited = words.slice(0, maxWords).join(' ');
 
   const sentenceEnds = [...limited.matchAll(/[.!?](?=\s|$)/g)];
   if (sentenceEnds.length > 3) {
@@ -275,7 +307,7 @@ function limitCamilleReply(text) {
 
   return {
     text: limited,
-    limited: words.length > 20 || sentenceEnds.length > 3
+    limited: words.length > (targetLanguage === 'en' ? 28 : 20) || sentenceEnds.length > 3
   };
 }
 
@@ -479,7 +511,7 @@ async function finalizeUserTranslation(text, messageId) {
 
 async function translateToEnglish(text) {
   const clean = (text || '').trim();
-  if (!clean) return '';
+  if (!clean || targetLanguage === 'en') return '';
 
   try {
     const response = await fetch('/translate', {
@@ -532,51 +564,73 @@ async function finalizeSubtitle(nlText, messageId) {
 function buildRuntimeContext() {
   const meta = difficultyMeta[difficulty];
   const isFrench = targetLanguage === 'fr';
-  const target = isFrench ? 'French' : 'Dutch/Flemish';
+  const isEnglish = targetLanguage === 'en';
+  const target = isEnglish ? 'English' : isFrench ? 'French' : 'Dutch/Flemish';
 
-  const levelRules = isFrench
+  const levelRules = isEnglish
     ? {
-        1: 'Use very easy A1 French. Speak slowly. Aim for 6–10 words total.',
-        2: 'Use only very common A1–A2 practical spoken French. Speak slowly. Aim for 8–12 words total.',
-        3: 'Use practical B1 French. Speak calmly and clearly. Aim for 12–16 words total.',
-        4: 'Use natural B2 French. Speak clearly at a calm natural pace. Aim for 14–18 words total.',
-        5: 'Use advanced natural French, but stay concise. Never exceed 20 words total.'
+        1: 'Use clear B1 professional English. Keep it accessible and practical. Aim for 12–18 words.',
+        2: 'Use fluent B2 professional English. Natural business vocabulary, common collocations and concise phrasing. Aim for 16–22 words.',
+        3: 'Use strong B2+ professional English. Add nuance, phrasal verbs and polished workplace phrasing. Aim for 18–24 words.',
+        4: 'Use C1 professional English. Sound confident, natural and internationally polished. Aim for 20–26 words.',
+        5: 'Use rich C1+ professional English. Precise, fluent and executive-ready, but concise. Never exceed 28 words.'
       }
-    : {
-        1: 'Use very easy A1 Dutch. Speak slowly. Aim for 6–10 words total.',
-        2: 'Use only very common A1–A2 practical Flemish. Avoid rare words, idioms and long compounds. Speak slowly. Aim for 8–12 words total.',
-        3: 'Use practical B1 Dutch. Speak calmly and clearly. Aim for 12–16 words total.',
-        4: 'Use natural B2 Flemish. Speak clearly at a calm natural pace. Aim for 14–18 words total.',
-        5: 'Use advanced natural Flemish, but stay concise. Never exceed 20 words total.'
-      };
+    : isFrench
+      ? {
+          1: 'Use very easy A1 French. Speak slowly. Aim for 6–10 words total.',
+          2: 'Use only very common A1–A2 practical spoken French. Speak slowly. Aim for 8–12 words total.',
+          3: 'Use practical B1 French. Speak calmly and clearly. Aim for 12–16 words total.',
+          4: 'Use natural B2 French. Speak clearly at a calm natural pace. Aim for 14–18 words total.',
+          5: 'Use advanced natural French, but stay concise. Never exceed 20 words total.'
+        }
+      : {
+          1: 'Use very easy A1 Dutch. Speak slowly. Aim for 6–10 words total.',
+          2: 'Use only very common A1–A2 practical Flemish. Avoid rare words, idioms and long compounds. Speak slowly. Aim for 8–12 words total.',
+          3: 'Use practical B1 Dutch. Speak calmly and clearly. Aim for 12–16 words total.',
+          4: 'Use natural B2 Flemish. Speak clearly at a calm natural pace. Aim for 14–18 words total.',
+          5: 'Use advanced natural Flemish, but stay concise. Never exceed 20 words total.'
+        };
 
-  const styleRule = isFrench
-    ? 'Use simple modern spoken French, not schoolbook French. Prefer natural everyday phrasing, common contractions and informal but broadly understandable usage. Avoid heavy regional slang.'
-    : 'Use simple modern spoken Belgian Dutch/Flemish, not schoolbook Dutch. Prefer short informal daily phrasing with je/jij, natural omissions and common contractions, but avoid heavy dialect that an A2 learner cannot reuse.';
+  const styleRule = isEnglish
+    ? 'Use polished, fluent international professional English. Improve clarity, confidence, natural rhythm, collocations, softening, stakeholder language and executive-style phrasing. Avoid stiff textbook English and unnecessary jargon.'
+    : isFrench
+      ? 'Use simple modern spoken French, not schoolbook French. Prefer natural everyday phrasing, common contractions and informal but broadly understandable usage. Avoid heavy regional slang.'
+      : 'Use simple modern spoken Belgian Dutch/Flemish, not schoolbook Dutch. Prefer short informal daily phrasing with je/jij, natural omissions and common contractions, but avoid heavy dialect that an A2 learner cannot reuse.';
+
+  const workExamples = isEnglish
+    ? 'Useful professional examples to teach naturally: "Have you sent that email yet?", "What’s the current status?", "Are we still on track?", "Are we likely to hit the deadline?", "Is anything blocking progress?", "Could you give me a quick update?", "Do you foresee any changes?"'
+    : isFrench
+      ? 'Useful work examples to teach naturally: "Tu as envoyé ce mail ?", "Quel est le statut actuel ?", "On est dans les temps ?", "On va tenir la deadline ?", "Tu prévois un changement bientôt ?", "Tu peux me faire un point ?"'
+      : 'Useful work examples to teach naturally: "Heb je die mail al gestuurd?", "Wat is de huidige status?", "Liggen we nog op schema?", "Halen we de deadline?", "Plan je binnenkort een wijziging?", "Kun je me even een update geven?"';
 
   return [
     'SESSION LEARNING CONTEXT — IMPORTANT:',
     `You are Camille, Ulas Atilgan’s practical ${target} conversation coach.`,
-    `The goal is short, useful, real-life speaking in ${target} — not grammar study.`,
+    isEnglish
+      ? 'The goal is fluent, confident, high-quality professional English for international work and real conversations.'
+      : `The goal is short, useful, real-life speaking in ${target} — not grammar study.`,
     `Current difficulty is level ${difficulty}/5 (${meta.cefr}, ${meta.name}).`,
     levelRules[difficulty],
-    'HARD LIMIT: maximum 20 spoken words total and maximum 3 short sentences. Prefer 1–2 sentences.',
-    `You MUST understand English normally, whether Ulas speaks it or types it. Camille must still answer in ${target} only.`,
-    `When Ulas switches to English because he is stuck, understand him and immediately give the short natural ${target} expression.`,
-    `If he asks in English how to say something, answer with the ${target} phrase directly and invite him to try it.`,
-    `Do not answer in English. Use English only internally to understand him, then respond in ${target}.`,
+    isEnglish
+      ? 'HARD LIMIT: maximum 28 spoken words total and maximum 3 short sentences. Prefer one polished correction plus one useful answer.'
+      : 'HARD LIMIT: maximum 20 spoken words total and maximum 3 short sentences. Prefer 1–2 sentences.',
+    isEnglish
+      ? 'Always answer in English. Correct awkward, vague or non-native phrasing into fluent professional English before answering.'
+      : `You MUST understand English normally, whether Ulas speaks it or types it. Camille must still answer in ${target} only.`,
+    isEnglish
+      ? 'Do not simplify English unnaturally. Keep it fluent and richer than the Dutch/French modes, while remaining practical and conversational.'
+      : `When Ulas switches to English because he is stuck, understand him and immediately give the short natural ${target} expression.`,
     styleRule,
-    'Keep one idea per reply. Do not lecture about grammar. Teach through short examples, prompts and repetition.',
-    'Be proactive like a personal language teacher. Do not wait for Ulas to choose every topic. Regularly introduce one useful phrase, verb, question pattern or negative/positive pattern and ask him to use it.',
-    'Give high priority to work and project-follow-up language: project updates, emails, status, progress, blockers, ownership, meetings, deadlines, planning, changes, decisions and asking colleagues for clarification.',
-    isFrench
-      ? 'Useful work examples to teach naturally: "Tu as envoyé ce mail ?", "Quel est le statut actuel ?", "On est dans les temps ?", "On va tenir la deadline ?", "Tu prévois un changement bientôt ?", "Tu peux me faire un point ?"'
-      : 'Useful work examples to teach naturally: "Heb je die mail al gestuurd?", "Wat is de huidige status?", "Liggen we nog op schema?", "Halen we de deadline?", "Plan je binnenkort een wijziging?", "Kun je me even een update geven?"',
-    'Also teach daily-life street language: appointments, doctor, café, neighbours, shopping, transport, phone calls and practical requests.',
+    'Teach through short examples, prompts and repetition. Be proactive like a personal language teacher.',
+    'Give high priority to work and project-follow-up language: meetings, stakeholder updates, emails, status, progress, blockers, ownership, deadlines, planning, decisions, negotiation, disagreement, clarification and next steps.',
+    workExamples,
+    isEnglish
+      ? 'Also teach professional collocations, phrasal verbs, diplomatic disagreement, concise executive wording, interview answers and presentation language.'
+      : 'Also teach daily-life street language: appointments, doctor, café, neighbours, shopping, transport, phone calls and practical requests.',
     'If he is stuck, give him the beginning of the sentence so he can finish it.',
-    'Every few turns, proactively say a compact equivalent of: "You can also say it like this" or "This verb is very common", then give one short reusable example.',
-    `On every user turn, first restate the ENTIRE intended sentence in natural spoken ${target}, not just the wrong word. Then answer immediately. Keep both inside the same 20-word limit.`,
-    'Use his real life naturally when useful: ING/IT, Hondinn, padel, investing, Kapellen/Antwerp, business, cars and renovation.'
+    'Every few turns, proactively introduce one stronger or more natural alternative and one reusable phrase.',
+    `On every user turn, first restate the ENTIRE intended sentence in natural spoken ${target}, not just one word. Then answer immediately.`,
+    'Use his real life naturally when useful: ING/IT, Hondinn, job interviews, project work, investing, business, cars and renovation.'
   ].join(' ');
 }
 
@@ -592,7 +646,7 @@ function pushLearningContext() {
 }
 
 function updateDifficultyUi() {
-  const meta = difficultyMeta[difficulty];
+  const meta = targetLanguage === 'en' ? englishDifficultyMeta[difficulty] : difficultyMeta[difficulty];
   difficultySlider.value = String(difficulty);
   difficultyValue.textContent = String(difficulty);
   if (difficultyToggleValue) difficultyToggleValue.textContent = String(difficulty);
@@ -1181,11 +1235,12 @@ function attachAnamListeners(client) {
     // Reinforce the hard brevity rule immediately before Camille's next turn.
     if (connected) {
       try {
-        anamClient?.addContext(
-          targetLanguage === 'fr'
-            ? 'NEXT REPLY RULE: French only. First give the FULL corrected sentence, then answer. Stay under 20 words. Be proactive: when possible teach one useful work/daily phrase or verb.'
-            : 'NEXT REPLY RULE: Dutch/Flemish only. First give the FULL corrected sentence, then answer. Stay under 20 words. Be proactive: when possible teach one useful work/daily phrase or verb.'
-        );
+        const nextRule = targetLanguage === 'fr'
+          ? 'NEXT REPLY RULE: French only. First give the FULL corrected sentence, then answer. Stay under 20 words. Be proactive.'
+          : targetLanguage === 'en'
+            ? 'NEXT REPLY RULE: English only. First give the FULL polished sentence, then answer. Stay under 28 words. Use fluent professional English with richer natural phrasing.'
+            : 'NEXT REPLY RULE: Dutch/Flemish only. First give the FULL corrected sentence, then answer. Stay under 20 words. Be proactive.';
+        anamClient?.addContext(nextRule);
       } catch {}
     }
   });
@@ -1393,10 +1448,9 @@ difficultyToggle?.addEventListener('click', () => {
 });
 
 languageToggle?.addEventListener('click', () => {
-  // Close the current language session before switching so archives never mix.
   if (currentHistorySessionId) endHistorySession();
 
-  targetLanguage = targetLanguage === 'nl' ? 'fr' : 'nl';
+  targetLanguage = targetLanguage === 'nl' ? 'fr' : targetLanguage === 'fr' ? 'en' : 'nl';
   localStorage.setItem(LANGUAGE_KEY, targetLanguage);
 
   learnedWords = loadJson(wordsKey(), []);
@@ -1421,11 +1475,12 @@ languageToggle?.addEventListener('click', () => {
     beginHistorySession();
     pushLearningContext();
     try {
-      anamClient?.addContext(
-        targetLanguage === 'fr'
-          ? 'LANGUAGE SWITCH: from now on speak ONLY French. Same correction method, but be more proactive: teach useful work/project phrases and daily spoken patterns without waiting for Ulas.'
-          : 'LANGUAGE SWITCH: from now on speak ONLY Belgian Dutch/Flemish. Same correction method, but be more proactive: teach useful work/project phrases and daily spoken patterns without waiting for Ulas.'
-      );
+      const switchContext = targetLanguage === 'fr'
+        ? 'LANGUAGE SWITCH: speak ONLY French. Keep the same correction method and proactively teach useful work and daily spoken patterns.'
+        : targetLanguage === 'en'
+          ? 'LANGUAGE SWITCH: speak ONLY English. Make this mode more professional, fluent and linguistically rich. Improve business phrasing, stakeholder communication, collocations and natural confidence.'
+          : 'LANGUAGE SWITCH: speak ONLY Belgian Dutch/Flemish. Keep the same correction method and proactively teach useful work and daily spoken patterns.';
+      anamClient?.addContext(switchContext);
     } catch {}
     setStatus(languageConfig().ready);
   }

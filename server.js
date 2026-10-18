@@ -39,7 +39,23 @@ const tutorInstructions = [
   "Never use markdown, bullets or headings in spoken replies."
 ].join(' ');
 
+function normalizeTargetLanguage(value) {
+  return ['nl', 'fr', 'en'].includes(value) ? value : 'nl';
+}
+
 function targetLanguageInstruction(language) {
+  if (language === 'en') {
+    return [
+      'TARGET LANGUAGE: Professional English.',
+      'Always answer in English.',
+      'This mode should be more fluent, polished and linguistically rich than Dutch/French mode.',
+      'Use natural international business English: strong collocations, phrasal verbs, diplomatic softeners, concise executive phrasing and confident spoken rhythm.',
+      'Correct the complete sentence first, then answer. Offer a stronger professional version when useful.',
+      'Proactively teach phrases for meetings, stakeholder updates, interviews, presentations, negotiation, disagreement, project status, blockers, deadlines and next steps.',
+      'Useful examples: "Are we still on track?", "What’s the current status?", "Is anything blocking progress?", "Could you give me a quick update?", "Do you foresee any changes?", "I’d suggest we revisit this before we commit."'
+    ].join(' ');
+  }
+
   if (language === 'fr') {
     return [
       'TARGET LANGUAGE: French.',
@@ -63,7 +79,32 @@ function targetLanguageInstruction(language) {
 
 function difficultyInstruction(level, language) {
   const n = Math.max(1, Math.min(5, Number(level) || 2));
-  const target = language === 'fr' ? 'French' : 'Dutch/Flemish';
+  const target = language === 'en' ? 'English' : language === 'fr' ? 'French' : 'Dutch/Flemish';
+
+  if (language === 'en') {
+    const englishStyles = {
+      1: 'clear B1 professional English',
+      2: 'fluent B2 professional English',
+      3: 'strong B2+ professional English',
+      4: 'natural C1 professional English',
+      5: 'rich C1+ executive-ready English'
+    };
+    const englishRanges = {
+      1: '12 to 18 words',
+      2: '16 to 22 words',
+      3: '18 to 24 words',
+      4: '20 to 26 words',
+      5: '28 words or fewer'
+    };
+    return [
+      'Maximum 28 words total and maximum 3 short sentences.',
+      `Difficulty ${n}: ${englishStyles[n]}.`,
+      'Sound natural, polished and internationally professional.',
+      'Use richer vocabulary and collocations without becoming verbose or corporate-jargony.',
+      `Keep the whole reply around ${englishRanges[n]}.`
+    ].join(' ');
+  }
+
   const shared =
     'Absolute speaking limit: maximum 20 words total and maximum 3 short sentences. Prefer 1–2 sentences. Never exceed this.';
 
@@ -93,7 +134,7 @@ function difficultyInstruction(level, language) {
 }
 
 function correctionInstruction(level, language) {
-  const target = language === 'fr' ? 'French' : 'Dutch/Flemish';
+  const target = language === 'en' ? 'English' : language === 'fr' ? 'French' : 'Dutch/Flemish';
   if (level === 'strict') {
     return `Every turn: give the complete corrected ${target} sentence first, never a word-only correction. Strict may be slightly more explicit, but stay short.`;
   }
@@ -231,7 +272,7 @@ app.post('/chat', async (req, res) => {
   const correctionLevel = req.body?.correctionLevel || 'medium';
   const difficulty = Math.max(1, Math.min(5, Number(req.body?.difficulty) || 2));
   const kickoff = Boolean(req.body?.kickoff);
-  const targetLanguage = req.body?.targetLanguage === 'fr' ? 'fr' : 'nl';
+  const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
 
   const history = incoming
     .filter(message =>
@@ -251,7 +292,9 @@ app.post('/chat', async (req, res) => {
       role: 'user',
       content: targetLanguage === 'fr'
         ? '[Conversation start] Start now with one very short practical French sentence and one easy question. Do not explain grammar.'
-        : '[Conversation start] Start now with one very short practical Flemish sentence and one easy question. Do not explain grammar.'
+        : targetLanguage === 'en'
+          ? '[Conversation start] Start with one polished professional-English prompt about work, projects or stakeholder communication. Keep it conversational.'
+          : '[Conversation start] Start now with one very short practical Flemish sentence and one easy question. Do not explain grammar.'
     });
   }
 
@@ -262,7 +305,9 @@ app.post('/chat', async (req, res) => {
     correctionInstruction(correctionLevel, targetLanguage)
   ].join(' ');
 
-  const maxTokensByDifficulty = { 1: 24, 2: 28, 3: 32, 4: 36, 5: 40 };
+  const maxTokensByDifficulty = targetLanguage === 'en'
+    ? { 1: 36, 2: 44, 3: 52, 4: 58, 5: 64 }
+    : { 1: 24, 2: 28, 3: 32, 4: 36, 5: 40 };
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -337,8 +382,8 @@ app.post('/translate', async (req, res) => {
   }
 
   const text = req.body?.text?.trim();
-  const targetLanguage = req.body?.targetLanguage === 'fr' ? 'fr' : 'nl';
-  if (!text) return res.json({ translation: '' });
+  const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
+  if (!text || targetLanguage === 'en') return res.json({ translation: '' });
 
   try {
     const response = await fetch('https://api.openai.com/v1/responses', {
@@ -390,7 +435,7 @@ app.post('/vocab', async (req, res) => {
   }
 
   const text = String(req.body?.text || '').trim();
-  const targetLanguage = req.body?.targetLanguage === 'fr' ? 'fr' : 'nl';
+  const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
   const knownWords = Array.isArray(req.body?.knownWords)
     ? req.body.knownWords.filter(word => typeof word === 'string').slice(-120)
     : [];
@@ -416,16 +461,22 @@ app.post('/vocab', async (req, res) => {
             content: [
               targetLanguage === 'fr'
                 ? 'You select exactly one useful learning word from a spoken French sentence for an A2 learner.'
-                : 'You select exactly one useful learning word from a spoken Belgian Dutch/Flemish sentence for an A2 learner.',
+                : targetLanguage === 'en'
+                  ? 'You select exactly one useful professional-English word, collocation or short expression from the sentence.'
+                  : 'You select exactly one useful learning word from a spoken Belgian Dutch/Flemish sentence for an A2 learner.',
               targetLanguage === 'fr'
                 ? 'Prefer a practical noun, verb, adjective or short fixed expression useful in everyday French.'
-                : 'Prefer a practical noun, verb, adjective or short fixed expression that is useful in daily life in Flanders.',
+                : targetLanguage === 'en'
+                  ? 'Prefer professional collocations, phrasal verbs, concise workplace expressions, diplomatic wording or high-value business vocabulary.'
+                  : 'Prefer a practical noun, verb, adjective or short fixed expression that is useful in daily life in Flanders.',
               'Do not pick names, articles, pronouns, basic conjunctions, numbers, or trivial function words.',
               'Prefer a word not already learned.',
               'Return JSON only with this shape: {"nl":"...","en":"..."}.',
               targetLanguage === 'fr'
                 ? 'Use the natural French lemma or short expression in nl and a concise English meaning in en.'
-                : 'Use the natural Dutch lemma or short expression in nl and a concise English meaning in en.',
+                : targetLanguage === 'en'
+                  ? 'Put the English word or expression in nl and a short plain-English definition or stronger synonym in en.'
+                  : 'Use the natural Dutch lemma or short expression in nl and a concise English meaning in en.',
               'If there is no useful new item, return {"nl":"","en":""}.'
             ].join(' ')
           },
