@@ -646,7 +646,7 @@ function pushLearningContext() {
 }
 
 function updateDifficultyUi() {
-  const meta = difficultyMeta[difficulty];
+  const meta = targetLanguage === 'en' ? englishDifficultyMeta[difficulty] : difficultyMeta[difficulty];
   difficultySlider.value = String(difficulty);
   difficultyValue.textContent = String(difficulty);
   if (difficultyToggleValue) difficultyToggleValue.textContent = String(difficulty);
