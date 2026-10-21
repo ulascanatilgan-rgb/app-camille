@@ -171,6 +171,8 @@ function languageConfig() {
 
 function updateLanguageUi(resetSubtitle = false) {
   const cfg = languageConfig();
+  document.documentElement.lang = targetLanguage;
+  document.body.dataset.learningLanguage = targetLanguage;
   languageToggleLabel.textContent = cfg.short;
   const nextLanguage = targetLanguage === 'nl' ? 'French' : targetLanguage === 'fr' ? 'English' : 'Dutch';
   languageToggle.title = `Switch to ${nextLanguage}`;
@@ -184,6 +186,8 @@ function updateLanguageUi(resetSubtitle = false) {
   const displayMeta = targetLanguage === 'en' ? englishDifficultyMeta[difficulty] : difficultyMeta[difficulty];
   difficultyName.textContent = `${displayMeta.cefr} · ${displayMeta.name}`;
 
+  historyButton.setAttribute('aria-label', `${cfg.name} history`);
+  wordsButton.setAttribute('aria-label', `${cfg.name} saved words`);
   if (resetSubtitle) {
     lastSubtitlePair = { nl: cfg.greeting, en: cfg.greetingEn };
     setSubtitle(cfg.greeting, cfg.greetingEn);
@@ -1447,8 +1451,13 @@ difficultyToggle?.addEventListener('click', () => {
   document.body.classList.toggle('level-expanded');
 });
 
-languageToggle?.addEventListener('click', () => {
-  if (currentHistorySessionId) endHistorySession();
+languageToggle?.addEventListener('click', async () => {
+  // Stop the previous Anam persona session before changing the language.
+  // Otherwise the live avatar can keep speaking in its old language.
+  languageToggle.disabled = true;
+  try {
+    if (connected || connecting || anamClient) await disconnect();
+    if (currentHistorySessionId) endHistorySession();
 
   targetLanguage = targetLanguage === 'nl' ? 'fr' : targetLanguage === 'fr' ? 'en' : 'nl';
   localStorage.setItem(LANGUAGE_KEY, targetLanguage);
@@ -1471,18 +1480,12 @@ languageToggle?.addEventListener('click', () => {
   renderWordsDialog();
   renderHistoryDialog();
 
-  if (connected) {
-    beginHistorySession();
-    pushLearningContext();
-    try {
-      const switchContext = targetLanguage === 'fr'
-        ? 'LANGUAGE SWITCH: speak ONLY French. Keep the same correction method and proactively teach useful work and daily spoken patterns.'
-        : targetLanguage === 'en'
-          ? 'LANGUAGE SWITCH: speak ONLY English. Make this mode more professional, fluent and linguistically rich. Improve business phrasing, stakeholder communication, collocations and natural confidence.'
-          : 'LANGUAGE SWITCH: speak ONLY Belgian Dutch/Flemish. Keep the same correction method and proactively teach useful work and daily spoken patterns.';
-      anamClient?.addContext(switchContext);
-    } catch {}
-    setStatus(languageConfig().ready);
+  // A new session is required for a different language. No context or speech
+  // history is reused across Dutch, French and English.
+  setStatus(languageConfig().ready);
+  avatarPlaceholderText.textContent = `Ready for ${languageConfig().name}. Press Start conversation.`;
+  } finally {
+    languageToggle.disabled = false;
   }
 });
 
