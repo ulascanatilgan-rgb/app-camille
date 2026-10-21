@@ -9,6 +9,15 @@ const __dirname = path.dirname(__filename);
 const port = process.env.PORT || 3000;
 
 app.use(express.json({ limit: '1mb' }));
+// Prevent installed iOS PWAs from keeping old HTML, scripts and styles.
+app.use((req, res, next) => {
+  if (req.method === 'GET' && (/^\/$/.test(req.path) || /\.(?:html|js|css|webmanifest)$/.test(req.path) || req.path === '/sw.js')) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  next();
+});
 app.use(express.static(__dirname));
 
 const ANAM_API_BASE = 'https://api.anam.ai/v1';
