@@ -186,6 +186,10 @@ function updateLanguageUi(resetSubtitle = false) {
   const displayMeta = targetLanguage === 'en' ? englishDifficultyMeta[difficulty] : difficultyMeta[difficulty];
   difficultyName.textContent = `${displayMeta.cefr} · ${displayMeta.name}`;
 
+  const historyTitle = historyDialog?.querySelector('.archive-title-row h2');
+  const wordsTitle = wordsDialog?.querySelector('.archive-title-row h2');
+  if (historyTitle) historyTitle.textContent = `${cfg.name} History`;
+  if (wordsTitle) wordsTitle.textContent = `${cfg.name} Words`;
   historyButton.setAttribute('aria-label', `${cfg.name} history`);
   wordsButton.setAttribute('aria-label', `${cfg.name} saved words`);
   if (resetSubtitle) {
