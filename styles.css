@@ -2686,3 +2686,96 @@ dialog::backdrop {
     font-size: 8px;
   }
 }
+
+/* Camille warm paper refresh — October 2026 */
+@import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;500;600;700&display=swap');
+:root {
+  --bg: #f5f0e5;
+  --paper: #f8f3e9;
+  --cream: #efe7d8;
+  --ink: #191815;
+  --anthracite: #292723;
+  --muted: #514b42;
+  --soft: #746d62;
+  --line: #ddd3c3;
+  --line-dark: #c9bda9;
+  --english: #51483b;
+  --control: #25231f;
+}
+html, body, button, input, select, textarea {
+  font-family: 'Comfortaa', 'Trebuchet MS', Arial, sans-serif !important;
+  font-weight: 500;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+html, body, .app-shell, .workspace, .conversation-column {
+  background: var(--paper) !important;
+  color: var(--ink);
+}
+.topbar, .controls, .live-caption-card, .live-exchange-card,
+.conversation-separator, .history-date {
+  background: #f8f3e9 !important;
+}
+.topbar { border-bottom: 1px solid var(--line); }
+.avatar-column { background: #f1e9dc !important; }
+.portrait-wrap, .avatar-placeholder { border-radius: 19px; }
+.avatar-placeholder {
+  background: linear-gradient(150deg, #f7f0e4, #e6dac8);
+}
+.live-exchange-card, .live-caption-card, .subtitle-panel,
+.live-speaker, .bubble, .message.user .bubble, .word-card,
+.archive-dialog, .settings-card, dialog, .difficulty-panel,
+.type-composer, .type-input, #typeInput, .history-session,
+.word-list-row {
+  border-radius: 15px !important;
+}
+.live-exchange-card {
+  background: #f4eddf !important;
+  border: 1px solid #ded2be !important;
+  box-shadow: 0 5px 18px rgba(76,57,34,.035);
+}
+.live-speaker { background: transparent; }
+.message.user .bubble, .history-session, .word-list-row {
+  background: #f0e7d9 !important;
+}
+.nav-button, .language-toggle, .difficulty-toggle, .type-toggle,
+.type-composer button, .type-toggle, .mic-button, .end-button,
+.close-settings, .dialog-close, .icon-button, .text-button,
+#typeSend, .mode {
+  border-radius: 13px !important;
+}
+.mic-button { border-radius: 16px !important; }
+.word-card { border-left: 4px solid var(--yellow); }
+.eyebrow, .control-label, .live-exchange-label, .live-speaker-label,
+.conversation-separator span, .word-card-label {
+  font-weight: 700 !important;
+  letter-spacing: .055em !important;
+}
+.conversation-head h1, .subtitle-line, .dutch-line,
+.english-line, .assistant-fr, .assistant-en, .archive-title-row h2 {
+  font-weight: 600 !important;
+  letter-spacing: -.025em !important;
+  line-height: 1.42 !important;
+}
+.conversation-head h1 { font-weight: 600 !important; }
+.subtitle-line, .dutch-line, .assistant-fr { color: #191815 !important; }
+.english-line, .assistant-en { color: #4b443a !important; }
+.hint, .conversation-head p, .archive-count, .history-session-meta {
+  color: #554d42 !important;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.status, .nav-button, .language-toggle, .difficulty-name { font-weight: 600; }
+dialog, .archive-dialog { background: #f8f3e9 !important; border: 1px solid var(--line-dark); }
+.settings-card select, #typeInput { background: #fffaf0; color: var(--ink); }
+button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 3px solid #c69e39;
+  outline-offset: 2px;
+}
+button:disabled { cursor: not-allowed; }
+@media (max-width: 760px) {
+  .portrait-wrap { border-radius: 13px; }
+  .live-exchange-card { border-radius: 13px !important; }
+  .conversation-head h1 { line-height: 1.28 !important; }
+  .subtitle-line { line-height: 1.48 !important; }
+}
