@@ -106,15 +106,7 @@
           <div id="quickReplyBar" class="quick-reply-bar" hidden aria-label="Quick reply choices"></div>
         </section>
 
-        <div class="history-zone">
-          <div class="conversation-separator">
-            <span>HISTORY</span>
-          </div>
-
-          <section id="messages" class="messages" aria-live="polite">
-            <div class="history-empty-inline">Previous turns will appear here.</div>
-          </section>
-        </div>
+        <section id="messages" class="messages inline-history-store" hidden aria-hidden="true"></section>
 
         <section class="controls">
           <div class="difficulty-control">
@@ -172,10 +164,26 @@
             <button id="typeModeButton" class="interaction-mode-button" type="button" data-mode="type" aria-pressed="false">Type</button>
             <button id="buttonModeButton" class="interaction-mode-button" type="button" data-mode="button" aria-pressed="false">Button</button>
           </div>
+
+          <button id="sessionHistoryButton" class="session-history-button" type="button">History</button>
         </section>
       </section>
     </section>
   </main>
+
+  <dialog id="sessionHistoryDialog" class="session-history-dialog">
+    <div class="session-history-shell">
+      <header class="session-history-header">
+        <button id="closeSessionHistory" class="session-history-back" type="button" aria-label="Back to conversation">← Back</button>
+        <div>
+          <div class="eyebrow">CURRENT SESSION</div>
+          <h2>Conversation</h2>
+        </div>
+        <span id="sessionHistoryCount" class="session-history-count"></span>
+      </header>
+      <div id="sessionHistoryContent" class="session-history-content"></div>
+    </div>
+  </dialog>
 
   <dialog id="historyDialog" class="archive-dialog">
     <div class="archive-shell">
