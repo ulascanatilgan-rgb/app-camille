@@ -3295,3 +3295,103 @@ body.level-expanded .range-wrap {
     margin-top: 6px !important;
   }
 }
+
+
+/* ---- Graphik conversation + sharper history panel v29 ---- */
+#practiceTitle {
+  display: none !important;
+}
+
+.conversation-head {
+  min-height: 0 !important;
+  padding-bottom: 4px !important;
+}
+
+.live-exchange-card,
+.live-exchange-card *,
+.history-zone,
+.history-zone *,
+.type-composer input,
+#typeInput {
+  font-family: "Graphik", "Graphik Web", Arial, Helvetica, sans-serif !important;
+}
+
+.live-exchange-card .dutch-line {
+  font-weight: 400 !important;
+  letter-spacing: -.005em !important;
+  line-height: 1.44 !important;
+}
+
+.live-user .last-user-text {
+  font-weight: 400 !important;
+  letter-spacing: 0 !important;
+}
+
+.live-exchange-card .english-line,
+.last-user-en,
+.history-zone .assistant-fr,
+.history-zone .assistant-en,
+.history-zone .message.user .bubble {
+  font-weight: 400 !important;
+  letter-spacing: 0 !important;
+}
+
+.history-zone {
+  margin: 16px 20px 0 !important;
+  padding: 0 14px 10px !important;
+  background: #e9dfce !important;
+  border: 1px solid #d1c1aa !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+}
+
+.history-zone .conversation-separator {
+  margin: 0 !important;
+  min-height: 30px !important;
+  border: 0 !important;
+  border-bottom: 1px solid #d6c7b2 !important;
+  background: transparent !important;
+}
+
+.history-zone .conversation-separator::before {
+  width: 8px !important;
+  height: 2px !important;
+  background: #8e806c !important;
+}
+
+.history-zone .conversation-separator span {
+  color: #746958 !important;
+  font-size: 8px !important;
+  font-weight: 600 !important;
+  letter-spacing: .06em !important;
+}
+
+.history-zone .messages {
+  padding: 9px 0 4px !important;
+  opacity: .82 !important;
+}
+
+.history-zone .bubble,
+.history-zone .message.user .bubble {
+  border-radius: 3px !important;
+}
+
+.history-zone .message.user .bubble {
+  background: #f3ebde !important;
+}
+
+.history-zone .message.assistant .bubble {
+  border-left: 1px solid #b8a78f !important;
+}
+
+@media (max-width: 760px) {
+  .history-zone {
+    margin: 12px 9px 0 !important;
+    padding: 0 9px 7px !important;
+    border-radius: 3px !important;
+  }
+
+  .conversation-head {
+    padding-bottom: 2px !important;
+  }
+}
