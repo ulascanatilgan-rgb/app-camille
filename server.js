@@ -51,6 +51,17 @@ const tutorInstructions = [
   "Never use markdown, bullets or headings in spoken replies."
 ].join(' ');
 
+function choiceModeInstruction(enabled) {
+  if (!enabled) return '';
+
+  return [
+    'BUTTON REPLY MODE IS ON.',
+    'End every reply with exactly one short, concrete question that can naturally be answered using two distinct one- or two-word options.',
+    'Do not list the two options in the spoken response; the interface generates them separately.',
+    'Prefer questions that move the conversation forward and make the learner choose, react or express a simple preference.'
+  ].join(' ');
+}
+
 function normalizeTargetLanguage(value) {
   return ['nl', 'fr', 'en'].includes(value) ? value : 'nl';
 }
@@ -289,6 +300,7 @@ app.post('/chat', async (req, res) => {
   const difficulty = Math.max(1, Math.min(5, Number(req.body?.difficulty) || 2));
   const kickoff = Boolean(req.body?.kickoff);
   const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
+  const choiceModeEnabled = Boolean(req.body?.choiceModeEnabled);
 
   const history = incoming
     .filter(message =>
@@ -318,7 +330,8 @@ app.post('/chat', async (req, res) => {
     tutorInstructions,
     targetLanguageInstruction(targetLanguage),
     difficultyInstruction(difficulty, targetLanguage),
-    correctionInstruction(correctionLevel, targetLanguage)
+    correctionInstruction(correctionLevel, targetLanguage),
+    choiceModeInstruction(choiceModeEnabled)
   ].join(' ');
 
   const maxTokensByDifficulty = targetLanguage === 'en'
@@ -389,6 +402,85 @@ app.post('/chat', async (req, res) => {
       return res.status(500).send('Could not generate Camille response.');
     }
     res.end();
+  }
+});
+
+app.post('/choices', async (req, res) => {
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(500).json({ choices: [] });
+  }
+
+  const text = String(req.body?.text || '').trim();
+  const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
+  const recentMessages = Array.isArray(req.body?.recentMessages)
+    ? req.body.recentMessages
+        .filter(message => message && typeof message.content === 'string')
+        .slice(-6)
+        .map(message => `${message.role === 'user' ? 'USER' : 'CAMILLE'}: ${message.content.trim()}`)
+        .join('\n')
+    : '';
+
+  if (!text) return res.json({ choices: [] });
+
+  const targetRule = targetLanguage === 'fr'
+    ? 'Write both choices in natural everyday French.'
+    : targetLanguage === 'en'
+      ? 'Write both choices in natural English; use professional wording only when the context is professional.'
+      : 'Write both choices in natural everyday Belgian Dutch/Flemish.';
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        temperature: 0.25,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content: [
+              'Create exactly two plausible quick-reply buttons for the learner to answer Camille’s latest question.',
+              targetRule,
+              'Each choice must be one or two words maximum.',
+              'The two choices must be clearly different and both must make sense as direct answers.',
+              'No punctuation, explanations, emojis, labels or translations.',
+              'If Camille did not ask a meaningful question or invite a simple choice, return {"choices":[]}.',
+              'Otherwise return JSON only in this exact shape: {"choices":["...","..."]}.'
+            ].join(' ')
+          },
+          {
+            role: 'user',
+            content: `Recent conversation:\n${recentMessages || '(none)'}\n\nCamille’s latest message:\n${text}`
+          }
+        ],
+        max_tokens: 45
+      })
+    });
+
+    const data = await response.json();
+    if (!response.ok) return res.json({ choices: [] });
+
+    let parsed = {};
+    try {
+      parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}');
+    } catch {}
+
+    const cleaned = Array.isArray(parsed.choices)
+      ? parsed.choices
+          .map(value => String(value || '').trim().replace(/[.!?;,]+$/g, ''))
+          .map(value => value.split(/\s+/).filter(Boolean).slice(0, 2).join(' '))
+          .filter(Boolean)
+      : [];
+
+    const choices = [...new Set(cleaned)].slice(0, 2);
+    return res.json({ choices: choices.length === 2 ? choices : [] });
+  } catch (error) {
+    console.error('Quick reply generation failed:', error);
+    return res.status(500).json({ choices: [] });
   }
 });
 
