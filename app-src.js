@@ -630,6 +630,29 @@ function interactionModeInstruction() {
   return 'INPUT MODE: SPEAK. The microphone is active. Continue normal spoken conversation.';
 }
 
+function syncRecentConversationContext() {
+  if (!anamClient || !connected) return;
+
+  const recent = currentMessages
+    .filter(message => message?.content?.trim())
+    .slice(-8)
+    .map(message => {
+      const role = message.role === 'persona' ? 'CAMILLE' : 'ULAS';
+      return `${role}: ${message.content.trim()}`;
+    })
+    .join('\n');
+
+  if (!recent) return;
+
+  try {
+    anamClient.addContext(
+      `CONVERSATION CONTINUITY: The following exchanges are already part of this same live conversation, including typed or button turns. Do not restart the topic. Continue naturally from them.\n${recent}`
+    );
+  } catch (error) {
+    console.warn('Could not sync conversation context:', error);
+  }
+}
+
 function setInteractionMode(mode) {
   if (!['speak', 'type', 'button'].includes(mode)) return;
   interactionMode = mode;
@@ -641,6 +664,7 @@ function setInteractionMode(mode) {
   applyInteractionAudioState();
 
   if (connected) {
+    syncRecentConversationContext();
     try {
       anamClient?.addContext(interactionModeInstruction());
       anamClient?.addContext(choiceModeInstruction());
@@ -1235,6 +1259,7 @@ async function sendTypedTurn(text, inputKind = 'type') {
     processVocabularyProgress(personaId, full, true);
     saveCurrentHistory();
     renderMessages(currentMessages);
+    syncRecentConversationContext();
     if (interactionMode === 'button') requestQuickChoices(full);
   } catch (error) {
     if (error?.name !== 'AbortError') {
