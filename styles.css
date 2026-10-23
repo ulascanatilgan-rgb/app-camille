@@ -3911,3 +3911,21 @@ body.level-expanded .range-wrap {
     right: 8px !important;
   }
 }
+
+
+/* ---- v32 layout refinements ---- */
+.controls {
+  margin-top: auto !important;
+}
+
+.session-history-button {
+  min-width: 92px;
+  height: 36px;
+}
+
+@media (max-width: 760px) {
+  .session-history-button {
+    min-width: 74px;
+    height: 32px !important;
+  }
+}
