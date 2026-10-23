@@ -663,7 +663,7 @@ function choiceModeInstruction() {
     return 'BUTTON REPLY MODE is off. Continue normal spoken conversation.';
   }
 
-  return 'BUTTON REPLY MODE is ON. End each reply with exactly one short, concrete question that can naturally be answered by two distinct one- or two-word choices. Do not say or list the choices; the interface will show them. Keep the question useful, varied and easy to continue from.';
+  return 'BUTTON REPLY MODE is ON. End each reply with exactly one short, concrete question that can naturally be answered by two distinct one- or two-word choices. Do not say or list the choices; the interface will show them. Keep the question useful, varied and easy to continue from. If Ulas answers with only one or two words, treat it as a valid button reply: do not force a full-sentence correction unless it is actually wrong; react naturally and continue.';
 }
 
 function buildRuntimeContext() {
