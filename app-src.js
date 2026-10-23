@@ -46,7 +46,9 @@ const successBalloon = document.getElementById('successBalloon');
 const typeToggle = document.getElementById('typeToggle');
 const typeComposer = document.getElementById('typeComposer');
 const typeInput = document.getElementById('typeInput');
-const choiceModeToggle = document.getElementById('choiceModeToggle');
+const speakModeButton = document.getElementById('speakModeButton');
+const typeModeButton = document.getElementById('typeModeButton');
+const buttonModeButton = document.getElementById('buttonModeButton');
 const quickReplyBar = document.getElementById('quickReplyBar');
 const languageToggle = document.getElementById('languageToggle');
 const languageToggleLabel = document.getElementById('languageToggleLabel');
@@ -64,6 +66,7 @@ const WORDS_BASE_KEY = 'camille.words.v3';
 const LEVEL_KEY = 'camille.difficulty.v1';
 const LANGUAGE_KEY = 'camille.targetLanguage.v1';
 const CHOICE_MODE_KEY = 'camille.choiceMode.v1';
+const INPUT_MODE_KEY = 'camille.inputMode.v1';
 
 let anamClient = null;
 let connected = false;
@@ -83,7 +86,11 @@ let pinnedUserMessageId = null;
 let popAudioContext = null;
 let userTranslationSeq = 0;
 let lastUserTranslationAt = 0;
-let choiceModeEnabled = localStorage.getItem(CHOICE_MODE_KEY) === 'true';
+const savedInputMode = localStorage.getItem(INPUT_MODE_KEY);
+let interactionMode = ['speak', 'type', 'button'].includes(savedInputMode)
+  ? savedInputMode
+  : (localStorage.getItem(CHOICE_MODE_KEY) === 'true' ? 'button' : 'speak');
+let choiceModeEnabled = interactionMode === 'button';
 let choiceGenerationSeq = 0;
 let lastChoiceSource = '';
 
@@ -575,12 +582,76 @@ async function finalizeSubtitle(nlText, messageId) {
   renderMessages(currentMessages);
 }
 
-function updateChoiceModeUi() {
-  if (!choiceModeToggle) return;
-  choiceModeToggle.classList.toggle('active', choiceModeEnabled);
-  choiceModeToggle.classList.toggle('inactive', !choiceModeEnabled);
-  choiceModeToggle.setAttribute('aria-pressed', String(choiceModeEnabled));
-  choiceModeToggle.title = choiceModeEnabled ? 'Button replies on' : 'Button replies off';
+function updateInteractionModeUi() {
+  const buttons = [
+    [speakModeButton, 'speak'],
+    [typeModeButton, 'type'],
+    [buttonModeButton, 'button']
+  ];
+
+  for (const [button, mode] of buttons) {
+    if (!button) continue;
+    const active = interactionMode === mode;
+    button.classList.toggle('active', active);
+    button.classList.toggle('inactive', !active);
+    button.setAttribute('aria-pressed', String(active));
+  }
+
+  choiceModeEnabled = interactionMode === 'button';
+  typeComposer.hidden = interactionMode !== 'type';
+
+  if (interactionMode !== 'button') clearQuickChoices();
+  if (interactionMode === 'type' && connected) {
+    setTimeout(() => typeInput?.focus(), 0);
+  }
+}
+
+function applyInteractionAudioState() {
+  if (!anamClient || !connected) return;
+
+  try {
+    if (interactionMode === 'speak') {
+      anamClient.unmuteInputAudio();
+    } else {
+      anamClient.muteInputAudio();
+    }
+  } catch (error) {
+    console.warn('Could not change Camille microphone state:', error);
+  }
+}
+
+function interactionModeInstruction() {
+  if (interactionMode === 'button') {
+    return 'INPUT MODE: BUTTON. The microphone is muted. The user responds through short interface choices. Treat one- or two-word button answers as intentional complete answers and continue naturally.';
+  }
+  if (interactionMode === 'type') {
+    return 'INPUT MODE: TYPE. The microphone is muted. The user types messages. Continue the same conversation naturally without restarting or changing topic just because the input method changed.';
+  }
+  return 'INPUT MODE: SPEAK. The microphone is active. Continue normal spoken conversation.';
+}
+
+function setInteractionMode(mode) {
+  if (!['speak', 'type', 'button'].includes(mode)) return;
+  interactionMode = mode;
+  choiceModeEnabled = mode === 'button';
+  localStorage.setItem(INPUT_MODE_KEY, mode);
+  localStorage.setItem(CHOICE_MODE_KEY, String(choiceModeEnabled));
+
+  updateInteractionModeUi();
+  applyInteractionAudioState();
+
+  if (connected) {
+    try {
+      anamClient?.addContext(interactionModeInstruction());
+      anamClient?.addContext(choiceModeInstruction());
+    } catch {}
+    pushLearningContext();
+
+    if (mode === 'button') {
+      const currentCamilleText = subtitleNl?.textContent?.trim() || '';
+      if (currentCamilleText) requestQuickChoices(currentCamilleText);
+    }
+  }
 }
 
 function clearQuickChoices() {
@@ -592,7 +663,7 @@ function clearQuickChoices() {
 }
 
 function renderQuickChoices(choices) {
-  if (!quickReplyBar || !choiceModeEnabled || !Array.isArray(choices) || choices.length < 2) {
+  if (!quickReplyBar || interactionMode !== 'button' || !Array.isArray(choices) || choices.length < 2) {
     clearQuickChoices();
     return;
   }
@@ -609,7 +680,7 @@ function renderQuickChoices(choices) {
     button.addEventListener('click', () => {
       if (!connected || isResponding) return;
       clearQuickChoices();
-      sendTypedTurn(text);
+      sendTypedTurn(text, 'button');
     });
     quickReplyBar.appendChild(button);
   }
@@ -619,7 +690,7 @@ function renderQuickChoices(choices) {
 
 async function requestQuickChoices(camilleText) {
   const clean = String(camilleText || '').trim();
-  if (!choiceModeEnabled || !connected || !clean) {
+  if (interactionMode !== 'button' || !connected || !clean) {
     clearQuickChoices();
     return;
   }
@@ -650,7 +721,7 @@ async function requestQuickChoices(camilleText) {
     if (!response.ok) throw new Error('Could not generate quick replies.');
     const data = await response.json();
 
-    if (seq !== choiceGenerationSeq || !choiceModeEnabled) return;
+    if (seq !== choiceGenerationSeq || interactionMode !== 'button') return;
     renderQuickChoices(data.choices || []);
   } catch (error) {
     if (seq === choiceGenerationSeq) clearQuickChoices();
@@ -659,11 +730,11 @@ async function requestQuickChoices(camilleText) {
 }
 
 function choiceModeInstruction() {
-  if (!choiceModeEnabled) {
-    return 'BUTTON REPLY MODE is off. Continue normal spoken conversation.';
+  if (interactionMode !== 'button') {
+    return 'BUTTON REPLY MODE is off.';
   }
 
-  return 'BUTTON REPLY MODE is ON. End each reply with exactly one short, concrete question that can naturally be answered by two distinct one- or two-word choices. Do not say or list the choices; the interface will show them. Keep the question useful, varied and easy to continue from. If Ulas answers with only one or two words, treat it as a valid button reply: do not force a full-sentence correction unless it is actually wrong; react naturally and continue.';
+  return 'BUTTON REPLY MODE is ON. End each reply with exactly one short, concrete question that can naturally be answered by two distinct one- or two-word choices. Do not say or list the choices; the interface will show them. Treat one- or two-word button answers as intentional complete answers. Do not force the same correction formula. React naturally and vary your response: sometimes acknowledge, agree, disagree politely, show curiosity, give a tiny suggestion, contrast an idea, or move directly to the next question. Avoid repeating the same opening phrase in consecutive turns.';
 }
 
 function buildRuntimeContext() {
@@ -722,6 +793,7 @@ function buildRuntimeContext() {
     'SESSION LEARNING CONTEXT — IMPORTANT:',
     languageLock,
     teachingMode,
+    interactionModeInstruction(),
     choiceModeInstruction(),
     `You are Camille, Ulas Atilgan’s practical ${target} conversation coach.`,
     isEnglish
@@ -1078,7 +1150,7 @@ function renderWordsDialog() {
   }
 }
 
-async function sendTypedTurn(text) {
+async function sendTypedTurn(text, inputKind = 'type') {
   const clean = String(text || '').trim();
   if (!clean || !anamClient || !connected || isResponding) return;
 
@@ -1119,7 +1191,9 @@ async function sendTypedTurn(text) {
         difficulty,
         correctionLevel: correctionLevel.value || 'medium',
         targetLanguage,
-        choiceModeEnabled
+        choiceModeEnabled,
+        interactionMode,
+        inputKind
       })
     });
 
@@ -1161,7 +1235,7 @@ async function sendTypedTurn(text) {
     processVocabularyProgress(personaId, full, true);
     saveCurrentHistory();
     renderMessages(currentMessages);
-    if (choiceModeEnabled) requestQuickChoices(full);
+    if (interactionMode === 'button') requestQuickChoices(full);
   } catch (error) {
     if (error?.name !== 'AbortError') {
       console.error('Typed Camille response error:', error);
@@ -1192,7 +1266,9 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
         difficulty,
         correctionLevel: correctionLevel.value || 'medium',
         targetLanguage,
-        choiceModeEnabled
+        choiceModeEnabled,
+        interactionMode,
+        inputKind
       })
     });
 
@@ -1310,7 +1386,7 @@ function handleStreamEvent(event) {
       partialTranslationSeq += 1;
       lastPartialTranslationAt = 0;
       finalizeSubtitle(limited.text, event.id);
-      if (choiceModeEnabled) requestQuickChoices(limited.text);
+      if (interactionMode === 'button') requestQuickChoices(limited.text);
     }
 
     if (event.endOfSpeech) {
@@ -1347,11 +1423,14 @@ function attachAnamListeners(client) {
     micLabel.textContent = 'Camille connected';
     endButton.disabled = false;
     setAvatarLive(true);
+    applyInteractionAudioState();
+    try { anamClient?.addContext(interactionModeInstruction()); } catch {}
     setStatus(languageConfig().ready);
   });
 
   client.addListener(AnamEvent.VIDEO_PLAY_STARTED, () => {
     setAvatarLive(true);
+    applyInteractionAudioState();
     try { anamClient?.addContext(liveLanguageLockInstruction()); } catch {}
     pushLearningContext();
     setTimeout(() => {
@@ -1364,6 +1443,7 @@ function attachAnamListeners(client) {
   client.addListener(AnamEvent.MESSAGE_HISTORY_UPDATED, handleMessagesUpdated);
 
   client.addListener(AnamEvent.USER_SPEECH_STARTED, () => {
+    if (interactionMode !== 'speak') return;
     clearQuickChoices();
     try {
       anamClient?.addContext(liveLanguageLockInstruction());
@@ -1387,6 +1467,7 @@ function attachAnamListeners(client) {
   });
 
   client.addListener(AnamEvent.USER_SPEECH_ENDED, () => {
+    if (interactionMode !== 'speak') return;
     setStatus('Thinking…');
     voiceRing.classList.remove('active');
     successBalloon?.classList.remove('listening');
@@ -1472,6 +1553,8 @@ async function connect() {
       micLabel.textContent = 'Camille connected';
       endButton.disabled = false;
       setAvatarLive(true);
+      applyInteractionAudioState();
+      try { anamClient?.addContext(interactionModeInstruction()); } catch {}
       setStatus(languageConfig().ready);
     }
 
@@ -1560,29 +1643,10 @@ micButton.addEventListener('click', () => {
   if (!connected && !connecting) connect();
 });
 
-typeToggle?.addEventListener('click', () => {
-  const open = typeToggle.getAttribute('aria-expanded') !== 'true';
-  typeToggle.setAttribute('aria-expanded', String(open));
-  typeComposer.hidden = !open;
-  if (open) setTimeout(() => typeInput?.focus(), 0);
-});
-
-choiceModeToggle?.addEventListener('click', () => {
-  choiceModeEnabled = !choiceModeEnabled;
-  localStorage.setItem(CHOICE_MODE_KEY, String(choiceModeEnabled));
-  clearQuickChoices();
-  updateChoiceModeUi();
-
-  if (connected) {
-    try { anamClient?.addContext(choiceModeInstruction()); } catch {}
-    pushLearningContext();
-
-    if (choiceModeEnabled) {
-      const currentCamilleText = subtitleNl?.textContent?.trim() || '';
-      if (currentCamilleText) requestQuickChoices(currentCamilleText);
-    }
-  }
-});
+typeToggle?.addEventListener('click', () => setInteractionMode('type'));
+speakModeButton?.addEventListener('click', () => setInteractionMode('speak'));
+typeModeButton?.addEventListener('click', () => setInteractionMode('type'));
+buttonModeButton?.addEventListener('click', () => setInteractionMode('button'));
 
 typeComposer?.addEventListener('submit', async event => {
   event.preventDefault();
@@ -1597,7 +1661,7 @@ typeComposer?.addEventListener('submit', async event => {
   }
 
   typeInput.value = '';
-  sendTypedTurn(text);
+  sendTypedTurn(text, 'type');
 });
 
 endButton.addEventListener('click', disconnect);
@@ -1715,7 +1779,7 @@ migrateLanguageStores();
 learnedWords = loadJson(wordsKey(), []);
 updateDifficultyUi();
 updateLanguageUi(true);
-updateChoiceModeUi();
+updateInteractionModeUi();
 setAvatarLive(false);
 
 // ---- PWA install support ----
