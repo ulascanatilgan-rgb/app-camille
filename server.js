@@ -58,6 +58,7 @@ function choiceModeInstruction(enabled) {
     'BUTTON REPLY MODE IS ON.',
     'End every reply with exactly one short, concrete question that can naturally be answered using two distinct one- or two-word options.',
     'Do not list the two options in the spoken response; the interface generates them separately.',
+    'If the learner answers with only one or two words, treat it as a valid button reply. Do not force a full-sentence correction unless the short answer is actually wrong.',
     'Prefer questions that move the conversation forward and make the learner choose, react or express a simple preference.'
   ].join(' ');
 }
