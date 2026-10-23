@@ -167,18 +167,11 @@
             <button id="typeSend" type="submit">Send</button>
           </form>
 
-          <div class="type-row">
-            <button id="typeToggle" class="type-toggle" type="button" aria-expanded="false">Type</button>
+          <div class="interaction-mode-bar" role="group" aria-label="Conversation input mode">
+            <button id="speakModeButton" class="interaction-mode-button" type="button" data-mode="speak" aria-pressed="true">Speak</button>
+            <button id="typeModeButton" class="interaction-mode-button" type="button" data-mode="type" aria-pressed="false">Type</button>
+            <button id="buttonModeButton" class="interaction-mode-button" type="button" data-mode="button" aria-pressed="false">Button</button>
           </div>
-
-          <button
-            id="choiceModeToggle"
-            class="choice-mode-toggle"
-            type="button"
-            aria-label="Toggle button replies"
-            aria-pressed="false"
-            title="Button replies off"
-          >B</button>
         </section>
       </section>
     </section>
