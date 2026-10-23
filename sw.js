@@ -1,4 +1,4 @@
-const CACHE = 'camille-pwa-input-modes-v31';
+const CACHE = 'camille-pwa-focused-history-v32';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
