@@ -3508,3 +3508,91 @@ body.level-expanded .range-wrap {
     font-size: 11px;
   }
 }
+
+
+/* ---- Three continuous input modes v31 ---- */
+.controls {
+  grid-template-columns: auto 1fr auto !important;
+  grid-template-areas:
+    "actions modes level"
+    "composer composer composer" !important;
+  column-gap: 9px !important;
+}
+
+.interaction-mode-bar {
+  grid-area: modes;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(64px, 1fr));
+  gap: 6px;
+  width: min(330px, 100%);
+  justify-self: center;
+}
+
+.interaction-mode-button {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  color: #fff;
+  font-family: "Graphik", "Graphik Web", Arial, Helvetica, sans-serif !important;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: filter .12s ease, transform .12s ease;
+}
+
+.interaction-mode-button.active {
+  background: #4d8a67;
+  border-color: #41785a;
+}
+
+.interaction-mode-button.inactive {
+  background: #a85b56;
+  border-color: #98504b;
+}
+
+.interaction-mode-button:hover {
+  filter: brightness(1.04);
+}
+
+.interaction-mode-button:active {
+  transform: translateY(1px);
+}
+
+.interaction-mode-button:focus-visible {
+  outline: 2px solid #6d6253;
+  outline-offset: 2px;
+}
+
+.type-composer {
+  grid-area: composer !important;
+}
+
+.choice-mode-toggle,
+.type-row {
+  display: none !important;
+}
+
+@media (max-width: 760px) {
+  .controls {
+    grid-template-columns: auto 1fr auto !important;
+    grid-template-areas:
+      "actions modes level"
+      "composer composer composer" !important;
+    column-gap: 5px !important;
+  }
+
+  .interaction-mode-bar {
+    gap: 4px;
+    width: 100%;
+  }
+
+  .interaction-mode-button {
+    min-width: 0;
+    min-height: 31px;
+    padding: 0 7px;
+    font-size: 9px;
+    border-radius: 8px;
+  }
+}
