@@ -179,7 +179,7 @@ function updateLanguageUi(resetSubtitle = false) {
   practiceEyebrow.textContent = cfg.eyebrow;
   practiceTitle.textContent = cfg.title;
   practiceDescription.textContent = cfg.description;
-  avatarGoal.textContent = cfg.goal;
+  if (avatarGoal) avatarGoal.textContent = cfg.goal;
   levelLabel.textContent = cfg.level;
   modeHint.textContent = cfg.hint;
   typeInput.placeholder = cfg.placeholder;
@@ -1238,6 +1238,7 @@ function attachAnamListeners(client) {
     } catch {}
     document.body.classList.add('conversation-live');
     document.body.classList.remove('level-expanded');
+  difficultyToggle?.setAttribute('aria-expanded', 'false');
     micButton.disabled = false;
     micButton.classList.add('live');
     micLabel.textContent = 'Camille connected';
@@ -1501,8 +1502,18 @@ difficultySlider.addEventListener('change', () => {
   document.body.classList.remove('level-expanded');
 });
 
-difficultyToggle?.addEventListener('click', () => {
-  document.body.classList.toggle('level-expanded');
+difficultyToggle?.addEventListener('click', event => {
+  event.stopPropagation();
+  const open = !document.body.classList.contains('level-expanded');
+  document.body.classList.toggle('level-expanded', open);
+  difficultyToggle.setAttribute('aria-expanded', String(open));
+});
+
+document.addEventListener('click', event => {
+  if (!document.body.classList.contains('level-expanded')) return;
+  if (event.target.closest('.difficulty-control')) return;
+  document.body.classList.remove('level-expanded');
+  difficultyToggle?.setAttribute('aria-expanded', 'false');
 });
 
 languageToggle?.addEventListener('click', async () => {
