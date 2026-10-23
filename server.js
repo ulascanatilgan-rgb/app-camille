@@ -71,10 +71,11 @@ function inputModeInstruction(mode, inputKind) {
   if (normalizedMode === 'button' || inputKind === 'button') {
     return [
       'The learner’s latest reply came from a quick-choice button.',
-      'Treat the short answer as complete and intentional.',
-      'Do not begin with repetitive formulas such as “You mean…” unless there is a real language error.',
-      'Avoid reusing the same opening phrase from recent assistant turns.',
-      'React in a varied, human way before asking the next short question.'
+      'Treat the short answer as complete and intentional. This overrides the general full-sentence correction rule for this turn unless the short answer is actually wrong.',
+      'Do not begin with repetitive formulas such as “You mean…”, “So you mean…”, “Great”, or their French/Dutch equivalents unless they are genuinely useful.',
+      'Do not reuse the same opening pattern from the previous four assistant turns.',
+      'Vary naturally: sometimes acknowledge briefly, sometimes agree, disagree politely, react with curiosity, offer a tiny suggestion, contrast the choice, or go directly to the next question.',
+      'Keep the response human and conversational rather than sounding like a quiz engine.'
     ].join(' ');
   }
 
