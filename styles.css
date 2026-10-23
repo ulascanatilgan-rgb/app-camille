@@ -3929,3 +3929,72 @@ body.level-expanded .range-wrap {
     height: 32px !important;
   }
 }
+
+
+/* ---- Recent Talks visual separation v33 ---- */
+.session-history-button {
+  background: #d8ddd4 !important;
+  border-color: #aeb7aa !important;
+  color: #2f382f !important;
+}
+
+.session-history-button:hover {
+  background: #cbd2c7 !important;
+}
+
+.session-history-dialog {
+  background: #e7ebe4 !important;
+}
+
+.session-history-dialog::backdrop {
+  background: #e7ebe4 !important;
+}
+
+.session-history-shell {
+  background:
+    radial-gradient(circle at 14% 5%, rgba(255,255,255,.36), transparent 30%),
+    linear-gradient(180deg, #edf0ea 0%, #e3e8df 100%) !important;
+}
+
+.session-history-header {
+  background: rgba(235,240,233,.97) !important;
+  border-bottom-color: #b9c2b5 !important;
+}
+
+.session-history-back {
+  background: #f2f5ef !important;
+  border-color: #b6c0b2 !important;
+  color: #2e352e !important;
+}
+
+.session-history-message {
+  border-bottom-color: rgba(156,170,154,.48) !important;
+}
+
+.session-history-role,
+.session-history-count {
+  color: #667063 !important;
+}
+
+.session-history-main {
+  color: #273027 !important;
+}
+
+.session-history-message.user .session-history-main {
+  color: #4b554a !important;
+}
+
+.session-history-en {
+  color: #6c7669 !important;
+}
+
+/* Keep full archive History visually distinct: warm aged-paper palette. */
+.archive-dialog {
+  background: #f6ecd8 !important;
+}
+
+.archive-header,
+.archive-content,
+.history-date {
+  background-color: #f6ecd8;
+}
