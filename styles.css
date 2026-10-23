@@ -2983,3 +2983,315 @@ button:not(:disabled):active {
     border-radius: 12px !important;
   }
 }
+
+
+/* ---- Compact desktop learning controls + calm reading UI v28 ---- */
+:root {
+  --bg: #eee3cd;
+  --paper: #f6ecd8;
+  --paper-raised: #faf3e5;
+  --paper-soft: #eadcc5;
+  --ink: #25221d;
+  --anthracite: #34302a;
+  --muted: #675f54;
+  --soft: #877d70;
+  --line: #d7c8b2;
+  --line-dark: #c5b49b;
+}
+
+html, body, button, input, select, textarea {
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif !important;
+  font-weight: 400;
+  letter-spacing: 0 !important;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html,
+body {
+  background-color: var(--bg) !important;
+  background-image:
+    radial-gradient(circle at 12% 4%, rgba(255,255,255,.32), transparent 28%),
+    radial-gradient(circle at 90% 20%, rgba(150,105,45,.055), transparent 34%),
+    repeating-linear-gradient(0deg, rgba(101,75,43,.018) 0, rgba(101,75,43,.018) 1px, transparent 1px, transparent 31px);
+}
+
+.topbar {
+  background: rgba(248,240,225,.95) !important;
+}
+
+.avatar-column {
+  background: #e9dcc5 !important;
+}
+
+.conversation-column {
+  padding-top: 22px !important;
+}
+
+.conversation-head {
+  padding-bottom: 8px !important;
+}
+
+.conversation-head p {
+  display: none !important;
+}
+
+.conversation-head h1 {
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif !important;
+  font-size: clamp(24px, 2.1vw, 32px) !important;
+  font-weight: 540 !important;
+  letter-spacing: -.02em !important;
+  line-height: 1.15 !important;
+}
+
+.live-exchange-card {
+  margin-top: 10px !important;
+  margin-left: 20px !important;
+  margin-right: 20px !important;
+  padding: 18px 20px 19px !important;
+  border-radius: 18px !important;
+  background: rgba(249,242,228,.94) !important;
+  box-shadow: 0 5px 18px rgba(75,58,35,.035) !important;
+}
+
+.live-exchange-card .dutch-line,
+.live-user .last-user-text,
+.assistant-fr,
+.assistant-en,
+.english-line,
+.last-user-en {
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif !important;
+  letter-spacing: 0 !important;
+}
+
+.live-exchange-card .dutch-line {
+  font-size: clamp(20px, 1.75vw, 26px) !important;
+  line-height: 1.46 !important;
+  font-weight: 460 !important;
+}
+
+.live-user .last-user-text {
+  font-size: clamp(16px, 1.4vw, 20px) !important;
+  line-height: 1.45 !important;
+  font-weight: 450 !important;
+}
+
+.live-exchange-card .english-line,
+.last-user-en {
+  font-size: clamp(12px, 1vw, 14px) !important;
+  line-height: 1.48 !important;
+  font-weight: 400 !important;
+  color: #74695b !important;
+}
+
+.live-exchange-label,
+.live-speaker-label,
+.eyebrow,
+.control-label,
+.conversation-separator span {
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-weight: 600 !important;
+  letter-spacing: .035em !important;
+}
+
+.history-zone {
+  margin-top: 20px !important;
+  min-height: 100px !important;
+}
+
+.history-zone .messages {
+  padding-bottom: 10px !important;
+}
+
+.avatar-goal {
+  display: none !important;
+}
+
+.avatar-meta {
+  right: auto !important;
+  width: auto !important;
+}
+
+.controls {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 12 !important;
+  margin: 0 -38px !important;
+  padding: 7px 22px calc(8px + env(safe-area-inset-bottom)) !important;
+  min-height: 46px;
+  display: grid !important;
+  grid-template-columns: auto auto 1fr auto;
+  grid-template-areas:
+    "actions type spacer level"
+    "composer composer composer composer";
+  align-items: center;
+  gap: 7px !important;
+  background: rgba(247,239,224,.94) !important;
+  border-top: 1px solid rgba(199,181,154,.6) !important;
+  backdrop-filter: blur(12px);
+}
+
+.controls .hint {
+  display: none !important;
+}
+
+.action-row {
+  grid-area: actions;
+  display: flex;
+  gap: 5px !important;
+  margin: 0 !important;
+}
+
+.mic-button,
+.end-button {
+  min-height: 34px !important;
+  height: 34px !important;
+  flex: 0 0 auto !important;
+  padding: 0 11px !important;
+  font-size: 11px !important;
+  border-radius: 11px !important;
+}
+
+.mic-button {
+  min-width: 126px !important;
+}
+
+.end-button {
+  min-width: 46px !important;
+}
+
+.type-row {
+  grid-area: type;
+  margin: 0 !important;
+  display: flex;
+  align-items: center;
+}
+
+.type-toggle {
+  min-height: 30px;
+  padding: 0 8px !important;
+  text-decoration: none !important;
+  border: 1px solid transparent !important;
+  font-size: 10px !important;
+}
+
+.type-toggle:hover,
+.type-toggle[aria-expanded="true"] {
+  background: #eee2cf !important;
+  border-color: #d5c5ad !important;
+}
+
+.type-composer {
+  grid-area: composer;
+  margin: 6px 0 0 !important;
+  width: 100%;
+}
+
+.difficulty-control {
+  grid-area: level;
+  position: relative !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.difficulty-toggle {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 66px;
+  height: 32px;
+  padding: 0 9px !important;
+  border: 1px solid #d0c0a8 !important;
+  border-radius: 11px !important;
+  background: #f8f0e1 !important;
+  color: var(--ink) !important;
+  font-size: 10px !important;
+  font-weight: 550 !important;
+}
+
+.difficulty-toggle strong {
+  font-size: 11px !important;
+  font-weight: 650 !important;
+}
+
+.difficulty-panel {
+  display: none !important;
+}
+
+body.level-expanded .difficulty-panel {
+  position: absolute !important;
+  right: 0 !important;
+  left: auto !important;
+  bottom: 39px !important;
+  display: block !important;
+  width: 270px !important;
+  min-width: 270px !important;
+  padding: 12px 13px 11px !important;
+  background: #faf3e5 !important;
+  border: 1px solid #cfbea6 !important;
+  border-radius: 14px !important;
+  box-shadow: 0 12px 30px rgba(70,52,30,.12) !important;
+}
+
+body.level-expanded .difficulty-head {
+  display: flex !important;
+}
+
+body.level-expanded .range-wrap {
+  display: block !important;
+}
+
+@media (min-width: 761px) {
+  .workspace {
+    height: calc(100dvh - 64px) !important;
+  }
+
+  .conversation-column {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .history-zone {
+    flex: 1 1 auto !important;
+    min-height: 80px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .conversation-head {
+    padding-bottom: 5px !important;
+  }
+
+  .controls {
+    margin: 0 -11px !important;
+    padding: 6px 10px calc(7px + env(safe-area-inset-bottom)) !important;
+    grid-template-columns: auto auto 1fr auto !important;
+  }
+
+  .mic-button {
+    min-width: 64px !important;
+  }
+
+  .difficulty-toggle {
+    min-width: 54px !important;
+    height: 31px !important;
+    padding: 0 7px !important;
+  }
+
+  .level-word {
+    font-size: 8px;
+  }
+
+  body.level-expanded .difficulty-panel {
+    width: min(260px, calc(100vw - 24px)) !important;
+    min-width: 0 !important;
+    bottom: 37px !important;
+  }
+
+  .live-exchange-card {
+    margin-left: 9px !important;
+    margin-right: 9px !important;
+    margin-top: 6px !important;
+  }
+}
