@@ -1500,6 +1500,7 @@ difficultySlider.addEventListener('change', () => {
   saveCurrentHistory();
   if (connected) pushLearningContext();
   document.body.classList.remove('level-expanded');
+  difficultyToggle?.setAttribute('aria-expanded', 'false');
 });
 
 difficultyToggle?.addEventListener('click', event => {
