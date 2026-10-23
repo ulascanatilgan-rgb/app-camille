@@ -647,7 +647,7 @@ function setInteractionMode(mode) {
     } catch {}
     pushLearningContext();
 
-    if (mode === 'button') {
+    if (mode === 'button' && !isResponding) {
       const currentCamilleText = subtitleNl?.textContent?.trim() || '';
       if (currentCamilleText) requestQuickChoices(currentCamilleText);
     }
@@ -1268,7 +1268,7 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
         targetLanguage,
         choiceModeEnabled,
         interactionMode,
-        inputKind
+        inputKind: 'speak'
       })
     });
 
