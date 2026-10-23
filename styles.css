@@ -3395,3 +3395,116 @@ body.level-expanded .range-wrap {
     padding-bottom: 2px !important;
   }
 }
+
+
+/* ---- Button reply mode v30 ---- */
+.controls {
+  grid-template-columns: auto auto 1fr auto auto !important;
+  grid-template-areas:
+    "actions type spacer choice level"
+    "composer composer composer composer composer" !important;
+}
+
+.choice-mode-toggle {
+  grid-area: choice;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: #fff;
+  font-family: "Graphik", "Graphik Web", Arial, Helvetica, sans-serif !important;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.choice-mode-toggle.inactive {
+  background: #a85b56;
+  border-color: #98504b;
+}
+
+.choice-mode-toggle.active {
+  background: #4d8a67;
+  border-color: #41785a;
+}
+
+.choice-mode-toggle:hover {
+  filter: brightness(1.04);
+}
+
+.choice-mode-toggle:focus-visible {
+  outline: 2px solid #6d6253;
+  outline-offset: 2px;
+}
+
+.quick-reply-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #d7c9b5;
+}
+
+.quick-reply-bar[hidden] {
+  display: none !important;
+}
+
+.quick-reply-button {
+  min-width: 74px;
+  max-width: 150px;
+  min-height: 34px;
+  padding: 6px 13px;
+  border: 1px solid #c8b79f;
+  border-radius: 9px;
+  background: #f3eadb;
+  color: #2b2721;
+  font-family: "Graphik", "Graphik Web", Arial, Helvetica, sans-serif !important;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.1;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quick-reply-button:hover {
+  background: #eadfcd;
+  border-color: #ad9b81;
+}
+
+.quick-reply-button:active {
+  transform: translateY(1px);
+}
+
+@media (max-width: 760px) {
+  .controls {
+    grid-template-columns: auto auto 1fr auto auto !important;
+  }
+
+  .choice-mode-toggle {
+    width: 31px;
+    height: 31px;
+    border-radius: 9px;
+    font-size: 10px;
+  }
+
+  .quick-reply-bar {
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 9px;
+  }
+
+  .quick-reply-button {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+    min-height: 32px;
+    padding: 6px 9px;
+    font-size: 11px;
+  }
+}
