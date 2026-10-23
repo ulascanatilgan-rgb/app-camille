@@ -2780,3 +2780,206 @@ button:disabled { cursor: not-allowed; }
   .conversation-head h1 { line-height: 1.28 !important; }
   .subtitle-line { line-height: 1.48 !important; }
 }
+
+
+/* ---- Camille friendly paper UI + clearer typography v27 ---- */
+:root {
+  --bg: #f1eadc;
+  --paper: #f7f0e3;
+  --paper-raised: #fbf6ec;
+  --paper-soft: #eee4d4;
+  --ink: #24211c;
+  --anthracite: #35312b;
+  --muted: #665f55;
+  --soft: #82796d;
+  --line: #d9ccba;
+  --line-dark: #c8b9a4;
+}
+
+html, body, button, input, select, textarea {
+  font-family: ui-rounded, "SF Pro Rounded", "Avenir Next Rounded", "Avenir Next", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-weight: 450;
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html,
+body {
+  background-color: var(--bg) !important;
+  background-image:
+    radial-gradient(circle at 18% 8%, rgba(255,255,255,.38), transparent 30%),
+    radial-gradient(circle at 82% 28%, rgba(180,145,92,.055), transparent 34%),
+    repeating-linear-gradient(0deg, rgba(112,88,55,.018) 0, rgba(112,88,55,.018) 1px, transparent 1px, transparent 30px);
+}
+
+.app-shell,
+.workspace,
+.conversation-column {
+  background: transparent !important;
+}
+
+.topbar {
+  background: rgba(250,245,235,.94) !important;
+  backdrop-filter: blur(12px);
+  border-bottom-color: rgba(190,174,151,.68) !important;
+}
+
+.center-brand,
+.language-toggle,
+.nav-button,
+.icon-button,
+.text-button,
+.difficulty-toggle,
+.type-toggle,
+.mic-button,
+.end-button,
+#typeSend,
+.dialog-close,
+.close-settings {
+  border-radius: 14px !important;
+}
+
+.center-brand {
+  border-color: #cdbfa9 !important;
+  background: #fbf6ed !important;
+  box-shadow: 0 2px 8px rgba(75,58,35,.035);
+}
+
+.portrait-wrap {
+  border-radius: 22px !important;
+  overflow: hidden;
+}
+
+.live-exchange-card {
+  background: rgba(251,246,236,.92) !important;
+  border: 1px solid rgba(205,190,167,.78) !important;
+  border-radius: 22px !important;
+  box-shadow: 0 8px 28px rgba(75,58,35,.05);
+  padding: 22px 24px 24px !important;
+}
+
+.live-speaker + .live-speaker {
+  border-top-color: rgba(205,190,167,.55) !important;
+}
+
+.live-user {
+  background: #f0e8db !important;
+  border-radius: 16px !important;
+  padding: 14px 12px 10px !important;
+}
+
+.live-exchange-card .dutch-line,
+.live-user .last-user-text {
+  font-family: ui-rounded, "SF Pro Rounded", "Avenir Next Rounded", "Avenir Next", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-weight: 470 !important;
+  letter-spacing: -.006em !important;
+}
+
+.live-exchange-card .dutch-line {
+  font-size: clamp(21px, 2vw, 28px) !important;
+  line-height: 1.43 !important;
+}
+
+.live-user .last-user-text {
+  font-size: clamp(17px, 1.55vw, 22px) !important;
+  line-height: 1.42 !important;
+}
+
+.live-exchange-card .english-line,
+.last-user-en {
+  font-weight: 400 !important;
+  line-height: 1.48 !important;
+  color: #756b5e !important;
+}
+
+.live-exchange-label,
+.live-speaker-label,
+.eyebrow,
+.control-label,
+.conversation-separator span {
+  letter-spacing: .045em !important;
+  font-weight: 650 !important;
+}
+
+.history-zone {
+  border-top-color: rgba(198,181,157,.6) !important;
+}
+
+.history-zone .messages {
+  opacity: .7 !important;
+}
+
+.history-zone .bubble,
+.history-session,
+.word-list-row,
+.word-card,
+.archive-dialog,
+.settings-card,
+dialog,
+.difficulty-panel {
+  border-radius: 17px !important;
+}
+
+.history-session,
+.word-list-row,
+.message.user .bubble {
+  background: #efe6d8 !important;
+}
+
+.type-composer input,
+#typeInput,
+.settings-card select {
+  border-radius: 14px !important;
+  background: #fffaf1 !important;
+  border-color: #d1c2ad !important;
+}
+
+.type-composer button,
+#typeSend,
+.mic-button {
+  border-radius: 14px !important;
+}
+
+button {
+  transition: transform .12s ease, background .15s ease, box-shadow .15s ease;
+}
+
+button:not(:disabled):active {
+  transform: scale(.98);
+}
+
+.hint,
+.conversation-head p,
+.history-session-meta,
+.archive-count {
+  color: #665d50 !important;
+  line-height: 1.55 !important;
+}
+
+@media (max-width: 760px) {
+  .live-exchange-card {
+    margin-left: 10px !important;
+    margin-right: 10px !important;
+    padding: 14px 15px 15px !important;
+    border-radius: 18px !important;
+  }
+
+  .live-exchange-card .dutch-line {
+    font-size: clamp(18px, 4.8vw, 21px) !important;
+    line-height: 1.42 !important;
+  }
+
+  .live-user .last-user-text {
+    font-size: clamp(15px, 4.15vw, 18px) !important;
+    line-height: 1.4 !important;
+  }
+
+  .portrait-wrap {
+    border-radius: 16px !important;
+  }
+
+  .center-brand {
+    border-radius: 12px !important;
+  }
+}
