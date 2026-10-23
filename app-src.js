@@ -936,7 +936,7 @@ function processVocabularyProgress(messageId, text, endOfSpeech = false) {
 
 function renderWordsDialog() {
   learnedWords = loadJson(wordsKey(), []).filter(item =>
-    item && (!item.language ? targetLanguage === 'nl' : item.language === targetLanguage)
+    item && (!item.language || item.language === targetLanguage)
   );
   wordsContent.innerHTML = '';
   wordsCount.textContent = `${learnedWords.length} ${languageConfig().name} words`;
