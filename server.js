@@ -396,10 +396,10 @@ app.post('/chat', async (req, res) => {
     tutorInstructions,
     targetLanguageInstruction(targetLanguage),
     difficultyInstruction(difficulty, targetLanguage),
-    correctionInstruction(correctionLevel, targetLanguage),
+    inputKind === 'button' ? '' : correctionInstruction(correctionLevel, targetLanguage),
     choiceModeInstruction(choiceModeEnabled),
     inputModeInstruction(interactionMode, inputKind, targetLanguage)
-  ].join(' ');
+  ].filter(Boolean).join(' ');
 
   const maxTokensByDifficulty = targetLanguage === 'en'
     ? { 1: 36, 2: 44, 3: 52, 4: 58, 5: 64 }
@@ -420,7 +420,9 @@ app.post('/chat', async (req, res) => {
           ...history
         ],
         stream: !isButtonTurn,
-        temperature: isButtonTurn ? 0.78 : 0.55,
+        temperature: isButtonTurn ? 0.82 : 0.55,
+        frequency_penalty: isButtonTurn ? 0.45 : 0,
+        presence_penalty: isButtonTurn ? 0.2 : 0,
         max_tokens: maxTokensByDifficulty[difficulty]
       })
     });
