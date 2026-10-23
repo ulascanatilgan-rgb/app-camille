@@ -320,6 +320,38 @@ app.get('/anam-health', async (_req, res) => {
   }
 });
 
+function escapeRegExp(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function sanitizeButtonReply(text, language, selectedChoice) {
+  let clean = String(text || '').trim();
+  if (!clean) return clean;
+
+  const prefixes = language === 'fr'
+    ? [
+        /^\s*(?:tu veux dire|mieux|oui[, ]+c['’]est bien)\s*[:：-]?\s*/i,
+        /^\s*(?:donc[, ]+tu veux dire)\s*[:：-]?\s*/i
+      ]
+    : language === 'nl'
+      ? [
+          /^\s*(?:je bedoelt|beter|goed)\s*[:：-]?\s*/i,
+          /^\s*(?:dus[, ]+je bedoelt)\s*[:：-]?\s*/i
+        ]
+      : [
+          /^\s*(?:you mean|so you mean)\s*[:：-]?\s*/i
+        ];
+
+  for (const pattern of prefixes) clean = clean.replace(pattern, '').trim();
+
+  const choice = String(selectedChoice || '').trim();
+  if (choice) {
+    const echo = new RegExp('^\\s*' + escapeRegExp(choice) + '\\s*[,.:;!–—-]+\\s*', 'i');
+    clean = clean.replace(echo, '').trim();
+  }
+
+  return clean;
+}
 app.post('/chat', async (req, res) => {
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).send('OPENAI_API_KEY is missing on the server.');
@@ -374,6 +406,7 @@ app.post('/chat', async (req, res) => {
     : { 1: 24, 2: 28, 3: 32, 4: 36, 5: 40 };
 
   try {
+    const isButtonTurn = inputKind === 'button';
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -386,13 +419,13 @@ app.post('/chat', async (req, res) => {
           { role: 'system', content: systemPrompt },
           ...history
         ],
-        stream: true,
-        temperature: inputKind === 'button' ? 0.72 : 0.55,
+        stream: !isButtonTurn,
+        temperature: isButtonTurn ? 0.78 : 0.55,
         max_tokens: maxTokensByDifficulty[difficulty]
       })
     });
 
-    if (!response.ok || !response.body) {
+    if (!response.ok) {
       const detail = await response.text();
       console.error('OpenAI chat error:', detail);
       return res.status(response.status || 500).send('Could not generate Camille response.');
@@ -402,6 +435,18 @@ app.post('/chat', async (req, res) => {
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Accel-Buffering', 'no');
+
+    if (isButtonTurn) {
+      const data = await response.json();
+      const selectedChoice = [...history].reverse().find(message => message.role === 'user')?.content || '';
+      const raw = data.choices?.[0]?.message?.content || '';
+      const clean = sanitizeButtonReply(raw, targetLanguage, selectedChoice);
+      return res.end(clean || raw);
+    }
+
+    if (!response.body) {
+      return res.end('Could not generate Camille response.');
+    }
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
