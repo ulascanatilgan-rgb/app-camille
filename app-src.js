@@ -570,9 +570,9 @@ async function finalizeSubtitle(nlText, messageId) {
 }
 
 function buildRuntimeContext() {
-  const meta = difficultyMeta[difficulty];
   const isFrench = targetLanguage === 'fr';
   const isEnglish = targetLanguage === 'en';
+  const meta = isEnglish ? englishDifficultyMeta[difficulty] : difficultyMeta[difficulty];
   const target = isEnglish ? 'English' : isFrench ? 'French' : 'Dutch/Flemish';
 
   const levelRules = isEnglish
@@ -611,8 +611,20 @@ function buildRuntimeContext() {
       ? 'Useful work examples to teach naturally: "Tu as envoyé ce mail ?", "Quel est le statut actuel ?", "On est dans les temps ?", "On va tenir la deadline ?", "Tu prévois un changement bientôt ?", "Tu peux me faire un point ?"'
       : 'Useful work examples to teach naturally: "Heb je die mail al gestuurd?", "Wat is de huidige status?", "Liggen we nog op schema?", "Halen we de deadline?", "Plan je binnenkort een wijziging?", "Kun je me even een update geven?"';
 
+  const languageLock = isFrench
+    ? 'ABSOLUTE LANGUAGE LOCK: Ulas may speak French OR English. Understand both, but Camille must reply ONLY in French. Never reply in Dutch or English.'
+    : isEnglish
+      ? 'ABSOLUTE LANGUAGE LOCK: Camille must reply ONLY in English.'
+      : 'ABSOLUTE LANGUAGE LOCK: Ulas may speak Dutch/Flemish OR English. Understand both, but Camille must reply ONLY in Belgian Dutch/Flemish. Never reply in French or English.';
+
+  const teachingMode = isEnglish
+    ? 'TEACHER MODE: be proactive and professional. Regularly propose a useful workplace topic, upgrade Ulas’s sentence to fluent business English, then ask one short follow-up question.'
+    : 'TEACHER MODE: be proactive and natural. Regularly propose a useful everyday situation, teach the way people actually say it, then ask Ulas to use the phrase. Prioritize natural spoken usage over grammar theory.';
+
   return [
     'SESSION LEARNING CONTEXT — IMPORTANT:',
+    languageLock,
+    teachingMode,
     `You are Camille, Ulas Atilgan’s practical ${target} conversation coach.`,
     isEnglish
       ? 'The goal is fluent, confident, high-quality professional English for international work and real conversations.'
@@ -629,14 +641,22 @@ function buildRuntimeContext() {
       ? 'Do not simplify English unnaturally. Keep it fluent and richer than the Dutch/French modes, while remaining practical and conversational.'
       : `When Ulas switches to English because he is stuck, understand him and immediately give the short natural ${target} expression.`,
     styleRule,
-    'Teach through short examples, prompts and repetition. Be proactive like a personal language teacher.',
+    'Teach through short examples, prompts and repetition. Be a real teacher, not a passive chatbot. If Ulas gives a short answer or does not lead, immediately choose the next useful topic yourself.',
+    isEnglish
+      ? 'Every 2–3 turns initiate a practical professional micro-lesson: project update, stakeholder communication, email follow-up, meeting language, deadline, blocker, interview, presentation, negotiation or diplomatic disagreement.'
+      : 'Every 2–3 turns initiate a practical everyday micro-lesson: work chat, café, doctor, neighbour, appointment, shopping, transport, phone call, municipality or a common social situation.',
     'Give high priority to work and project-follow-up language: meetings, stakeholder updates, emails, status, progress, blockers, ownership, deadlines, planning, decisions, negotiation, disagreement, clarification and next steps.',
     workExamples,
     isEnglish
-      ? 'Also teach professional collocations, phrasal verbs, diplomatic disagreement, concise executive wording, interview answers and presentation language.'
-      : 'Also teach daily-life street language: appointments, doctor, café, neighbours, shopping, transport, phone calls and practical requests.',
+      ? 'Also teach professional collocations, phrasal verbs, diplomatic disagreement, concise executive wording, interview answers and presentation language. Say things like “A more professional way to put it is…” and give the complete sentence.'
+      : 'Also teach daily-life street language: appointments, doctor, café, neighbours, shopping, transport, phone calls and practical requests. Say the natural everyday version people actually use; avoid textbook alternatives unless asked.',
+    isFrench
+      ? 'Natural French is the priority: prefer common spoken phrases such as “Ça marche”, “On fait comment ?”, “Tu peux me dire… ?”, “J’ai besoin de…”, “Je peux pas…” when appropriate and understandable.'
+      : isEnglish
+        ? 'Professional English is the priority: make wording fluent, concise, confident and natural rather than simply grammatically correct.'
+        : 'Natural Flemish is the priority: prefer common spoken phrases such as “Is goed”, “Hoe zit het?”, “Kun je even…?”, “Ik heb … nodig”, “Dat lukt niet” when appropriate and understandable.',
     'If he is stuck, give him the beginning of the sentence so he can finish it.',
-    'Every few turns, proactively introduce one stronger or more natural alternative and one reusable phrase.',
+    'Every few turns, proactively introduce one stronger or more natural alternative and one reusable phrase. Then ask exactly one simple question.',
     `On every user turn, first restate the ENTIRE intended sentence in natural spoken ${target}, not just one word. Then answer immediately.`,
     'Use his real life naturally when useful: ING/IT, Hondinn, job interviews, project work, investing, business, cars and renovation.'
   ].join(' ');
@@ -749,6 +769,7 @@ function formatTime(iso) {
 function renderHistoryDialog() {
   saveCurrentHistory();
   const history = loadJson(historyKey(), [])
+    .filter(session => (!session.language || session.language === targetLanguage))
     .filter(session => Array.isArray(session.messages) && session.messages.length)
     .slice()
     .reverse();
@@ -864,6 +885,7 @@ async function captureVocabulary(text, vocabularyId) {
       id: globalThis.crypto?.randomUUID?.() || `word-${Date.now()}`,
       nl: word.nl.trim(),
       en: word.en.trim(),
+      language: targetLanguage,
       addedAt: new Date().toISOString()
     };
 
@@ -913,7 +935,9 @@ function processVocabularyProgress(messageId, text, endOfSpeech = false) {
 }
 
 function renderWordsDialog() {
-  learnedWords = loadJson(wordsKey(), []);
+  learnedWords = loadJson(wordsKey(), []).filter(item =>
+    item && (!item.language || item.language === targetLanguage)
+  );
   wordsContent.innerHTML = '';
   wordsCount.textContent = `${learnedWords.length} ${languageConfig().name} words`;
 
@@ -1192,10 +1216,26 @@ function handleStreamEvent(event) {
   }
 }
 
+function liveLanguageLockInstruction() {
+  if (targetLanguage === 'fr') {
+    return 'CRITICAL: Reply ONLY in French. Ulas may speak English; understand it but answer entirely in French. No Dutch. Use natural everyday French, correct the full sentence, then continue.';
+  }
+
+  if (targetLanguage === 'en') {
+    return 'CRITICAL: Reply ONLY in English. Use fluent professional English. Correct the full sentence into a natural polished version, then continue.';
+  }
+
+  return 'CRITICAL: Reply ONLY in Belgian Dutch/Flemish. Ulas may speak English; understand it but answer entirely in Dutch/Flemish. No French. Use natural everyday Flemish, correct the full sentence, then continue.';
+}
+
 function attachAnamListeners(client) {
   client.addListener(AnamEvent.CONNECTION_ESTABLISHED, () => {
     connected = true;
     connecting = false;
+    try {
+      anamClient?.addContext(liveLanguageLockInstruction());
+      pushLearningContext();
+    } catch {}
     document.body.classList.add('conversation-live');
     document.body.classList.remove('level-expanded');
     micButton.disabled = false;
@@ -1208,15 +1248,19 @@ function attachAnamListeners(client) {
 
   client.addListener(AnamEvent.VIDEO_PLAY_STARTED, () => {
     setAvatarLive(true);
-    if (!runtimeContextApplied) {
-      setTimeout(pushLearningContext, 150);
-    }
+    try { anamClient?.addContext(liveLanguageLockInstruction()); } catch {}
+    pushLearningContext();
+    setTimeout(() => {
+      try { anamClient?.addContext(liveLanguageLockInstruction()); } catch {}
+      pushLearningContext();
+    }, 160);
   });
 
   client.addListener(AnamEvent.MESSAGE_STREAM_EVENT_RECEIVED, handleStreamEvent);
   client.addListener(AnamEvent.MESSAGE_HISTORY_UPDATED, handleMessagesUpdated);
 
   client.addListener(AnamEvent.USER_SPEECH_STARTED, () => {
+    try { anamClient?.addContext(liveLanguageLockInstruction()); } catch {}
     setStatus('Listening…');
     voiceRing.classList.add('active');
     successBalloon?.classList.add('listening');
@@ -1244,10 +1288,11 @@ function attachAnamListeners(client) {
     if (connected) {
       try {
         const nextRule = targetLanguage === 'fr'
-          ? 'NEXT REPLY RULE: French only. First give the FULL corrected sentence, then answer. Stay under 20 words. Be proactive.'
+          ? 'NEXT TURN: ONLY French, even if Ulas spoke English. No Dutch. First give the FULL natural French sentence, then answer. Stay under 20 words. If useful, proactively teach one everyday phrase.'
           : targetLanguage === 'en'
-            ? 'NEXT REPLY RULE: English only. First give the FULL polished sentence, then answer. Stay under 28 words. Use fluent professional English with richer natural phrasing.'
-            : 'NEXT REPLY RULE: Dutch/Flemish only. First give the FULL corrected sentence, then answer. Stay under 20 words. Be proactive.';
+            ? 'NEXT TURN: ONLY English. First give the FULL polished professional sentence, then answer. Stay under 28 words. Proactively improve fluency, business wording or stakeholder phrasing.'
+            : 'NEXT TURN: ONLY Belgian Dutch/Flemish, even if Ulas spoke English. No French. First give the FULL natural Flemish sentence, then answer. Stay under 20 words. If useful, proactively teach one everyday phrase.';
+        anamClient?.addContext(liveLanguageLockInstruction());
         anamClient?.addContext(nextRule);
       } catch {}
     }
@@ -1323,7 +1368,12 @@ async function connect() {
 
     beginHistorySession();
     saveCurrentHistory();
+    try { anamClient?.addContext(liveLanguageLockInstruction()); } catch {}
+    pushLearningContext();
     setTimeout(pushLearningContext, 180);
+    setTimeout(() => {
+      try { anamClient?.addContext(liveLanguageLockInstruction()); } catch {}
+    }, 420);
 
     if (customLlmMode) {
       setTimeout(() => streamCamilleResponse([], true), 450);
