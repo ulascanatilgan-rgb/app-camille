@@ -1,4 +1,4 @@
-const CACHE = 'camille-pwa-button-replies-v30';
+const CACHE = 'camille-pwa-input-modes-v31';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
