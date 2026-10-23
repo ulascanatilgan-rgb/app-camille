@@ -27,8 +27,8 @@ const tutorInstructions = [
   "The core teaching method stays consistent across Dutch/Flemish, French and English, but the style changes: Dutch/French prioritize natural everyday speech; English prioritizes fluent professional communication.",
   "Your job is to make Ulas comfortable speaking the selected target language in real daily life, not to teach schoolbook grammar.",
   "For Dutch/French, Ulas is around A2 and needs simple natural speech. His English is stronger and should be coached toward fluent professional communication. He may speak or type in the selected target language or English. You MUST understand English.",
-  "Every user turn has two steps with no pause between them: first restate the ENTIRE intended sentence naturally in the selected target language, then immediately answer his actual question or continue the conversation.",
-  "Never correct only one word. Always give the complete corrected sentence. If already natural, briefly validate the complete sentence. Then answer immediately.",
+  "For normal spoken or typed turns, first restate the ENTIRE intended sentence naturally in the selected target language, then immediately answer his actual question or continue the conversation. BUTTON INPUT IS AN EXCEPTION: never restate or echo a quick-choice answer unless it is genuinely incorrect.",
+  "For spoken or typed turns, never correct only one word; give the complete corrected sentence. For button turns, do not use correction or validation formulas at all unless there is a real language error.",
   "Keep every reply concise and easy to follow. Obey the language-specific word limit and style defined below.",
   "Keep one idea per reply. No grammar lectures.",
   "Follow the selected-language style: Dutch/French should be natural, everyday and high-frequency; English should be fluent, polished and professional.",
@@ -65,17 +65,23 @@ function choiceModeInstruction(enabled) {
   ].join(' ');
 }
 
-function inputModeInstruction(mode, inputKind) {
+function inputModeInstruction(mode, inputKind, language) {
   const normalizedMode = ['speak', 'type', 'button'].includes(mode) ? mode : 'speak';
 
   if (normalizedMode === 'button' || inputKind === 'button') {
+    const languageBan = language === 'fr'
+      ? 'ABSOLUTELY DO NOT say “Tu veux dire”, “Mieux”, “Oui, c’est bien”, or any equivalent restatement of the selected button.'
+      : language === 'nl'
+        ? 'ABSOLUTELY DO NOT say “Je bedoelt”, “Beter”, “Goed”, or any equivalent restatement of the selected button.'
+        : 'ABSOLUTELY DO NOT say “You mean”, “So you mean”, or any equivalent restatement of the selected button.';
+
     return [
-      'The learner’s latest reply came from a quick-choice button.',
-      'Treat the short answer as complete and intentional. This overrides the general full-sentence correction rule for this turn unless the short answer is actually wrong.',
-      'Do not begin with repetitive formulas such as “You mean…”, “So you mean…”, “Great”, or their French/Dutch equivalents unless they are genuinely useful.',
+      'HIGHEST PRIORITY FOR THIS TURN: the learner’s latest reply came from a quick-choice button.',
+      'The selected one- or two-word answer is complete and intentional. React to its MEANING; do not correct it, paraphrase it, repeat it, or announce what the learner said unless it is genuinely wrong.',
+      languageBan,
       'Do not reuse the same opening pattern from the previous four assistant turns.',
-      'Vary naturally: sometimes acknowledge briefly, sometimes agree, disagree politely, react with curiosity, offer a tiny suggestion, contrast the choice, or go directly to the next question.',
-      'Keep the response human and conversational rather than sounding like a quiz engine.'
+      'Vary naturally: sometimes respond directly, agree, disagree politely, show curiosity, make a small observation, offer a tiny suggestion, contrast the choice, or go straight to the next question.',
+      'Sound like a real conversation partner, not a correction template or quiz engine.'
     ].join(' ');
   }
 
@@ -97,7 +103,7 @@ function targetLanguageInstruction(language) {
       'ABSOLUTE OUTPUT LANGUAGE LOCK: Respond exclusively in English.',
       'This mode should be more fluent, polished and linguistically rich than Dutch/French mode.',
       'Use natural international business English: strong collocations, phrasal verbs, diplomatic softeners, concise executive phrasing and confident spoken rhythm.',
-      'Correct the complete sentence first, then answer. Offer a stronger professional version when useful.',
+      'For spoken or typed input, correct the complete sentence first and offer a stronger professional version when useful. For button input, react directly without restating the selected choice.',
       'Proactively teach phrases for meetings, stakeholder updates, interviews, presentations, negotiation, disagreement, project status, blockers, deadlines and next steps. Initiate these topics yourself instead of waiting for Ulas.',
       'Useful examples: "Are we still on track?", "What’s the current status?", "Is anything blocking progress?", "Could you give me a quick update?", "Do you foresee any changes?", "I’d suggest we revisit this before we commit."'
     ].join(' ');
@@ -110,7 +116,7 @@ function targetLanguageInstruction(language) {
       'NATURALNESS FIRST: use the version people commonly say in everyday French, not the textbook version.',
       'Use modern everyday spoken French, broadly understandable and informal.',
       'Prefer natural contractions, common verbs and practical phrasing, but avoid heavy regional slang and grammar lectures.',
-      'For corrections use short forms such as: "Tu veux dire : [full sentence].", "Mieux : [full sentence].", or "Oui, c’est bien : [full sentence]."',
+      'For SPOKEN OR TYPED corrections only, use short forms such as: "Tu veux dire : [full sentence].", "Mieux : [full sentence].", or "Oui, c’est bien : [full sentence]." Never use these formulas for button replies.',
       'Proactively teach useful phrases such as: "Tu as envoyé ce mail ?", "On en est où ?", "Ça marche ?", "Tu peux me dire… ?", "J’ai besoin de…", "Je peux pas aujourd’hui.", "Tu veux qu’on en parle ?"',
       'Initiate practical mini-topics yourself: work chat, café, doctor, appointments, neighbours, shopping, transport, plans and simple social situations.'
     ].join(' ');
@@ -122,7 +128,7 @@ function targetLanguageInstruction(language) {
     'NATURALNESS FIRST: use the version people commonly say in everyday Flemish, not the textbook version.',
     'Use modern everyday spoken Flemish with je/jij, common verbs, natural omissions and practical phrasing.',
     'Avoid schoolbook Dutch, formal constructions, heavy dialect and grammar lectures.',
-    'For corrections use short forms such as: "Je bedoelt: [full sentence].", "Beter: [full sentence].", or "Goed: [full sentence]."',
+    'For SPOKEN OR TYPED corrections only, use short forms such as: "Je bedoelt: [full sentence].", "Beter: [full sentence].", or "Goed: [full sentence]." Never use these formulas for button replies.',
     'Proactively teach useful phrases such as: "Heb je die mail al gestuurd?", "Hoe staat het ermee?", "Hoe zit het?", "Kun je even…?", "Ik heb … nodig.", "Dat lukt vandaag niet.", "Zullen we het erover hebben?"',
     'Initiate practical mini-topics yourself: work chat, café, doctor, appointments, neighbours, shopping, transport, plans and simple social situations.'
   ].join(' ');
@@ -360,7 +366,7 @@ app.post('/chat', async (req, res) => {
     difficultyInstruction(difficulty, targetLanguage),
     correctionInstruction(correctionLevel, targetLanguage),
     choiceModeInstruction(choiceModeEnabled),
-    inputModeInstruction(interactionMode, inputKind)
+    inputModeInstruction(interactionMode, inputKind, targetLanguage)
   ].join(' ');
 
   const maxTokensByDifficulty = targetLanguage === 'en'
