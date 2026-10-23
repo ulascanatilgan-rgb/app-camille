@@ -58,9 +58,31 @@ function choiceModeInstruction(enabled) {
     'BUTTON REPLY MODE IS ON.',
     'End every reply with exactly one short, concrete question that can naturally be answered using two distinct one- or two-word options.',
     'Do not list the two options in the spoken response; the interface generates them separately.',
-    'If the learner answers with only one or two words, treat it as a valid button reply. Do not force a full-sentence correction unless the short answer is actually wrong.',
+    'If the learner answers with only one or two words, treat it as a valid intentional button reply. Do not force a full-sentence correction unless it is actually wrong.',
+    'Vary your reaction style. Do not repeat the same acknowledgement or correction formula.',
+    'You may agree, disagree politely, show curiosity, give a tiny suggestion, contrast an idea, react positively or neutrally, or move directly to the next question.',
     'Prefer questions that move the conversation forward and make the learner choose, react or express a simple preference.'
   ].join(' ');
+}
+
+function inputModeInstruction(mode, inputKind) {
+  const normalizedMode = ['speak', 'type', 'button'].includes(mode) ? mode : 'speak';
+
+  if (normalizedMode === 'button' || inputKind === 'button') {
+    return [
+      'The learner’s latest reply came from a quick-choice button.',
+      'Treat the short answer as complete and intentional.',
+      'Do not begin with repetitive formulas such as “You mean…” unless there is a real language error.',
+      'Avoid reusing the same opening phrase from recent assistant turns.',
+      'React in a varied, human way before asking the next short question.'
+    ].join(' ');
+  }
+
+  if (normalizedMode === 'type') {
+    return 'The learner is typing. Continue the exact same conversation and context; do not restart or change topic because the input method changed.';
+  }
+
+  return 'The learner is speaking. Continue the same conversation naturally.';
 }
 
 function normalizeTargetLanguage(value) {
@@ -302,6 +324,10 @@ app.post('/chat', async (req, res) => {
   const kickoff = Boolean(req.body?.kickoff);
   const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
   const choiceModeEnabled = Boolean(req.body?.choiceModeEnabled);
+  const interactionMode = ['speak', 'type', 'button'].includes(req.body?.interactionMode)
+    ? req.body.interactionMode
+    : (choiceModeEnabled ? 'button' : 'speak');
+  const inputKind = req.body?.inputKind === 'button' ? 'button' : req.body?.inputKind === 'type' ? 'type' : 'speak';
 
   const history = incoming
     .filter(message =>
@@ -332,7 +358,8 @@ app.post('/chat', async (req, res) => {
     targetLanguageInstruction(targetLanguage),
     difficultyInstruction(difficulty, targetLanguage),
     correctionInstruction(correctionLevel, targetLanguage),
-    choiceModeInstruction(choiceModeEnabled)
+    choiceModeInstruction(choiceModeEnabled),
+    inputModeInstruction(interactionMode, inputKind)
   ].join(' ');
 
   const maxTokensByDifficulty = targetLanguage === 'en'
@@ -353,7 +380,7 @@ app.post('/chat', async (req, res) => {
           ...history
         ],
         stream: true,
-        temperature: 0.55,
+        temperature: inputKind === 'button' ? 0.72 : 0.55,
         max_tokens: maxTokensByDifficulty[difficulty]
       })
     });
