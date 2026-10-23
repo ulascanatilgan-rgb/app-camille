@@ -46,6 +46,8 @@ const successBalloon = document.getElementById('successBalloon');
 const typeToggle = document.getElementById('typeToggle');
 const typeComposer = document.getElementById('typeComposer');
 const typeInput = document.getElementById('typeInput');
+const choiceModeToggle = document.getElementById('choiceModeToggle');
+const quickReplyBar = document.getElementById('quickReplyBar');
 const languageToggle = document.getElementById('languageToggle');
 const languageToggleLabel = document.getElementById('languageToggleLabel');
 const practiceEyebrow = document.getElementById('practiceEyebrow');
@@ -61,6 +63,7 @@ const HISTORY_BASE_KEY = 'camille.history.v3';
 const WORDS_BASE_KEY = 'camille.words.v3';
 const LEVEL_KEY = 'camille.difficulty.v1';
 const LANGUAGE_KEY = 'camille.targetLanguage.v1';
+const CHOICE_MODE_KEY = 'camille.choiceMode.v1';
 
 let anamClient = null;
 let connected = false;
@@ -80,6 +83,9 @@ let pinnedUserMessageId = null;
 let popAudioContext = null;
 let userTranslationSeq = 0;
 let lastUserTranslationAt = 0;
+let choiceModeEnabled = localStorage.getItem(CHOICE_MODE_KEY) === 'true';
+let choiceGenerationSeq = 0;
+let lastChoiceSource = '';
 
 const streamBuffers = new Map();
 const vocabProcessedIds = new Set();
@@ -569,6 +575,97 @@ async function finalizeSubtitle(nlText, messageId) {
   renderMessages(currentMessages);
 }
 
+function updateChoiceModeUi() {
+  if (!choiceModeToggle) return;
+  choiceModeToggle.classList.toggle('active', choiceModeEnabled);
+  choiceModeToggle.classList.toggle('inactive', !choiceModeEnabled);
+  choiceModeToggle.setAttribute('aria-pressed', String(choiceModeEnabled));
+  choiceModeToggle.title = choiceModeEnabled ? 'Button replies on' : 'Button replies off';
+}
+
+function clearQuickChoices() {
+  choiceGenerationSeq += 1;
+  lastChoiceSource = '';
+  if (!quickReplyBar) return;
+  quickReplyBar.innerHTML = '';
+  quickReplyBar.hidden = true;
+}
+
+function renderQuickChoices(choices) {
+  if (!quickReplyBar || !choiceModeEnabled || !Array.isArray(choices) || choices.length < 2) {
+    clearQuickChoices();
+    return;
+  }
+
+  quickReplyBar.innerHTML = '';
+  for (const choice of choices.slice(0, 2)) {
+    const text = String(choice || '').trim();
+    if (!text) continue;
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'quick-reply-button';
+    button.textContent = text;
+    button.addEventListener('click', () => {
+      if (!connected || isResponding) return;
+      clearQuickChoices();
+      sendTypedTurn(text);
+    });
+    quickReplyBar.appendChild(button);
+  }
+
+  quickReplyBar.hidden = quickReplyBar.children.length !== 2;
+}
+
+async function requestQuickChoices(camilleText) {
+  const clean = String(camilleText || '').trim();
+  if (!choiceModeEnabled || !connected || !clean) {
+    clearQuickChoices();
+    return;
+  }
+
+  if (clean === lastChoiceSource && quickReplyBar && !quickReplyBar.hidden) return;
+  lastChoiceSource = clean;
+
+  const seq = ++choiceGenerationSeq;
+  try {
+    const recentMessages = currentMessages
+      .filter(message => message?.content?.trim())
+      .slice(-6)
+      .map(message => ({
+        role: normalizedRole(message.role),
+        content: message.content.trim()
+      }));
+
+    const response = await fetch('/choices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: clean,
+        targetLanguage,
+        recentMessages
+      })
+    });
+
+    if (!response.ok) throw new Error('Could not generate quick replies.');
+    const data = await response.json();
+
+    if (seq !== choiceGenerationSeq || !choiceModeEnabled) return;
+    renderQuickChoices(data.choices || []);
+  } catch (error) {
+    if (seq === choiceGenerationSeq) clearQuickChoices();
+    console.warn('Quick reply generation failed:', error);
+  }
+}
+
+function choiceModeInstruction() {
+  if (!choiceModeEnabled) {
+    return 'BUTTON REPLY MODE is off. Continue normal spoken conversation.';
+  }
+
+  return 'BUTTON REPLY MODE is ON. End each reply with exactly one short, concrete question that can naturally be answered by two distinct one- or two-word choices. Do not say or list the choices; the interface will show them. Keep the question useful, varied and easy to continue from.';
+}
+
 function buildRuntimeContext() {
   const isFrench = targetLanguage === 'fr';
   const isEnglish = targetLanguage === 'en';
@@ -625,6 +722,7 @@ function buildRuntimeContext() {
     'SESSION LEARNING CONTEXT — IMPORTANT:',
     languageLock,
     teachingMode,
+    choiceModeInstruction(),
     `You are Camille, Ulas Atilgan’s practical ${target} conversation coach.`,
     isEnglish
       ? 'The goal is fluent, confident, high-quality professional English for international work and real conversations.'
@@ -984,6 +1082,7 @@ async function sendTypedTurn(text) {
   const clean = String(text || '').trim();
   if (!clean || !anamClient || !connected || isResponding) return;
 
+  clearQuickChoices();
   celebrateUserTurn();
 
   const userId = `typed-user-${Date.now()}`;
@@ -1019,7 +1118,8 @@ async function sendTypedTurn(text) {
         kickoff: false,
         difficulty,
         correctionLevel: correctionLevel.value || 'medium',
-        targetLanguage
+        targetLanguage,
+        choiceModeEnabled
       })
     });
 
@@ -1061,6 +1161,7 @@ async function sendTypedTurn(text) {
     processVocabularyProgress(personaId, full, true);
     saveCurrentHistory();
     renderMessages(currentMessages);
+    if (choiceModeEnabled) requestQuickChoices(full);
   } catch (error) {
     if (error?.name !== 'AbortError') {
       console.error('Typed Camille response error:', error);
@@ -1090,7 +1191,8 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
         kickoff,
         difficulty,
         correctionLevel: correctionLevel.value || 'medium',
-        targetLanguage
+        targetLanguage,
+        choiceModeEnabled
       })
     });
 
@@ -1208,6 +1310,7 @@ function handleStreamEvent(event) {
       partialTranslationSeq += 1;
       lastPartialTranslationAt = 0;
       finalizeSubtitle(limited.text, event.id);
+      if (choiceModeEnabled) requestQuickChoices(limited.text);
     }
 
     if (event.endOfSpeech) {
@@ -1261,7 +1364,11 @@ function attachAnamListeners(client) {
   client.addListener(AnamEvent.MESSAGE_HISTORY_UPDATED, handleMessagesUpdated);
 
   client.addListener(AnamEvent.USER_SPEECH_STARTED, () => {
-    try { anamClient?.addContext(liveLanguageLockInstruction()); } catch {}
+    clearQuickChoices();
+    try {
+      anamClient?.addContext(liveLanguageLockInstruction());
+      if (choiceModeEnabled) anamClient?.addContext(choiceModeInstruction());
+    } catch {}
     setStatus('Listening…');
     voiceRing.classList.add('active');
     successBalloon?.classList.add('listening');
@@ -1295,6 +1402,7 @@ function attachAnamListeners(client) {
             : 'NEXT TURN: ONLY Belgian Dutch/Flemish, even if Ulas spoke English. No French. First give the FULL natural Flemish sentence, then answer. Stay under 20 words. If useful, proactively teach one everyday phrase.';
         anamClient?.addContext(liveLanguageLockInstruction());
         anamClient?.addContext(nextRule);
+        if (choiceModeEnabled) anamClient?.addContext(choiceModeInstruction());
       } catch {}
     }
   });
@@ -1395,6 +1503,7 @@ async function connect() {
 }
 
 function resetUiAfterDisconnect() {
+  clearQuickChoices();
   connected = false;
   connecting = false;
   document.body.classList.remove('conversation-live', 'level-expanded');
@@ -1456,6 +1565,23 @@ typeToggle?.addEventListener('click', () => {
   typeToggle.setAttribute('aria-expanded', String(open));
   typeComposer.hidden = !open;
   if (open) setTimeout(() => typeInput?.focus(), 0);
+});
+
+choiceModeToggle?.addEventListener('click', () => {
+  choiceModeEnabled = !choiceModeEnabled;
+  localStorage.setItem(CHOICE_MODE_KEY, String(choiceModeEnabled));
+  clearQuickChoices();
+  updateChoiceModeUi();
+
+  if (connected) {
+    try { anamClient?.addContext(choiceModeInstruction()); } catch {}
+    pushLearningContext();
+
+    if (choiceModeEnabled) {
+      const currentCamilleText = subtitleNl?.textContent?.trim() || '';
+      if (currentCamilleText) requestQuickChoices(currentCamilleText);
+    }
+  }
 });
 
 typeComposer?.addEventListener('submit', async event => {
@@ -1529,6 +1655,7 @@ languageToggle?.addEventListener('click', async () => {
   localStorage.setItem(LANGUAGE_KEY, targetLanguage);
 
   learnedWords = loadJson(wordsKey(), []);
+  clearQuickChoices();
   currentMessages = [];
   translationByMessageId.clear();
   streamBuffers.clear();
@@ -1588,6 +1715,7 @@ migrateLanguageStores();
 learnedWords = loadJson(wordsKey(), []);
 updateDifficultyUi();
 updateLanguageUi(true);
+updateChoiceModeUi();
 setAvatarLive(false);
 
 // ---- PWA install support ----
