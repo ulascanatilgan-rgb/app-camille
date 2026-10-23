@@ -35,6 +35,12 @@ const historyCount = document.getElementById('historyCount');
 const wordsCount = document.getElementById('wordsCount');
 const closeHistory = document.getElementById('closeHistory');
 const closeWords = document.getElementById('closeWords');
+const sessionHistoryButton = document.getElementById('sessionHistoryButton');
+const sessionHistoryDialog = document.getElementById('sessionHistoryDialog');
+const sessionHistoryContent = document.getElementById('sessionHistoryContent');
+const sessionHistoryCount = document.getElementById('sessionHistoryCount');
+const closeSessionHistory = document.getElementById('closeSessionHistory');
+const workspaceEl = document.querySelector('.workspace');
 
 const wordCard = document.getElementById('wordCard');
 const wordNl = document.getElementById('wordNl');
@@ -93,6 +99,8 @@ let interactionMode = ['speak', 'type', 'button'].includes(savedInputMode)
 let choiceModeEnabled = interactionMode === 'button';
 let choiceGenerationSeq = 0;
 let lastChoiceSource = '';
+let stableViewportHeight = window.innerHeight;
+let stableWorkspaceHeight = workspaceEl?.getBoundingClientRect().height || 0;
 
 const streamBuffers = new Map();
 const vocabProcessedIds = new Set();
@@ -582,6 +590,40 @@ async function finalizeSubtitle(nlText, messageId) {
   renderMessages(currentMessages);
 }
 
+function captureStableTypeViewport() {
+  stableViewportHeight = window.innerHeight || stableViewportHeight;
+  stableWorkspaceHeight = workspaceEl?.getBoundingClientRect().height || stableWorkspaceHeight;
+  document.documentElement.style.setProperty('--stable-workspace-height', `${Math.round(stableWorkspaceHeight)}px`);
+  updateTypeKeyboardOffset();
+}
+
+function updateTypeKeyboardOffset() {
+  if (interactionMode !== 'type') {
+    document.documentElement.style.setProperty('--keyboard-offset', '0px');
+    return;
+  }
+
+  const viewport = window.visualViewport;
+  if (!viewport) {
+    document.documentElement.style.setProperty('--keyboard-offset', '0px');
+    return;
+  }
+
+  const keyboardOffset = Math.max(0, stableViewportHeight - viewport.height - viewport.offsetTop);
+  document.documentElement.style.setProperty('--keyboard-offset', `${Math.round(keyboardOffset)}px`);
+}
+
+function updateTypeModeLayout() {
+  const typing = interactionMode === 'type';
+  document.body.classList.toggle('type-input-mode', typing);
+
+  if (typing) {
+    captureStableTypeViewport();
+    setTimeout(updateTypeKeyboardOffset, 60);
+  } else {
+    document.documentElement.style.setProperty('--keyboard-offset', '0px');
+  }
+}
 function updateInteractionModeUi() {
   const buttons = [
     [speakModeButton, 'speak'],
@@ -599,10 +641,12 @@ function updateInteractionModeUi() {
 
   choiceModeEnabled = interactionMode === 'button';
   typeComposer.hidden = interactionMode !== 'type';
+  updateTypeModeLayout();
 
   if (interactionMode !== 'button') clearQuickChoices();
   if (interactionMode === 'type' && connected) {
-    setTimeout(() => typeInput?.focus(), 0);
+    captureStableTypeViewport();
+    setTimeout(() => typeInput?.focus({ preventScroll: true }), 80);
   }
 }
 
@@ -758,7 +802,7 @@ function choiceModeInstruction() {
     return 'BUTTON REPLY MODE is off.';
   }
 
-  return 'BUTTON REPLY MODE is ON. End each reply with exactly one short, concrete question that can naturally be answered by two distinct one- or two-word choices. Do not say or list the choices; the interface will show them. Treat one- or two-word button answers as intentional complete answers. Do not force the same correction formula. React naturally and vary your response: sometimes acknowledge, agree, disagree politely, show curiosity, give a tiny suggestion, contrast an idea, or move directly to the next question. Avoid repeating the same opening phrase in consecutive turns.';
+  return 'BUTTON REPLY MODE is ON. End each reply with exactly one short, concrete question that can naturally be answered by two distinct one- or two-word choices. Do not say or list the choices; the interface will show them. A button answer is already a complete intentional answer. NEVER restate or correct it with formulas like “Tu veux dire”, “Mieux”, “Je bedoelt”, “Beter”, “You mean” or “So you mean”. React to its meaning instead. Vary naturally: agree, disagree politely, show curiosity, make a tiny comment or suggestion, contrast the idea, or go directly to the next question. Do not repeat the same opening pattern.';
 }
 
 function buildRuntimeContext() {
@@ -960,6 +1004,74 @@ function formatTime(iso) {
   }
 }
 
+function getLatestSessionMessages() {
+  if (currentMessages.some(message => message?.content?.trim())) {
+    return currentMessages
+      .filter(message => message?.content?.trim())
+      .map(message => ({
+        id: message.id,
+        role: normalizedRole(message.role),
+        content: message.content.trim(),
+        en: translationByMessageId.get(message.id) || ''
+      }));
+  }
+
+  const latest = loadJson(historyKey(), [])
+    .filter(session => (!session.language || session.language === targetLanguage))
+    .filter(session => Array.isArray(session.messages) && session.messages.length)
+    .slice(-1)[0];
+
+  return Array.isArray(latest?.messages) ? latest.messages : [];
+}
+
+function renderSessionHistoryDialog() {
+  saveCurrentHistory();
+  const messages = getLatestSessionMessages();
+
+  sessionHistoryContent.innerHTML = '';
+  sessionHistoryCount.textContent = messages.length ? `${messages.length} turns` : '';
+
+  if (!messages.length) {
+    const empty = document.createElement('div');
+    empty.className = 'session-history-empty';
+    empty.textContent = 'No conversation in this session yet.';
+    sessionHistoryContent.appendChild(empty);
+    return;
+  }
+
+  for (const message of messages) {
+    const role = normalizedRole(message.role);
+    const row = document.createElement('section');
+    row.className = `session-history-message ${role === 'user' ? 'user' : 'camille'}`;
+
+    const label = document.createElement('div');
+    label.className = 'session-history-role';
+    label.textContent = role === 'user' ? 'YOU' : 'CAMILLE';
+
+    const body = document.createElement('div');
+    body.className = 'session-history-body';
+
+    const main = document.createElement('div');
+    main.className = 'session-history-main';
+    main.textContent = role === 'user' ? message.content : limitCamilleReply(message.content).text;
+    body.appendChild(main);
+
+    const english = message.en || (message.id ? translationByMessageId.get(message.id) : '');
+    if (role !== 'user' && english) {
+      const en = document.createElement('div');
+      en.className = 'session-history-en';
+      en.textContent = english;
+      body.appendChild(en);
+    }
+
+    row.append(label, body);
+    sessionHistoryContent.appendChild(row);
+  }
+
+  requestAnimationFrame(() => {
+    sessionHistoryContent.scrollTop = sessionHistoryContent.scrollHeight;
+  });
+}
 function renderHistoryDialog() {
   saveCurrentHistory();
   const history = loadJson(historyKey(), [])
@@ -1445,7 +1557,7 @@ function attachAnamListeners(client) {
   difficultyToggle?.setAttribute('aria-expanded', 'false');
     micButton.disabled = false;
     micButton.classList.add('live');
-    micLabel.textContent = 'Camille connected';
+    micLabel.textContent = 'Live';
     endButton.disabled = false;
     setAvatarLive(true);
     applyInteractionAudioState();
@@ -1575,7 +1687,7 @@ async function connect() {
       document.body.classList.remove('level-expanded');
       micButton.disabled = false;
       micButton.classList.add('live');
-      micLabel.textContent = 'Camille connected';
+      micLabel.textContent = 'Live';
       endButton.disabled = false;
       setAvatarLive(true);
       applyInteractionAudioState();
@@ -1641,7 +1753,7 @@ function resetUiAfterDisconnect() {
 
   micButton.disabled = false;
   micButton.classList.remove('live');
-  micLabel.textContent = 'Start conversation';
+  micLabel.textContent = 'Start';
   endButton.disabled = true;
   setStatus('Ready');
   setSubtitle(lastSubtitlePair.nl, lastSubtitlePair.en);
@@ -1771,6 +1883,17 @@ languageToggle?.addEventListener('click', async () => {
   }
 });
 
+sessionHistoryButton?.addEventListener('click', () => {
+  renderSessionHistoryDialog();
+  sessionHistoryDialog.showModal();
+});
+
+closeSessionHistory?.addEventListener('click', () => sessionHistoryDialog.close());
+
+sessionHistoryDialog?.addEventListener('click', event => {
+  if (event.target === sessionHistoryDialog) sessionHistoryDialog.close();
+});
+
 historyButton.addEventListener('click', () => {
   renderHistoryDialog();
   historyDialog.showModal();
@@ -1790,6 +1913,16 @@ historyDialog.addEventListener('click', event => {
 
 wordsDialog.addEventListener('click', event => {
   if (event.target === wordsDialog) wordsDialog.close();
+});
+
+window.visualViewport?.addEventListener('resize', updateTypeKeyboardOffset);
+window.visualViewport?.addEventListener('scroll', updateTypeKeyboardOffset);
+
+window.addEventListener('resize', () => {
+  if (interactionMode !== 'type') {
+    stableViewportHeight = window.innerHeight;
+    stableWorkspaceHeight = workspaceEl?.getBoundingClientRect().height || stableWorkspaceHeight;
+  }
 });
 
 window.addEventListener('beforeunload', () => {
