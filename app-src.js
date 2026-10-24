@@ -415,7 +415,7 @@ function browserReplay(text, element, runId) {
   });
 }
 
-async function replayText(text, element = null) {
+async function replayText(text, element = null, { useAvatarVoice = false } = {}) {
   const clean = String(text || '').trim();
   if (!clean) return;
 
@@ -431,7 +431,7 @@ async function replayText(text, element = null) {
   replayingAudio = true;
 
   try {
-    if (connected && anamClient) {
+    if (useAvatarVoice && connected && anamClient) {
       try { anamClient.muteInputAudio(); } catch {}
       const duration = estimateReplayDuration(clean);
       const highlight = animateReplayHighlight(element, clean, duration, runId);
@@ -2015,7 +2015,8 @@ settingsButton.addEventListener('click', () => {
 
 liveReplayButton?.addEventListener('click', () => {
   const text = subtitleNl?.textContent?.trim() || lastSubtitlePair.nl || '';
-  replayText(text, subtitleNl);
+  const highlightTarget = captionsToggle.checked ? subtitleNl : null;
+  replayText(text, highlightTarget, { useAvatarVoice: true });
 });
 
 captionsToggle.addEventListener('change', () => {
