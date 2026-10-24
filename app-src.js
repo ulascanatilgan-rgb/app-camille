@@ -431,8 +431,11 @@ async function replayText(text, element = null, { useAvatarVoice = false } = {})
   replayingAudio = true;
 
   try {
-    if (useAvatarVoice && connected && anamClient) {
+    if (connected && anamClient) {
       try { anamClient.muteInputAudio(); } catch {}
+    }
+
+    if (useAvatarVoice && connected && anamClient) {
       const duration = estimateReplayDuration(clean);
       const highlight = animateReplayHighlight(element, clean, duration, runId);
       await anamClient.talk(clean);
@@ -837,13 +840,14 @@ function applyInteractionAudioState() {
 }
 
 function interactionModeInstruction() {
+  const pace = ' Keep Camille’s spoken delivery calm, clearly articulated and about 15% slower than ordinary conversational speed.';
   if (interactionMode === 'button') {
-    return 'INPUT MODE: BUTTON. The microphone is muted. The user responds through short interface choices. Treat one- or two-word button answers as intentional complete answers and continue naturally.';
+    return 'INPUT MODE: BUTTON. The microphone is muted. The user responds through short interface choices. Treat one- or two-word button answers as intentional complete answers and continue naturally.' + pace;
   }
   if (interactionMode === 'type') {
-    return 'INPUT MODE: TYPE. The microphone is muted. The user types messages. Continue the same conversation naturally without restarting or changing topic just because the input method changed.';
+    return 'INPUT MODE: TYPE. The microphone is muted. The user types messages. Continue the same conversation naturally without restarting or changing topic just because the input method changed.' + pace;
   }
-  return 'INPUT MODE: SPEAK. The microphone is active. Continue normal spoken conversation.';
+  return 'INPUT MODE: SPEAK. The microphone is active. Continue normal spoken conversation.' + pace;
 }
 
 function syncRecentConversationContext() {
