@@ -1640,6 +1640,7 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
 }
 
 async function handleMessagesUpdated(messages) {
+  if (replayingAudio) return;
   currentMessages = Array.isArray(messages) ? [...messages] : [];
   saveCurrentHistory();
   renderMessages(currentMessages);
@@ -1659,6 +1660,7 @@ async function handleMessagesUpdated(messages) {
 
 function handleStreamEvent(event) {
   if (!event?.id || typeof event?.content !== 'string') return;
+  if (replayingAudio && event.role === 'persona') return;
 
   const previous = streamBuffers.get(event.id) || '';
   const next = previous + event.content;
@@ -1730,15 +1732,16 @@ function handleStreamEvent(event) {
 }
 
 function liveLanguageLockInstruction() {
+  const pace = ' SPEAKING PACE: speak calmly and about 15% slower than your normal pace, with clear articulation and small natural pauses between phrases.';
   if (targetLanguage === 'fr') {
-    return 'CRITICAL: Reply ONLY in French. Ulas may speak English; understand it but answer entirely in French. No Dutch. Use natural everyday French, correct the full sentence, then continue.';
+    return 'CRITICAL: Reply ONLY in French. Ulas may speak English; understand it but answer entirely in French. No Dutch. Use natural everyday French, correct the full sentence, then continue.' + pace;
   }
 
   if (targetLanguage === 'en') {
-    return 'CRITICAL: Reply ONLY in English. Use fluent professional English. Correct the full sentence into a natural polished version, then continue.';
+    return 'CRITICAL: Reply ONLY in English. Use fluent professional English. Correct the full sentence into a natural polished version, then continue.' + pace;
   }
 
-  return 'CRITICAL: Reply ONLY in Belgian Dutch/Flemish. Ulas may speak English; understand it but answer entirely in Dutch/Flemish. No French. Use natural everyday Flemish, correct the full sentence, then continue.';
+  return 'CRITICAL: Reply ONLY in Belgian Dutch/Flemish. Ulas may speak English; understand it but answer entirely in Dutch/Flemish. No French. Use natural everyday Flemish, correct the full sentence, then continue.' + pace;
 }
 
 function attachAnamListeners(client) {
@@ -1778,6 +1781,9 @@ function attachAnamListeners(client) {
 
   client.addListener(AnamEvent.USER_SPEECH_STARTED, () => {
     if (interactionMode !== 'speak') return;
+    replaySequence += 1;
+    window.speechSynthesis?.cancel?.();
+    replayingAudio = false;
     clearQuickChoices();
     try {
       anamClient?.addContext(liveLanguageLockInstruction());
@@ -1920,6 +1926,9 @@ async function connect() {
 }
 
 function resetUiAfterDisconnect() {
+  replaySequence += 1;
+  window.speechSynthesis?.cancel?.();
+  replayingAudio = false;
   clearQuickChoices();
   connected = false;
   connecting = false;
@@ -2002,6 +2011,11 @@ endButton.addEventListener('click', disconnect);
 
 settingsButton.addEventListener('click', () => {
   settingsDialog.showModal();
+});
+
+liveReplayButton?.addEventListener('click', () => {
+  const text = subtitleNl?.textContent?.trim() || lastSubtitlePair.nl || '';
+  replayText(text, subtitleNl);
 });
 
 captionsToggle.addEventListener('change', () => {
