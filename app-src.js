@@ -14,6 +14,7 @@ const correctionLevel = document.getElementById('correctionLevel');
 const captionsToggle = document.getElementById('captionsToggle');
 const subtitleNl = document.getElementById('subtitleNl');
 const subtitleEn = document.getElementById('subtitleEn');
+const liveReplayButton = document.getElementById('liveReplayButton');
 const avatarVideo = document.getElementById('avatarVideo');
 const avatarPlaceholder = document.getElementById('avatarPlaceholder');
 const avatarPlaceholderText = document.getElementById('avatarPlaceholderText');
@@ -101,6 +102,9 @@ let choiceGenerationSeq = 0;
 let lastChoiceSource = '';
 let stableViewportHeight = window.innerHeight;
 let stableWorkspaceHeight = workspaceEl?.getBoundingClientRect().height || 0;
+let replaySequence = 0;
+let replayingAudio = false;
+let replayHighlightTimer = null;
 
 const streamBuffers = new Map();
 const vocabProcessedIds = new Set();
@@ -295,6 +299,177 @@ function setSubtitle(nl = '', en = '') {
 
   subtitleNl.textContent = nl || '';
   subtitleEn.textContent = en || '';
+}
+
+function replayLocale() {
+  return languageConfig().locale || (targetLanguage === 'fr' ? 'fr-FR' : targetLanguage === 'en' ? 'en-GB' : 'nl-BE');
+}
+
+function splitReplaySentences(text) {
+  const clean = String(text || '').trim();
+  if (!clean) return [];
+  return clean.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map(part => part.trim()).filter(Boolean) || [clean];
+}
+
+function replayWordParts(text) {
+  return String(text || '').match(/[\p{L}\p{N}][\p{L}\p{N}'’\-]*|[^\p{L}\p{N}'’\-]+/gu) || [String(text || '')];
+}
+
+function renderReplayHighlight(element, text, activeWordIndex = -1) {
+  if (!element) return;
+  const clean = String(text || '');
+  const parts = replayWordParts(clean);
+  let wordIndex = -1;
+  const fragment = document.createDocumentFragment();
+
+  for (const part of parts) {
+    if (/^[\p{L}\p{N}]/u.test(part)) {
+      wordIndex += 1;
+      const span = document.createElement('span');
+      span.textContent = part;
+      if (wordIndex === activeWordIndex) span.className = 'replay-word-active';
+      fragment.appendChild(span);
+    } else {
+      fragment.appendChild(document.createTextNode(part));
+    }
+  }
+
+  element.replaceChildren(fragment);
+}
+
+function estimateReplayDuration(text) {
+  const words = countSpokenWords(text);
+  const punctuationPauses = (String(text || '').match(/[,.!?;:]/g) || []).length;
+  return Math.max(950, words * 460 + punctuationPauses * 120);
+}
+
+function animateReplayHighlight(element, text, duration, runId) {
+  if (!element) return Promise.resolve();
+  const words = countSpokenWords(text);
+  if (!words) return Promise.resolve();
+
+  const step = Math.max(180, duration / words);
+  let index = 0;
+  renderReplayHighlight(element, text, 0);
+
+  return new Promise(resolve => {
+    const tick = () => {
+      if (runId !== replaySequence) {
+        renderReplayHighlight(element, text, -1);
+        resolve();
+        return;
+      }
+
+      index += 1;
+      if (index >= words) {
+        renderReplayHighlight(element, text, -1);
+        resolve();
+        return;
+      }
+
+      renderReplayHighlight(element, text, index);
+      replayHighlightTimer = window.setTimeout(tick, step);
+    };
+
+    replayHighlightTimer = window.setTimeout(tick, step);
+  });
+}
+
+function pickBrowserVoice(locale) {
+  const voices = window.speechSynthesis?.getVoices?.() || [];
+  const normalized = String(locale || '').toLowerCase();
+  const base = normalized.split('-')[0];
+  return voices.find(voice => voice.lang?.toLowerCase() === normalized)
+    || voices.find(voice => voice.lang?.toLowerCase().startsWith(base))
+    || null;
+}
+
+function browserReplay(text, element, runId) {
+  return new Promise(resolve => {
+    if (!('speechSynthesis' in window)) {
+      resolve();
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = replayLocale();
+    utterance.rate = 0.82;
+    utterance.pitch = 1;
+    const voice = pickBrowserVoice(utterance.lang);
+    if (voice) utterance.voice = voice;
+
+    const duration = estimateReplayDuration(text);
+    const highlight = animateReplayHighlight(element, text, duration, runId);
+
+    utterance.onend = async () => {
+      await highlight;
+      resolve();
+    };
+    utterance.onerror = async () => {
+      await highlight;
+      resolve();
+    };
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
+async function replayText(text, element = null, { useAvatarVoice = false } = {}) {
+  const clean = String(text || '').trim();
+  if (!clean) return;
+
+  if (isResponding) {
+    setStatus('Wait for Camille to finish');
+    return;
+  }
+
+  const runId = ++replaySequence;
+  if (replayHighlightTimer) window.clearTimeout(replayHighlightTimer);
+  replayHighlightTimer = null;
+  window.speechSynthesis?.cancel?.();
+  replayingAudio = true;
+
+  try {
+    if (connected && anamClient) {
+      try { anamClient.muteInputAudio(); } catch {}
+    }
+
+    if (useAvatarVoice && connected && anamClient) {
+      const duration = estimateReplayDuration(clean);
+      const highlight = animateReplayHighlight(element, clean, duration, runId);
+      await anamClient.talk(clean);
+      await highlight;
+    } else {
+      await browserReplay(clean, element, runId);
+    }
+  } catch (error) {
+    console.warn('Replay failed, using local speech fallback:', error);
+    if (runId === replaySequence) await browserReplay(clean, element, runId);
+  } finally {
+    if (runId === replaySequence) {
+      if (replayHighlightTimer) window.clearTimeout(replayHighlightTimer);
+      replayHighlightTimer = null;
+      renderReplayHighlight(element, clean, -1);
+      replayingAudio = false;
+      applyInteractionAudioState();
+      if (connected) setStatus(languageConfig().ready);
+    }
+  }
+}
+
+function createAudioReplayButton(text, element, label = 'Replay audio') {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'audio-replay-button';
+  button.textContent = '🎧';
+  button.setAttribute('aria-label', label);
+  button.title = label;
+  button.addEventListener('click', event => {
+    event.stopPropagation();
+    replayText(text, element);
+  });
+  return button;
 }
 
 function setLastUserPin(text, messageId = null, english = null) {
@@ -665,13 +840,14 @@ function applyInteractionAudioState() {
 }
 
 function interactionModeInstruction() {
+  const pace = ' Keep Camille’s spoken delivery calm, clearly articulated and about 15% slower than ordinary conversational speed.';
   if (interactionMode === 'button') {
-    return 'INPUT MODE: BUTTON. The microphone is muted. The user responds through short interface choices. Treat one- or two-word button answers as intentional complete answers and continue naturally.';
+    return 'INPUT MODE: BUTTON. The microphone is muted. The user responds through short interface choices. Treat one- or two-word button answers as intentional complete answers and continue naturally.' + pace;
   }
   if (interactionMode === 'type') {
-    return 'INPUT MODE: TYPE. The microphone is muted. The user types messages. Continue the same conversation naturally without restarting or changing topic just because the input method changed.';
+    return 'INPUT MODE: TYPE. The microphone is muted. The user types messages. Continue the same conversation naturally without restarting or changing topic just because the input method changed.' + pace;
   }
-  return 'INPUT MODE: SPEAK. The microphone is active. Continue normal spoken conversation.';
+  return 'INPUT MODE: SPEAK. The microphone is active. Continue normal spoken conversation.' + pace;
 }
 
 function syncRecentConversationContext() {
@@ -1051,10 +1227,21 @@ function renderSessionHistoryDialog() {
     const body = document.createElement('div');
     body.className = 'session-history-body';
 
-    const main = document.createElement('div');
-    main.className = 'session-history-main';
-    main.textContent = role === 'user' ? message.content : limitCamilleReply(message.content).text;
-    body.appendChild(main);
+    const sourceText = role === 'user' ? message.content : limitCamilleReply(message.content).text;
+    const sentences = splitReplaySentences(sourceText);
+
+    for (const sentence of sentences) {
+      const sentenceRow = document.createElement('div');
+      sentenceRow.className = 'history-sentence-row';
+
+      const main = document.createElement('div');
+      main.className = 'session-history-main replay-text';
+      main.textContent = sentence;
+
+      const replay = createAudioReplayButton(sentence, main, 'Replay sentence');
+      sentenceRow.append(main, replay);
+      body.appendChild(sentenceRow);
+    }
 
     const english = message.en || (message.id ? translationByMessageId.get(message.id) : '');
     if (role !== 'user' && english) {
@@ -1072,6 +1259,7 @@ function renderSessionHistoryDialog() {
     sessionHistoryContent.scrollTop = sessionHistoryContent.scrollHeight;
   });
 }
+
 function renderHistoryDialog() {
   saveCurrentHistory();
   const history = loadJson(historyKey(), [])
@@ -1126,9 +1314,19 @@ function renderHistoryDialog() {
         const body = document.createElement('div');
         body.className = 'archive-body';
 
-        const nl = document.createElement('div');
-        nl.textContent = message.content;
-        body.appendChild(nl);
+        const sentences = splitReplaySentences(message.content);
+        for (const sentence of sentences) {
+          const sentenceRow = document.createElement('div');
+          sentenceRow.className = 'history-sentence-row';
+
+          const text = document.createElement('div');
+          text.className = 'archive-sentence replay-text';
+          text.textContent = sentence;
+
+          const replay = createAudioReplayButton(sentence, text, 'Replay sentence');
+          sentenceRow.append(text, replay);
+          body.appendChild(sentenceRow);
+        }
 
         if (message.role !== 'user' && message.en) {
           const en = document.createElement('div');
@@ -1265,7 +1463,7 @@ function renderWordsDialog() {
     pair.className = 'word-list-pair';
 
     const nl = document.createElement('div');
-    nl.className = 'word-list-nl';
+    nl.className = 'word-list-nl replay-text';
     nl.textContent = item.nl;
 
     const en = document.createElement('div');
@@ -1281,7 +1479,10 @@ function renderWordsDialog() {
       month: 'short'
     }).format(new Date(item.addedAt));
 
-    row.append(pair, date);
+    const replay = createAudioReplayButton(item.nl, nl, `Replay ${item.nl}`);
+    replay.classList.add('word-audio-button');
+
+    row.append(pair, date, replay);
     wordsContent.appendChild(row);
   }
 }
@@ -1443,6 +1644,7 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
 }
 
 async function handleMessagesUpdated(messages) {
+  if (replayingAudio) return;
   currentMessages = Array.isArray(messages) ? [...messages] : [];
   saveCurrentHistory();
   renderMessages(currentMessages);
@@ -1462,6 +1664,7 @@ async function handleMessagesUpdated(messages) {
 
 function handleStreamEvent(event) {
   if (!event?.id || typeof event?.content !== 'string') return;
+  if (replayingAudio && event.role === 'persona') return;
 
   const previous = streamBuffers.get(event.id) || '';
   const next = previous + event.content;
@@ -1533,15 +1736,16 @@ function handleStreamEvent(event) {
 }
 
 function liveLanguageLockInstruction() {
+  const pace = ' SPEAKING PACE: speak calmly and about 15% slower than your normal pace, with clear articulation and small natural pauses between phrases.';
   if (targetLanguage === 'fr') {
-    return 'CRITICAL: Reply ONLY in French. Ulas may speak English; understand it but answer entirely in French. No Dutch. Use natural everyday French, correct the full sentence, then continue.';
+    return 'CRITICAL: Reply ONLY in French. Ulas may speak English; understand it but answer entirely in French. No Dutch. Use natural everyday French, correct the full sentence, then continue.' + pace;
   }
 
   if (targetLanguage === 'en') {
-    return 'CRITICAL: Reply ONLY in English. Use fluent professional English. Correct the full sentence into a natural polished version, then continue.';
+    return 'CRITICAL: Reply ONLY in English. Use fluent professional English. Correct the full sentence into a natural polished version, then continue.' + pace;
   }
 
-  return 'CRITICAL: Reply ONLY in Belgian Dutch/Flemish. Ulas may speak English; understand it but answer entirely in Dutch/Flemish. No French. Use natural everyday Flemish, correct the full sentence, then continue.';
+  return 'CRITICAL: Reply ONLY in Belgian Dutch/Flemish. Ulas may speak English; understand it but answer entirely in Dutch/Flemish. No French. Use natural everyday Flemish, correct the full sentence, then continue.' + pace;
 }
 
 function attachAnamListeners(client) {
@@ -1581,6 +1785,9 @@ function attachAnamListeners(client) {
 
   client.addListener(AnamEvent.USER_SPEECH_STARTED, () => {
     if (interactionMode !== 'speak') return;
+    replaySequence += 1;
+    window.speechSynthesis?.cancel?.();
+    replayingAudio = false;
     clearQuickChoices();
     try {
       anamClient?.addContext(liveLanguageLockInstruction());
@@ -1723,6 +1930,9 @@ async function connect() {
 }
 
 function resetUiAfterDisconnect() {
+  replaySequence += 1;
+  window.speechSynthesis?.cancel?.();
+  replayingAudio = false;
   clearQuickChoices();
   connected = false;
   connecting = false;
@@ -1805,6 +2015,12 @@ endButton.addEventListener('click', disconnect);
 
 settingsButton.addEventListener('click', () => {
   settingsDialog.showModal();
+});
+
+liveReplayButton?.addEventListener('click', () => {
+  const text = subtitleNl?.textContent?.trim() || lastSubtitlePair.nl || '';
+  const highlightTarget = captionsToggle.checked ? subtitleNl : null;
+  replayText(text, highlightTarget, { useAvatarVoice: true });
 });
 
 captionsToggle.addEventListener('change', () => {
