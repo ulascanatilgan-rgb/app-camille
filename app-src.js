@@ -1223,10 +1223,21 @@ function renderSessionHistoryDialog() {
     const body = document.createElement('div');
     body.className = 'session-history-body';
 
-    const main = document.createElement('div');
-    main.className = 'session-history-main';
-    main.textContent = role === 'user' ? message.content : limitCamilleReply(message.content).text;
-    body.appendChild(main);
+    const sourceText = role === 'user' ? message.content : limitCamilleReply(message.content).text;
+    const sentences = splitReplaySentences(sourceText);
+
+    for (const sentence of sentences) {
+      const sentenceRow = document.createElement('div');
+      sentenceRow.className = 'history-sentence-row';
+
+      const main = document.createElement('div');
+      main.className = 'session-history-main replay-text';
+      main.textContent = sentence;
+
+      const replay = createAudioReplayButton(sentence, main, 'Replay sentence');
+      sentenceRow.append(main, replay);
+      body.appendChild(sentenceRow);
+    }
 
     const english = message.en || (message.id ? translationByMessageId.get(message.id) : '');
     if (role !== 'user' && english) {
@@ -1244,6 +1255,7 @@ function renderSessionHistoryDialog() {
     sessionHistoryContent.scrollTop = sessionHistoryContent.scrollHeight;
   });
 }
+
 function renderHistoryDialog() {
   saveCurrentHistory();
   const history = loadJson(historyKey(), [])
@@ -1298,9 +1310,19 @@ function renderHistoryDialog() {
         const body = document.createElement('div');
         body.className = 'archive-body';
 
-        const nl = document.createElement('div');
-        nl.textContent = message.content;
-        body.appendChild(nl);
+        const sentences = splitReplaySentences(message.content);
+        for (const sentence of sentences) {
+          const sentenceRow = document.createElement('div');
+          sentenceRow.className = 'history-sentence-row';
+
+          const text = document.createElement('div');
+          text.className = 'archive-sentence replay-text';
+          text.textContent = sentence;
+
+          const replay = createAudioReplayButton(sentence, text, 'Replay sentence');
+          sentenceRow.append(text, replay);
+          body.appendChild(sentenceRow);
+        }
 
         if (message.role !== 'user' && message.en) {
           const en = document.createElement('div');
@@ -1437,7 +1459,7 @@ function renderWordsDialog() {
     pair.className = 'word-list-pair';
 
     const nl = document.createElement('div');
-    nl.className = 'word-list-nl';
+    nl.className = 'word-list-nl replay-text';
     nl.textContent = item.nl;
 
     const en = document.createElement('div');
@@ -1453,7 +1475,10 @@ function renderWordsDialog() {
       month: 'short'
     }).format(new Date(item.addedAt));
 
-    row.append(pair, date);
+    const replay = createAudioReplayButton(item.nl, nl, `Replay ${item.nl}`);
+    replay.classList.add('word-audio-button');
+
+    row.append(pair, date, replay);
     wordsContent.appendChild(row);
   }
 }
