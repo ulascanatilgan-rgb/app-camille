@@ -14,6 +14,7 @@ const correctionLevel = document.getElementById('correctionLevel');
 const captionsToggle = document.getElementById('captionsToggle');
 const subtitleNl = document.getElementById('subtitleNl');
 const subtitleEn = document.getElementById('subtitleEn');
+const liveReplayButton = document.getElementById('liveReplayButton');
 const avatarVideo = document.getElementById('avatarVideo');
 const avatarPlaceholder = document.getElementById('avatarPlaceholder');
 const avatarPlaceholderText = document.getElementById('avatarPlaceholderText');
@@ -101,6 +102,9 @@ let choiceGenerationSeq = 0;
 let lastChoiceSource = '';
 let stableViewportHeight = window.innerHeight;
 let stableWorkspaceHeight = workspaceEl?.getBoundingClientRect().height || 0;
+let replaySequence = 0;
+let replayingAudio = false;
+let replayHighlightTimer = null;
 
 const streamBuffers = new Map();
 const vocabProcessedIds = new Set();
@@ -295,6 +299,174 @@ function setSubtitle(nl = '', en = '') {
 
   subtitleNl.textContent = nl || '';
   subtitleEn.textContent = en || '';
+}
+
+function replayLocale() {
+  return languageConfig().locale || (targetLanguage === 'fr' ? 'fr-FR' : targetLanguage === 'en' ? 'en-GB' : 'nl-BE');
+}
+
+function splitReplaySentences(text) {
+  const clean = String(text || '').trim();
+  if (!clean) return [];
+  return clean.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map(part => part.trim()).filter(Boolean) || [clean];
+}
+
+function replayWordParts(text) {
+  return String(text || '').match(/[\p{L}\p{N}][\p{L}\p{N}'’\-]*|[^\p{L}\p{N}'’\-]+/gu) || [String(text || '')];
+}
+
+function renderReplayHighlight(element, text, activeWordIndex = -1) {
+  if (!element) return;
+  const clean = String(text || '');
+  const parts = replayWordParts(clean);
+  let wordIndex = -1;
+  const fragment = document.createDocumentFragment();
+
+  for (const part of parts) {
+    if (/^[\p{L}\p{N}]/u.test(part)) {
+      wordIndex += 1;
+      const span = document.createElement('span');
+      span.textContent = part;
+      if (wordIndex === activeWordIndex) span.className = 'replay-word-active';
+      fragment.appendChild(span);
+    } else {
+      fragment.appendChild(document.createTextNode(part));
+    }
+  }
+
+  element.replaceChildren(fragment);
+}
+
+function estimateReplayDuration(text) {
+  const words = countSpokenWords(text);
+  const punctuationPauses = (String(text || '').match(/[,.!?;:]/g) || []).length;
+  return Math.max(950, words * 460 + punctuationPauses * 120);
+}
+
+function animateReplayHighlight(element, text, duration, runId) {
+  if (!element) return Promise.resolve();
+  const words = countSpokenWords(text);
+  if (!words) return Promise.resolve();
+
+  const step = Math.max(180, duration / words);
+  let index = 0;
+  renderReplayHighlight(element, text, 0);
+
+  return new Promise(resolve => {
+    const tick = () => {
+      if (runId !== replaySequence) {
+        renderReplayHighlight(element, text, -1);
+        resolve();
+        return;
+      }
+
+      index += 1;
+      if (index >= words) {
+        renderReplayHighlight(element, text, -1);
+        resolve();
+        return;
+      }
+
+      renderReplayHighlight(element, text, index);
+      replayHighlightTimer = window.setTimeout(tick, step);
+    };
+
+    replayHighlightTimer = window.setTimeout(tick, step);
+  });
+}
+
+function pickBrowserVoice(locale) {
+  const voices = window.speechSynthesis?.getVoices?.() || [];
+  const normalized = String(locale || '').toLowerCase();
+  const base = normalized.split('-')[0];
+  return voices.find(voice => voice.lang?.toLowerCase() === normalized)
+    || voices.find(voice => voice.lang?.toLowerCase().startsWith(base))
+    || null;
+}
+
+function browserReplay(text, element, runId) {
+  return new Promise(resolve => {
+    if (!('speechSynthesis' in window)) {
+      resolve();
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = replayLocale();
+    utterance.rate = 0.82;
+    utterance.pitch = 1;
+    const voice = pickBrowserVoice(utterance.lang);
+    if (voice) utterance.voice = voice;
+
+    const duration = estimateReplayDuration(text);
+    const highlight = animateReplayHighlight(element, text, duration, runId);
+
+    utterance.onend = async () => {
+      await highlight;
+      resolve();
+    };
+    utterance.onerror = async () => {
+      await highlight;
+      resolve();
+    };
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
+async function replayText(text, element = null) {
+  const clean = String(text || '').trim();
+  if (!clean) return;
+
+  if (isResponding) {
+    setStatus('Wait for Camille to finish');
+    return;
+  }
+
+  const runId = ++replaySequence;
+  if (replayHighlightTimer) window.clearTimeout(replayHighlightTimer);
+  replayHighlightTimer = null;
+  window.speechSynthesis?.cancel?.();
+  replayingAudio = true;
+
+  try {
+    if (connected && anamClient) {
+      try { anamClient.muteInputAudio(); } catch {}
+      const duration = estimateReplayDuration(clean);
+      const highlight = animateReplayHighlight(element, clean, duration, runId);
+      await anamClient.talk(clean);
+      await highlight;
+    } else {
+      await browserReplay(clean, element, runId);
+    }
+  } catch (error) {
+    console.warn('Replay failed, using local speech fallback:', error);
+    if (runId === replaySequence) await browserReplay(clean, element, runId);
+  } finally {
+    if (runId === replaySequence) {
+      if (replayHighlightTimer) window.clearTimeout(replayHighlightTimer);
+      replayHighlightTimer = null;
+      renderReplayHighlight(element, clean, -1);
+      replayingAudio = false;
+      applyInteractionAudioState();
+      if (connected) setStatus(languageConfig().ready);
+    }
+  }
+}
+
+function createAudioReplayButton(text, element, label = 'Replay audio') {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'audio-replay-button';
+  button.textContent = '🎧';
+  button.setAttribute('aria-label', label);
+  button.title = label;
+  button.addEventListener('click', event => {
+    event.stopPropagation();
+    replayText(text, element);
+  });
+  return button;
 }
 
 function setLastUserPin(text, messageId = null, english = null) {
