@@ -84,6 +84,13 @@ let anamClient = null;
 let connected = false;
 let connecting = false;
 let customLlmMode = false;
+let openAiAvatarVoice = false;
+let agentAudioStream = null;
+let recognition = null;
+let recognitionRunning = false;
+let recognitionAllowed = true;
+let resumeVoiceAfter = 0;
+let recognitionTimer = null;
 let currentMessages = [];
 let lastProcessedUserMessageId = null;
 let isResponding = false;
@@ -916,9 +923,126 @@ function updateInteractionModeUi() {
   }
 }
 
+
+function stopOpenAiListening() {
+  if (recognitionTimer) window.clearTimeout(recognitionTimer);
+  recognitionTimer = null;
+  if (recognition && recognitionRunning) {
+    try { recognition.stop(); } catch {}
+  }
+}
+function startOpenAiListening() {
+  if (!openAiAvatarVoice || !connected || isResponding || replayingAudio ||
+      interactionMode !== 'speak' || !recognitionAllowed) return;
+  if (Date.now() < resumeVoiceAfter) {
+    if (recognitionTimer) window.clearTimeout(recognitionTimer);
+    recognitionTimer = window.setTimeout(startOpenAiListening, Math.min(1600, resumeVoiceAfter - Date.now() + 150));
+    return;
+  }
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    setStatus('Speech recognition unavailable; use Type or Button');
+    return;
+  }
+  if (!recognition) {
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.onstart = () => {
+      recognitionRunning = true;
+      if (!isResponding && connected) setStatus('Listening…');
+    };
+    recognition.onresult = event => {
+      let done = '', partial = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const part = String(event.results[i][0]?.transcript || '').trim();
+        if (event.results[i].isFinal) done += (done ? ' ' : '') + part;
+        else partial += (partial ? ' ' : '') + part;
+      }
+      if (partial) setLastUserPin(partial);
+      if (done && connected && !isResponding) {
+        stopOpenAiListening();
+        setStatus('Thinking…');
+        sendTypedTurn(done, 'speak');
+      }
+    };
+    recognition.onspeechstart = () => voiceRing.classList.add('active');
+    recognition.onspeechend = () => voiceRing.classList.remove('active');
+    recognition.onerror = event => {
+      if (['not-allowed','service-not-allowed','audio-capture'].includes(event.error)) {
+        recognitionAllowed = false;
+        setStatus('Microphone unavailable; use Type or Button');
+      }
+    };
+    recognition.onend = () => {
+      recognitionRunning = false;
+      voiceRing.classList.remove('active');
+      if (connected && !isResponding && interactionMode === 'speak' && recognitionAllowed) {
+        recognitionTimer = window.setTimeout(startOpenAiListening, 380);
+      }
+    };
+  }
+  if (recognitionRunning) return;
+  recognition.lang = replayLocale();
+  try { recognition.start(); } catch (error) { console.warn('Speech recognition failed:',error); }
+}
+
+async function speakWithOpenAi(text, signal) {
+  if (!openAiAvatarVoice || !anamClient || !connected) return;
+  const clean = String(text || '').trim();
+  if (!clean) return;
+  stopOpenAiListening();
+  const agentStream = anamClient.createAgentAudioInputStream({
+    encoding:'pcm_s16le',sampleRate:24000,channels:1
+  });
+  agentAudioStream = agentStream;
+  let bytes = 0, gotAudio = false, complete = false;
+  const start = Date.now();
+  try {
+    const response = await fetch('/openai-voice', {
+      method:'POST', headers:{'Content-Type':'application/json'},signal,
+      body:JSON.stringify({text:clean,targetLanguage})
+    });
+    if (!response.ok || !response.body) throw Error('OpenAI voice HTTP '+response.status);
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let pending = '';
+    while (true) {
+      const {done,value}=await reader.read();
+      if (done) break;
+      pending += decoder.decode(value,{stream:true});
+      let pos;
+      while ((pos=pending.indexOf('\n\n'))!==-1) {
+        const line=pending.slice(0,pos).trim();
+        pending=pending.slice(pos+2);
+        if (!line.startsWith('data: ')) continue;
+        const base64=line.slice(6).trim();
+        if (!base64) continue;
+        agentStream.sendAudioChunk(base64);
+        bytes += Math.floor(base64.length * 3 / 4);
+        gotAudio = true;
+      }
+    }
+    if (!gotAudio) throw Error('OpenAI provided no voice output');
+    complete = true;
+  } finally {
+    try { agentStream.endSequence(); } catch(error) { console.warn('Audio sequence could not close',error); }
+    if (agentAudioStream === agentStream) agentAudioStream = null;
+    if (complete) {
+      const duration=Math.max(950,bytes/48);
+      resumeVoiceAfter=Date.now()+Math.max(700,duration-(Date.now()-start)+950);
+    }
+  }
+}
+
 function applyInteractionAudioState() {
   if (!anamClient || !connected) return;
-
+  if (openAiAvatarVoice) {
+    if (interactionMode === 'speak') startOpenAiListening();
+    else stopOpenAiListening();
+    return;
+  }
   try {
     if (interactionMode === 'speak') {
       anamClient.unmuteInputAudio();
