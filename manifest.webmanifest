@@ -1,15 +1,25 @@
 {
-  "name": "Camille - Flemish Agent for Ulas Atilgan",
-  "short_name": "Camille",
-  "description": "Practical spoken Flemish for everyday life, work and business in Flanders.",
+  "name": "Emma — Language Coach",
+  "short_name": "Emma",
+  "description": "Learn French, Flemish, and English through natural conversations with Emma.",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#f4f2ed",
-  "theme_color": "#f4f2ed",
+  "background_color": "#111315",
+  "theme_color": "#111315",
   "icons": [
-    {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
-    {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }
