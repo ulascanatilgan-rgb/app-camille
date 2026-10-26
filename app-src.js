@@ -158,7 +158,7 @@ const languageUi = {
     description: 'Practical spoken Flemish for work, daily life and real conversations.',
     goal: '6 months · Flanders',
     level: 'DUTCH LEVEL',
-    hint: 'Speak or type in Dutch or English. Camille always answers in Dutch.',
+    hint: 'Speak or type in Dutch or English. Emma always answers in Dutch.',
     placeholder: 'Write in Dutch or English…',
     greeting: "Hey Ulas. Hoe is 't vandaag?",
     greetingEn: 'Hey Ulas. How are you today?',
@@ -174,7 +174,7 @@ const languageUi = {
     description: 'Practical spoken French for work, daily life and real conversations.',
     goal: '6 months · French',
     level: 'FRENCH LEVEL',
-    hint: 'Speak or type in French or English. Camille always answers in French.',
+    hint: 'Speak or type in French or English. Emma always answers in French.',
     placeholder: 'Write in French or English…',
     greeting: 'Salut Ulas. Ça va aujourd’hui ?',
     greetingEn: 'Hi Ulas. How are you today?',
@@ -190,7 +190,7 @@ const languageUi = {
     description: 'Fluent, polished English for meetings, stakeholders, interviews and international work.',
     goal: 'Professional · Global',
     level: 'ENGLISH LEVEL',
-    hint: 'Speak or type in English. Camille improves clarity, fluency and professional impact.',
+    hint: 'Speak or type in English. Emma improves clarity, fluency and professional impact.',
     placeholder: 'Write in English…',
     greeting: 'Hi Ulas. What are you working on today?',
     greetingEn: '',
@@ -428,7 +428,7 @@ async function replayText(text, element = null, { useAvatarVoice = false } = {})
   if (!clean) return;
 
   if (isResponding) {
-    setStatus('Wait for Camille to finish');
+    setStatus('Wait for Emma to finish');
     return;
   }
 
@@ -926,12 +926,12 @@ function applyInteractionAudioState() {
       anamClient.muteInputAudio();
     }
   } catch (error) {
-    console.warn('Could not change Camille microphone state:', error);
+    console.warn('Could not change Emma microphone state:', error);
   }
 }
 
 function interactionModeInstruction() {
-  const pace = ' Keep Camille’s spoken delivery calm, clearly articulated and about 15% slower than ordinary conversational speed.';
+  const pace = ' Keep Emma’s spoken delivery calm, clearly articulated and about 15% slower than ordinary conversational speed.';
   if (interactionMode === 'button') {
     return 'INPUT MODE: BUTTON. The microphone is muted. The user responds through short interface choices. Treat one- or two-word button answers as intentional complete answers and continue naturally.' + pace;
   }
@@ -948,7 +948,7 @@ function syncRecentConversationContext() {
     .filter(message => message?.content?.trim())
     .slice(-8)
     .map(message => {
-      const role = message.role === 'persona' ? 'CAMILLE' : 'ULAS';
+      const role = message.role === 'persona' ? 'EMMA' : 'ULAS';
       return `${role}: ${message.content.trim()}`;
     })
     .join('\n');
@@ -1182,10 +1182,10 @@ function buildRuntimeContext() {
       : 'Useful work examples to teach naturally: "Heb je die mail al gestuurd?", "Wat is de huidige status?", "Liggen we nog op schema?", "Halen we de deadline?", "Plan je binnenkort een wijziging?", "Kun je me even een update geven?"';
 
   const languageLock = isFrench
-    ? 'ABSOLUTE LANGUAGE LOCK: Ulas may speak French OR English. Understand both, but Camille must reply ONLY in French. Never reply in Dutch or English.'
+    ? 'ABSOLUTE LANGUAGE LOCK: Ulas may speak French OR English. Understand both, but Emma must reply ONLY in French. Never reply in Dutch or English.'
     : isEnglish
-      ? 'ABSOLUTE LANGUAGE LOCK: Camille must reply ONLY in English.'
-      : 'ABSOLUTE LANGUAGE LOCK: Ulas may speak Dutch/Flemish OR English. Understand both, but Camille must reply ONLY in Belgian Dutch/Flemish. Never reply in French or English.';
+      ? 'ABSOLUTE LANGUAGE LOCK: Emma must reply ONLY in English.'
+      : 'ABSOLUTE LANGUAGE LOCK: Ulas may speak Dutch/Flemish OR English. Understand both, but Emma must reply ONLY in Belgian Dutch/Flemish. Never reply in French or English.';
 
   const teachingMode = isEnglish
     ? 'TEACHER MODE: be proactive and professional. Regularly propose a useful workplace topic, upgrade Ulas’s sentence to fluent business English, then ask one short follow-up question.'
@@ -1197,7 +1197,7 @@ function buildRuntimeContext() {
     teachingMode,
     interactionModeInstruction(),
     choiceModeInstruction(),
-    `You are Camille, Ulas Atilgan’s practical ${target} conversation coach.`,
+    `You are Emma, Ulas Atilgan’s practical ${target} conversation coach.`,
     isEnglish
       ? 'The goal is fluent, confident, high-quality professional English for international work and real conversations.'
       : `The goal is short, useful, real-life speaking in ${target} — not grammar study.`,
@@ -1208,7 +1208,7 @@ function buildRuntimeContext() {
       : 'HARD LIMIT: maximum 20 spoken words total and maximum 3 short sentences. Prefer 1–2 sentences.',
     isEnglish
       ? 'Always answer in English. Correct awkward, vague or non-native phrasing into fluent professional English before answering.'
-      : `You MUST understand English normally, whether Ulas speaks it or types it. Camille must still answer in ${target} only.`,
+      : `You MUST understand English normally, whether Ulas speaks it or types it. Emma must still answer in ${target} only.`,
     isEnglish
       ? 'Do not simplify English unnaturally. Keep it fluent and richer than the Dutch/French modes, while remaining practical and conversational.'
       : `When Ulas switches to English because he is stuck, understand him and immediately give the short natural ${target} expression.`,
@@ -1380,7 +1380,7 @@ function renderSessionHistoryDialog() {
 
     const label = document.createElement('div');
     label.className = 'session-history-role';
-    label.textContent = role === 'user' ? 'YOU' : 'CAMILLE';
+    label.textContent = role === 'user' ? 'YOU' : 'EMMA';
 
     const body = document.createElement('div');
     body.className = 'session-history-body';
@@ -1467,7 +1467,7 @@ function renderHistoryDialog() {
 
         const role = document.createElement('span');
         role.className = 'archive-role';
-        role.textContent = message.role === 'user' ? 'ULAS' : 'CAMILLE';
+        role.textContent = message.role === 'user' ? 'ULAS' : 'EMMA';
 
         const body = document.createElement('div');
         body.className = 'archive-body';
@@ -1606,7 +1606,7 @@ function renderWordsDialog() {
   if (!learnedWords.length) {
     const empty = document.createElement('div');
     empty.className = 'empty-state';
-    empty.textContent = 'New words from Camille will appear here.';
+    empty.textContent = 'New words from Emma will appear here.';
     wordsContent.appendChild(empty);
     return;
   }
@@ -1665,7 +1665,7 @@ async function sendTypedTurn(text, inputKind = 'type') {
   renderMessages(currentMessages);
 
   isResponding = true;
-  setStatus('Camille denkt…');
+  setStatus('Emma denkt…');
   activeChatAbort = new AbortController();
   activeSubtitleMessageId = personaId;
 
@@ -1728,7 +1728,7 @@ async function sendTypedTurn(text, inputKind = 'type') {
     if (interactionMode === 'button') requestQuickChoices(full);
   } catch (error) {
     if (error?.name !== 'AbortError') {
-      console.error('Typed Camille response error:', error);
+      console.error('Typed Emma response error:', error);
       setStatus('Response error');
     }
   } finally {
@@ -1742,7 +1742,7 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
   if (!anamClient || !customLlmMode || isResponding) return;
 
   isResponding = true;
-  setStatus('Camille denkt…');
+  setStatus('Emma denkt…');
   activeChatAbort = new AbortController();
 
   try {
@@ -1783,7 +1783,7 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
     await activeTalkStream.endMessage();
   } catch (error) {
     if (error?.name !== 'AbortError') {
-      console.error('Camille response error:', error);
+      console.error('Emma response error:', error);
       setStatus('Response error');
     }
   } finally {
@@ -1834,7 +1834,7 @@ function handleStreamEvent(event) {
     setLastUserPin(next, event.id);
     scheduleUserTranslation(next, event.id);
 
-    // Keep this complete user turn visible while Camille answers.
+    // Keep this complete user turn visible while Emma answers.
     renderMessages(currentMessages);
 
     if (event.endOfSpeech) {
@@ -1865,7 +1865,7 @@ function handleStreamEvent(event) {
       try {
         anamClient?.interruptPersona();
       } catch (error) {
-        console.warn('Could not stop overlong Camille reply:', error);
+        console.warn('Could not stop overlong Emma reply:', error);
       }
     }
 
@@ -1955,7 +1955,7 @@ function attachAnamListeners(client) {
     voiceRing.classList.add('active');
     successBalloon?.classList.add('listening');
 
-    // Keep Camille's last sentence visible while Ulas speaks.
+    // Keep Emma's last sentence visible while Ulas speaks.
     // Keep the current user's sentence in the same live exchange card.
     if (!lastUserPinText.textContent.trim()) {
       lastUserPinText.textContent = 'Listening…';
@@ -1975,7 +1975,7 @@ function attachAnamListeners(client) {
     successBalloon?.classList.remove('listening');
     celebrateUserTurn();
 
-    // Reinforce the hard brevity rule immediately before Camille's next turn.
+    // Reinforce the hard brevity rule immediately before Emma's next turn.
     if (connected) {
       try {
         const nextRule = targetLanguage === 'fr'
@@ -2015,7 +2015,7 @@ async function connect() {
   micLabel.textContent = 'Connecting…';
   setStatus('Connecting Anam…');
   avatarBadge.textContent = 'CONNECTING';
-  avatarPlaceholderText.textContent = 'Connecting Camille…';
+  avatarPlaceholderText.textContent = 'Connecting Emma…';
 
   try {
     const response = await fetch('/anam-session', {
@@ -2081,7 +2081,7 @@ async function connect() {
     micLabel.textContent = 'Try again';
     endButton.disabled = true;
     avatarBadge.textContent = 'AVATAR OFFLINE';
-    const message = String(error?.message || 'Camille could not connect to Anam.').slice(0, 180);
+    const message = String(error?.message || 'Emma could not connect to Anam.').slice(0, 180);
     avatarPlaceholderText.textContent = message;
     setStatus('Could not connect');
   }
@@ -2162,7 +2162,7 @@ typeComposer?.addEventListener('submit', async event => {
   if (!text) return;
 
   if (!connected) {
-    setStatus('Start Camille first');
+    setStatus('Start Emma first');
     return;
   }
 
