@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#f8f3e9" />
+  <meta name="theme-color" content="#111315" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="Camille" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Emma" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="icon" type="image/png" href="/favicon-64.png" />
-  <title>Camille - Flemish Agent for Ulas Atilgan</title>
-  <link rel="stylesheet" href="/styles.css?v=history-20261026" />
+  <title>Emma — Language Coach</title>
+  <link rel="stylesheet" href="/styles.css?v=emma-dark-20261026" />
 </head>
 <body>
   <main class="app-shell">
@@ -26,8 +26,8 @@
         </button>
       </div>
 
-      <div class="center-brand" aria-label="Camille">
-        <span>Camille</span>
+      <div class="center-brand" aria-label="Emma">
+        <span>Emma</span>
       </div>
 
       <div class="header-status">
@@ -40,16 +40,22 @@
     </header>
 
     <section class="workspace">
-      <section class="avatar-column" aria-label="Camille live avatar">
+      <section class="avatar-column" aria-label="Emma live avatar">
         <div id="portraitWrap" class="portrait-wrap">
           <div id="avatarPlaceholder" class="avatar-placeholder">
-            <div class="placeholder-monogram">C</div>
-            <div id="avatarPlaceholderText" class="placeholder-text">Camille's Anam avatar will appear here.</div>
+            <img class="emma-placeholder-image" src="/emma-portrait.jpg" alt="Emma portrait" />
+            <div id="avatarPlaceholderText" class="placeholder-text">Emma is ready to talk.</div>
           </div>
 
           <video id="avatarVideo" class="anam-video" autoplay playsinline></video>
           <div class="stage-vignette"></div>
           <div id="voiceRing" class="voice-ring"></div>
+
+                    <div class="interaction-mode-bar" role="group" aria-label="Conversation input mode">
+            <button id="speakModeButton" class="interaction-mode-button" type="button" data-mode="speak" aria-pressed="true">Speak</button>
+            <button id="typeModeButton" class="interaction-mode-button" type="button" data-mode="type" aria-pressed="false">Type</button>
+            <button id="buttonModeButton" class="interaction-mode-button" type="button" data-mode="button" aria-pressed="false">Button</button>
+          </div>
 
           <div id="successBalloon" class="success-balloon avatar-balloon" aria-hidden="true">
             <span class="balloon-body"></span>
@@ -101,7 +107,7 @@
           </div>
 
           <div class="live-speaker live-camille">
-            <div class="live-speaker-label">CAMILLE</div>
+            <div class="live-speaker-label">EMMA</div>
             <div class="live-speaker-body">
               <div id="subtitleNl" class="subtitle-line dutch-line">Hey Ulas. Hoe is 't vandaag?</div>
               <div id="subtitleEn" class="subtitle-line english-line">Hey Ulas. How are you today?</div>
@@ -172,12 +178,6 @@
             <button id="typeSend" type="submit">Send</button>
           </form>
 
-          <div class="interaction-mode-bar" role="group" aria-label="Conversation input mode">
-            <button id="speakModeButton" class="interaction-mode-button" type="button" data-mode="speak" aria-pressed="true">Speak</button>
-            <button id="typeModeButton" class="interaction-mode-button" type="button" data-mode="type" aria-pressed="false">Type</button>
-            <button id="buttonModeButton" class="interaction-mode-button" type="button" data-mode="button" aria-pressed="false">Button</button>
-          </div>
-
           <button id="sessionHistoryButton" class="session-history-button" type="button">Recent Talks</button>
         </section>
       </section>
@@ -202,7 +202,7 @@
     <div class="archive-shell">
       <div class="archive-header">
         <div>
-          <div class="eyebrow">CAMILLE ARCHIVE</div>
+          <div class="eyebrow">EMMA ARCHIVE</div>
           <div class="archive-title-row">
             <h2>History</h2>
             <span id="historyCount" class="archive-count">0 sessions</span>
@@ -265,6 +265,6 @@
     </form>
   </dialog>
 
-  <script src="/app.bundle.js?v=history-20261026" type="module"></script>
+  <script src="/app.bundle.js?v=emma-dark-20261026" type="module"></script>
 </body>
 </html>
