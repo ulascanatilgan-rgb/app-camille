@@ -24,6 +24,7 @@ const avatarVideo = document.getElementById('avatarVideo');
 const avatarPlaceholder = document.getElementById('avatarPlaceholder');
 const avatarPlaceholderText = document.getElementById('avatarPlaceholderText');
 const avatarBadge = document.getElementById('avatarBadge');
+const voiceProviderNotice = document.getElementById('voiceProviderNotice');
 
 const difficultySlider = document.getElementById('difficultySlider');
 const difficultyValue = document.getElementById('difficultyValue');
@@ -2190,6 +2191,9 @@ async function connect() {
     }
 
     openAiAvatarVoice = data.mode === 'openai-passthrough';
+    if (voiceProviderNotice) voiceProviderNotice.textContent = openAiAvatarVoice
+      ? 'Voice: OpenAI Marin (calm, mature AI-generated speech). Anam lip-sync is enabled.'
+      : 'Voice: Anam AI (fallback). OpenAI speech is not active in this session.';
     customLlmMode = data.mode === 'custom-llm' || openAiAvatarVoice;
 
     anamClient = createClient(data.sessionToken, {
@@ -2309,6 +2313,10 @@ async function disconnect() {
 micButton.addEventListener('click', () => {
   primePopAudio();
   if (!connected && !connecting) connect();
+  else if (connected && openAiAvatarVoice && interactionMode === 'speak') {
+    recognitionAllowed = true;
+    startOpenAiListening();
+  }
 });
 
 typeToggle?.addEventListener('click', () => setInteractionMode('type'));
