@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="icon" type="image/png" href="/favicon-64.png" />
   <title>Emma — Language Coach</title>
-  <link rel="stylesheet" href="/styles.css?v=emma-compact-20261026" />
+  <link rel="stylesheet" href="/styles.css?v=emma-openai-voice-20261026" />
 </head>
 <body>
   <main class="app-shell">
@@ -250,7 +250,7 @@
   <dialog id="settingsDialog">
     <form method="dialog" class="settings-card">
       <div class="eyebrow">SETTINGS</div>
-      <h2>Camille</h2>
+      <h2>Emma</h2>
       <label>
         Correction level
         <select id="correctionLevel">
@@ -263,10 +263,11 @@
         <input id="captionsToggle" type="checkbox" checked />
         Show bilingual subtitles
       </label>
+      <p id="voiceProviderNotice" class="voice-provider-notice">Emma speaks with an AI-generated voice.</p>
       <button class="close-settings">Close</button>
     </form>
   </dialog>
 
-  <script src="/app.bundle.js?v=emma-compact-20261026" type="module"></script>
+  <script src="/app.bundle.js?v=emma-openai-voice-20261026" type="module"></script>
 </body>
 </html>
