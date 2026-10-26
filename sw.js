@@ -1,4 +1,4 @@
-const CACHE = 'camille-pwa-audio-replay-v34';
+const CACHE = 'camille-pwa-conversation-history-v35';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
