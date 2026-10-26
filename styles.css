@@ -4652,3 +4652,14 @@ input,select { accent-color:#759a80; }
  .portrait-wrap > .interaction-mode-bar { width:58px !important; max-width:58px !important; right:6px !important; }
  .portrait-wrap .interaction-mode-button { font-size:9px !important; }
 }
+
+/* Final dark-theme specificity refinements */
+.center-brand {
+  background:#252a2c !important;
+  border-color:#4b5355 !important;
+  box-shadow:0 1px 9px rgba(0,0,0,.22) !important;
+}
+.difficulty-slider { background:#373e41 !important; }
+.difficulty-panel strong,.range-numbers span { color:#ebe5dd !important; }
+.archive-dialog .archive-title-row h2,.session-history-header h2,
+.settings-card h2,.install-card h2 { color:#f5eee5 !important; }
