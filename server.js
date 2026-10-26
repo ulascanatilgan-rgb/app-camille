@@ -326,11 +326,11 @@ app.post('/openai-voice', async (req, res) => {
           'Your ONLY task is to speak the exact text provided by the user.',
           'Do not answer, add, correct, translate or introduce the sentence.',
           `Read it with natural native ${language} pronunciation.`,
-          'Voice: feminine, warm, low-mid pitch and slightly textured, not thin or bright.',
-          'Sound composed, confident, elegant, gentle and clearly articulated.',
+          'Voice: adult feminine, deeper low-mid register, full-bodied and softly textured, never thin, shrill or girlish.',
+          'Sound mature, composed, calm, confident, relaxed and clearly articulated with natural low resonance.',
           'Use an unhurried cadence with brief natural pauses, never exaggerated, theatrical or excited.'
         ].join(' '),
-        audio: { output: { voice: 'marin', speed: 0.86, format: { type: 'audio/pcm', rate: 24000 } } }
+        audio: { output: { voice: 'sage', speed: 0.84, format: { type: 'audio/pcm', rate: 24000 } } }
       }
     }));
     ws.send(JSON.stringify({
