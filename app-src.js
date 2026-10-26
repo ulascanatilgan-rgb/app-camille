@@ -450,7 +450,12 @@ async function replayText(text, element = null, { useAvatarVoice = false } = {})
       try { anamClient.muteInputAudio(); } catch {}
     }
 
-    if (useAvatarVoice && connected && anamClient) {
+    if (openAiAvatarVoice && connected && anamClient) {
+      const duration = estimateReplayDuration(clean);
+      const highlight = animateReplayHighlight(element, clean, duration, runId);
+      await speakWithOpenAi(clean);
+      await highlight;
+    } else if (useAvatarVoice && connected && anamClient) {
       const duration = estimateReplayDuration(clean);
       const highlight = animateReplayHighlight(element, clean, duration, runId);
       await anamClient.talk(clean);
@@ -1819,7 +1824,7 @@ async function sendTypedTurn(text, inputKind = 'type') {
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    talkStream = anamClient.createTalkMessageStream();
+    if (!openAiAvatarVoice) talkStream = anamClient.createTalkMessageStream();
 
     while (true) {
       const { done, value } = await reader.read();
@@ -1832,10 +1837,11 @@ async function sendTypedTurn(text, inputKind = 'type') {
       const limited = limitCamilleReply(full);
       renderLiveDutch(limited.text, chunk);
       schedulePartialTranslation(limited.text, personaId);
-      await talkStream.streamMessageChunk(chunk, false);
+      if (talkStream) await talkStream.streamMessageChunk(chunk, false);
     }
 
-    await talkStream.endMessage();
+    if (talkStream) await talkStream.endMessage();
+    if (openAiAvatarVoice) await speakWithOpenAi(limitCamilleReply(full).text, activeChatAbort.signal);
 
     full = limitCamilleReply(full).text;
     const english = await translateToEnglish(full);
@@ -1858,7 +1864,10 @@ async function sendTypedTurn(text, inputKind = 'type') {
   } finally {
     activeChatAbort = null;
     isResponding = false;
-    if (connected) setStatus(languageConfig().ready);
+    if (connected) {
+      setStatus(languageConfig().ready);
+      if (openAiAvatarVoice) startOpenAiListening();
+    }
   }
 }
 
@@ -1892,7 +1901,8 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    activeTalkStream = anamClient.createTalkMessageStream();
+    if (!openAiAvatarVoice) activeTalkStream = anamClient.createTalkMessageStream();
+    let full = '';
 
     while (true) {
       const { done, value } = await reader.read();
@@ -1901,10 +1911,29 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
       const chunk = decoder.decode(value, { stream: true });
       if (!chunk) continue;
 
-      await activeTalkStream.streamMessageChunk(chunk, false);
+      full += chunk;
+      if (openAiAvatarVoice) {
+        renderLiveDutch(limitCamilleReply(full).text, chunk);
+      } else {
+        await activeTalkStream.streamMessageChunk(chunk, false);
+      }
     }
 
-    await activeTalkStream.endMessage();
+    if (activeTalkStream) await activeTalkStream.endMessage();
+    if (openAiAvatarVoice && full.trim()) {
+      const clean = limitCamilleReply(full).text;
+      const messageId = `intro-emma-${Date.now()}`;
+      activeSubtitleMessageId = messageId;
+      await speakWithOpenAi(clean, activeChatAbort.signal);
+      const translation = await translateToEnglish(clean);
+      if (translation) translationByMessageId.set(messageId, translation);
+      setSubtitle(clean, translation);
+      lastSubtitlePair = { nl: clean, en: translation };
+      upsertConversationTurn({ id: messageId, role: 'persona', content: clean });
+      saveCurrentHistory();
+      renderMessages(currentMessages);
+      if (interactionMode === 'button') requestQuickChoices(clean);
+    }
   } catch (error) {
     if (error?.name !== 'AbortError') {
       console.error('Emma response error:', error);
@@ -1915,12 +1944,15 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
     activeTalkStream = null;
     isResponding = false;
 
-    if (connected) setStatus(languageConfig().ready);
+    if (connected) {
+      setStatus(languageConfig().ready);
+      if (openAiAvatarVoice) startOpenAiListening();
+    }
   }
 }
 
 async function handleMessagesUpdated(messages) {
-  if (replayingAudio) return;
+  if (replayingAudio || openAiAvatarVoice) return;
   mergeAnamHistory(messages);
   saveCurrentHistory();
   renderMessages(currentMessages);
@@ -1939,7 +1971,7 @@ async function handleMessagesUpdated(messages) {
 }
 
 function handleStreamEvent(event) {
-  if (!event?.id || typeof event?.content !== 'string') return;
+  if (openAiAvatarVoice || !event?.id || typeof event?.content !== 'string') return;
   if (replayingAudio && event.role === 'persona') return;
 
   const previous = streamBuffers.get(event.id) || '';
@@ -2157,10 +2189,11 @@ async function connect() {
       throw new Error(detail);
     }
 
-    customLlmMode = data.mode === 'custom-llm';
+    openAiAvatarVoice = data.mode === 'openai-passthrough';
+    customLlmMode = data.mode === 'custom-llm' || openAiAvatarVoice;
 
     anamClient = createClient(data.sessionToken, {
-      disableInputAudio: false,
+      disableInputAudio: openAiAvatarVoice,
       voiceDetection: {
         endOfSpeechSensitivity: 0.55
       }
@@ -2221,6 +2254,9 @@ function resetUiAfterDisconnect() {
   connecting = false;
   document.body.classList.remove('conversation-live', 'level-expanded');
   customLlmMode = false;
+  openAiAvatarVoice = false;
+  stopOpenAiListening();
+  recognition = null;
   runtimeContextApplied = false;
   lastProcessedUserMessageId = null;
   isResponding = false;
@@ -2237,6 +2273,8 @@ function resetUiAfterDisconnect() {
   lastPartialTranslationAt = 0;
 
   try { activeChatAbort?.abort(); } catch {}
+  try { agentAudioStream?.endSequence(); } catch {}
+  agentAudioStream = null;
   activeChatAbort = null;
   activeTalkStream = null;
 
