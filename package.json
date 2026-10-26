@@ -1,6 +1,6 @@
 {
-  "name": "camille-flemish-agent",
-  "version": "0.3.0",
+  "name": "emma-language-coach",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,6 +11,7 @@
     "@anam-ai/js-sdk": "4.27.0",
     "dotenv": "^16.4.7",
     "esbuild": "^0.25.9",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "sharp": "^0.34.4"
   }
 }
