@@ -1,6 +1,5 @@
 import 'dotenv/config';
 import express from 'express';
-import WebSocket from 'ws';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -233,32 +232,13 @@ async function requestAnamSessionToken(apiKey, personaConfig) {
 }
 
 async function buildAnamSession(apiKey, personaId) {
-  // Keep the saved Emma persona intact. Read its avatar ID and create an
-  // ephemeral passthrough session so Anam renders OpenAI speech verbatim.
-  // If this isn't supported by the account/avatar, retain the working persona.
-  if (process.env.OPENAI_API_KEY && process.env.EMMA_OPENAI_VOICE !== 'false') {
-    try {
-      const personaResponse = await fetch(`${ANAM_API_BASE}/personas/${encodeURIComponent(personaId)}`, {
-        headers: { Authorization: `Bearer ${apiKey}` }
-      });
-      if (!personaResponse.ok) throw new Error(`Anam persona read failed (${personaResponse.status})`);
-      const persona = await personaResponse.json();
-      const avatarId = persona.avatar?.id || persona.avatarId;
-      if (!avatarId) throw new Error('Anam persona has no published avatar ID');
-      const passthroughConfig = {
-        avatarId,
-        avatarModel: persona.avatarModel || 'cara-4',
-        enableAudioPassthrough: true
-      };
-      const sessionToken = await requestAnamSessionToken(apiKey, passthroughConfig);
-      return { sessionToken, mode: 'openai-passthrough', source: 'emma-avatar-openai-voice' };
-    } catch (error) {
-      console.warn('OpenAI voice passthrough unavailable; using existing Emma persona:', error.message);
-    }
-  }
-
   const sessionToken = await requestAnamSessionToken(apiKey, { personaId });
-  return { sessionToken, mode: 'published-persona', source: 'published-persona-fallback' };
+
+  return {
+    sessionToken,
+    mode: 'published-persona',
+    source: 'published-persona-id'
+  };
 }
 
 function safeAnamError(error) {
@@ -284,89 +264,6 @@ function safeAnamError(error) {
     message: String(message).slice(0, 300)
   };
 }
-
-
-/**
- * Stream OpenAI Realtime 2.1 Mini speech as 24kHz mono PCM (base64 SSE).
- * The browser forwards these chunks into Anam's synchronized audio
- * passthrough stream; the OpenAI API key never leaves the server.
- */
-app.post('/openai-voice', async (req, res) => {
-  const key = process.env.OPENAI_API_KEY;
-  const input = String(req.body?.text || '').trim().slice(0, 1400);
-  const lang = normalizeTargetLanguage(req.body?.targetLanguage);
-  if (!key) return res.status(503).json({ error: 'OPENAI_API_KEY missing' });
-  if (!input) return res.status(400).json({ error: 'Missing speech text' });
-
-  const language = lang === 'fr' ? 'France French' : lang === 'nl' ? 'Belgian Dutch' : 'English';
-  const ws = new WebSocket('wss://api.openai.com/v1/realtime?model=gpt-realtime-2.1-mini', {
-    headers: { Authorization: `Bearer ${key}` }
-  });
-  const abort = () => { try { ws.close(); } catch {} };
-  req.on('aborted', abort);
-  res.on('close', abort);
-  let audioChunks = 0, ended = false, openedResponse = false;
-
-  const fail = (message) => {
-    if (ended) return;
-    ended = true;
-    console.error('OpenAI voice streaming failure:', message);
-    if (!res.headersSent) res.status(502).json({ error: 'Voice generation failed' });
-    else res.end();
-    abort();
-  };
-  ws.on('open', () => {
-    ws.send(JSON.stringify({
-      type: 'session.update',
-      session: {
-        type: 'realtime',
-        output_modalities: ['audio'],
-        instructions: [
-          'You are the spoken voice of Emma, a calm mature adult woman and French language tutor.',
-          'Your ONLY task is to speak the exact text provided by the user.',
-          'Do not answer, add, correct, translate or introduce the sentence.',
-          `Read it with natural native ${language} pronunciation.`,
-          'Voice: adult feminine, deeper low-mid register, full-bodied and softly textured, never thin, shrill or girlish.',
-          'Sound mature, composed, calm, confident, relaxed and clearly articulated with natural low resonance.',
-          'Use an unhurried cadence with brief natural pauses, never exaggerated, theatrical or excited.'
-        ].join(' '),
-        audio: { output: { voice: 'sage', speed: 0.84, format: { type: 'audio/pcm', rate: 24000 } } }
-      }
-    }));
-    ws.send(JSON.stringify({
-      type: 'conversation.item.create',
-      item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: input }] }
-    }));
-    ws.send(JSON.stringify({ type: 'response.create', response: { output_modalities: ['audio'] } }));
-  });
-
-  ws.on('message', (payload) => {
-    let event;
-    try { event = JSON.parse(payload.toString()); } catch { return; }
-    if (event.type === 'response.output_audio.delta' && typeof event.delta === 'string') {
-      if (!openedResponse) {
-        openedResponse = true;
-        res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-        res.setHeader('Cache-Control', 'no-cache, no-transform');
-        res.setHeader('X-Accel-Buffering', 'no');
-      }
-      audioChunks++;
-      res.write(`data: ${event.delta}\n\n`);
-    }
-    if (event.type === 'error' || event.type === 'response.done' && event.response?.status === 'failed') {
-      fail(event.error?.message || event.response?.status_details?.error?.message || 'Realtime speech error');
-    }
-    if (event.type === 'response.done' && !ended) {
-      if (!audioChunks) return fail('Realtime returned no audio');
-      ended = true;
-      res.end();
-      abort();
-    }
-  });
-  ws.on('error', error => fail(error.message));
-  ws.on('close', () => { if (!ended) fail('OpenAI voice connection closed early'); });
-  setTimeout(() => { if (!ended) fail('OpenAI voice timeout'); }, 40000).unref?.();
-});
 
 app.post('/anam-session', async (_req, res) => {
   const apiKey = process.env.ANAM_API_KEY;
