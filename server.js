@@ -57,8 +57,8 @@ function choiceModeInstruction(enabled) {
 
   return [
     'BUTTON REPLY MODE IS ON.',
-    'End every reply with exactly one short, concrete question that can naturally be answered using two distinct one- or two-word options.',
-    'Do not list the two options in the spoken response; the interface generates them separately.',
+    'End every reply with exactly one short, concrete question that can naturally be answered using three distinct short options.',
+    'Do not list the three options in the spoken response; the interface generates them separately.',
     'If the learner answers with only one or two words, treat it as a valid intentional button reply. Do not force a full-sentence correction unless it is actually wrong.',
     'Vary your reaction style. Do not repeat the same acknowledgement or correction formula.',
     'You may agree, disagree politely, show curiosity, give a tiny suggestion, contrast an idea, react positively or neutrally, or move directly to the next question.',
@@ -488,82 +488,101 @@ app.post('/chat', async (req, res) => {
   }
 });
 
-app.post('/choices', async (req, res) => {
-  if (!process.env.OPENAI_API_KEY) {
-    return res.status(500).json({ choices: [] });
-  }
 
+app.post('/choices', async (req, res) => {
+  if (!process.env.OPENAI_API_KEY) return res.status(500).json({ choices: [] });
   const text = String(req.body?.text || '').trim();
   const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
   const recentMessages = Array.isArray(req.body?.recentMessages)
-    ? req.body.recentMessages
-        .filter(message => message && typeof message.content === 'string')
-        .slice(-6)
-        .map(message => `${message.role === 'user' ? 'USER' : 'CAMILLE'}: ${message.content.trim()}`)
-        .join('\n')
+    ? req.body.recentMessages.filter(m => m && typeof m.content === 'string')
+        .slice(-6).map(m => `${m.role === 'user' ? 'USER' : 'CAMILLE'}: ${m.content.trim()}`).join('\n')
     : '';
-
   if (!text) return res.json({ choices: [] });
-
-  const targetRule = targetLanguage === 'fr'
-    ? 'Write both choices in natural everyday French.'
-    : targetLanguage === 'en'
-      ? 'Write both choices in natural English; use professional wording only when the context is professional.'
-      : 'Write both choices in natural everyday Belgian Dutch/Flemish.';
-
+  const language = targetLanguage === 'fr' ? 'natural everyday French'
+    : targetLanguage === 'en' ? 'natural contextual English'
+    : 'natural everyday Belgian Dutch/Flemish';
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
+      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        temperature: 0.25,
+        model: 'gpt-4o-mini', temperature: 0.35,
         response_format: { type: 'json_object' },
         messages: [
-          {
-            role: 'system',
-            content: [
-              'Create exactly two plausible quick-reply buttons for the learner to answer Camille’s latest question.',
-              targetRule,
-              'Each choice must be one or two words maximum.',
-              'The two choices must be clearly different and both must make sense as direct answers.',
-              'No punctuation, explanations, emojis, labels or translations.',
-              'If Camille did not ask a meaningful question or invite a simple choice, return {"choices":[]}.',
-              'Otherwise return JSON only in this exact shape: {"choices":["...","..."]}.'
-            ].join(' ')
-          },
-          {
-            role: 'user',
-            content: `Recent conversation:\n${recentMessages || '(none)'}\n\nCamille’s latest message:\n${text}`
-          }
+          { role: 'system', content: [
+            'Create exactly THREE distinct, plausible, very short replies to Camille’s latest question.',
+            `Each text must be in ${language} and use only 1–4 words.`,
+            'Each english property must give the accurate natural English translation in 1–6 words.',
+            'Provide genuinely different answers, not three synonyms. No emojis, labels, commentary or trailing punctuation.',
+            'If no plausible direct answer exists, return {"choices":[]}.',
+            'Otherwise output only JSON: {"choices":[{"text":"...","english":"..."},{"text":"...","english":"..."},{"text":"...","english":"..."}]}.'
+          ].join(' ') },
+          { role: 'user', content: `Recent dialogue:\n${recentMessages || '(none)'}\n\nCamille just said:\n${text}` }
         ],
-        max_tokens: 45
+        max_tokens: 200
       })
     });
-
-    const data = await response.json();
     if (!response.ok) return res.json({ choices: [] });
-
+    const data = await response.json();
     let parsed = {};
-    try {
-      parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}');
-    } catch {}
-
-    const cleaned = Array.isArray(parsed.choices)
-      ? parsed.choices
-          .map(value => String(value || '').trim().replace(/[.!?;,]+$/g, ''))
-          .map(value => value.split(/\s+/).filter(Boolean).slice(0, 2).join(' '))
-          .filter(Boolean)
-      : [];
-
-    const choices = [...new Set(cleaned)].slice(0, 2);
-    return res.json({ choices: choices.length === 2 ? choices : [] });
+    try { parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}'); } catch {}
+    const choices = [], seen = new Set();
+    for (const choice of Array.isArray(parsed.choices) ? parsed.choices : []) {
+      if (!choice || typeof choice !== 'object') continue;
+      const text = String(choice.text || '').trim().replace(/[.!?;,]+$/g, '').split(/\s+/).slice(0,4).join(' ');
+      const english = String(choice.english || '').trim().replace(/[.!?;,]+$/g, '').split(/\s+/).slice(0,6).join(' ');
+      if (!text || (targetLanguage !== 'en' && !english) || seen.has(text.toLocaleLowerCase())) continue;
+      seen.add(text.toLocaleLowerCase());
+      choices.push({ text, english: targetLanguage === 'en' ? '' : english });
+      if (choices.length === 3) break;
+    }
+    return res.json({ choices: choices.length === 3 ? choices : [] });
   } catch (error) {
     console.error('Quick reply generation failed:', error);
     return res.status(500).json({ choices: [] });
+  }
+});
+
+app.post('/tip', async (req, res) => {
+  if (!process.env.OPENAI_API_KEY) return res.status(500).json({ tip: null });
+  const text = String(req.body?.text || '').trim().slice(0, 900);
+  const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
+  if (!text) return res.json({ tip: null });
+  const recentMessages = Array.isArray(req.body?.recentMessages)
+    ? req.body.recentMessages.filter(m => m && typeof m.content === 'string')
+        .slice(-6).map(m => `${m.role === 'user' ? 'USER' : 'CAMILLE'}: ${m.content.trim()}`).join('\n')
+    : '';
+  const language = targetLanguage === 'fr' ? 'French' : targetLanguage === 'en' ? 'English' : 'Belgian Dutch/Flemish';
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini', temperature: 0.45,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: [
+            `Generate ONE natural response in ${language} that the learner could say or type to reply to Camille.`,
+            'Keep it concise, ideally 3–10 words and at most 12. If the latest message is not a question, offer a brief natural reaction.',
+            'Match the learner’s language level. Provide its accurate natural English translation.',
+            'Do not take any action on behalf of the learner. Output JSON only: {"tip":{"text":"...","english":"..."}}.'
+          ].join(' ') },
+          { role: 'user', content: `Recent dialogue:\n${recentMessages || '(none)'}\n\nCamille just said:\n${text}` }
+        ],
+        max_tokens: 130
+      })
+    });
+    if (!response.ok) return res.status(502).json({ tip: null });
+    const data = await response.json();
+    let parsed = {};
+    try { parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}'); } catch {}
+    const answer = String(parsed.tip?.text || '').trim();
+    const english = String(parsed.tip?.english || '').trim();
+    if (!answer || (targetLanguage !== 'en' && !english)) return res.json({ tip: null });
+    return res.json({ tip: { text: answer, english: targetLanguage === 'en' ? '' : english } });
+  } catch (error) {
+    console.error('Tip generation failed:', error);
+    return res.status(500).json({ tip: null });
   }
 });
 
