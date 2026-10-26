@@ -24,7 +24,6 @@ const avatarVideo = document.getElementById('avatarVideo');
 const avatarPlaceholder = document.getElementById('avatarPlaceholder');
 const avatarPlaceholderText = document.getElementById('avatarPlaceholderText');
 const avatarBadge = document.getElementById('avatarBadge');
-const voiceProviderNotice = document.getElementById('voiceProviderNotice');
 
 const difficultySlider = document.getElementById('difficultySlider');
 const difficultyValue = document.getElementById('difficultyValue');
@@ -85,13 +84,6 @@ let anamClient = null;
 let connected = false;
 let connecting = false;
 let customLlmMode = false;
-let openAiAvatarVoice = false;
-let agentAudioStream = null;
-let recognition = null;
-let recognitionRunning = false;
-let recognitionAllowed = true;
-let resumeVoiceAfter = 0;
-let recognitionTimer = null;
 let currentMessages = [];
 let lastProcessedUserMessageId = null;
 let isResponding = false;
@@ -451,12 +443,7 @@ async function replayText(text, element = null, { useAvatarVoice = false } = {})
       try { anamClient.muteInputAudio(); } catch {}
     }
 
-    if (openAiAvatarVoice && connected && anamClient) {
-      const duration = estimateReplayDuration(clean);
-      const highlight = animateReplayHighlight(element, clean, duration, runId);
-      await speakWithOpenAi(clean);
-      await highlight;
-    } else if (useAvatarVoice && connected && anamClient) {
+    if (useAvatarVoice && connected && anamClient) {
       const duration = estimateReplayDuration(clean);
       const highlight = animateReplayHighlight(element, clean, duration, runId);
       await anamClient.talk(clean);
@@ -929,129 +916,9 @@ function updateInteractionModeUi() {
   }
 }
 
-
-function stopOpenAiListening() {
-  if (recognitionTimer) window.clearTimeout(recognitionTimer);
-  recognitionTimer = null;
-  if (recognition && recognitionRunning) {
-    try { recognition.stop(); } catch {}
-  }
-}
-function startOpenAiListening() {
-  if (!openAiAvatarVoice || !connected || isResponding || replayingAudio ||
-      interactionMode !== 'speak' || !recognitionAllowed) return;
-  if (Date.now() < resumeVoiceAfter) {
-    if (recognitionTimer) window.clearTimeout(recognitionTimer);
-    recognitionTimer = window.setTimeout(startOpenAiListening, Math.min(1600, resumeVoiceAfter - Date.now() + 150));
-    return;
-  }
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    setStatus('Speech recognition unavailable; use Type or Button');
-    return;
-  }
-  if (!recognition) {
-    recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-    recognition.onstart = () => {
-      recognitionRunning = true;
-      if (!isResponding && connected) setStatus('Listening…');
-    };
-    recognition.onresult = event => {
-      let done = '', partial = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const part = String(event.results[i][0]?.transcript || '').trim();
-        if (event.results[i].isFinal) done += (done ? ' ' : '') + part;
-        else partial += (partial ? ' ' : '') + part;
-      }
-      if (partial) setLastUserPin(partial);
-      if (done && connected && !isResponding) {
-        stopOpenAiListening();
-        setStatus('Thinking…');
-        sendTypedTurn(done, 'speak');
-      }
-    };
-    recognition.onspeechstart = () => voiceRing.classList.add('active');
-    recognition.onspeechend = () => voiceRing.classList.remove('active');
-    recognition.onerror = event => {
-      if (['not-allowed','service-not-allowed','audio-capture'].includes(event.error)) {
-        recognitionAllowed = false;
-        setStatus('Microphone unavailable; use Type or Button');
-      }
-    };
-    recognition.onend = () => {
-      recognitionRunning = false;
-      // iOS Safari can stop delivering SpeechRecognition events after video plays.
-      // Use a fresh recognizer on each turn instead of recycling a stalled instance.
-      recognition = null;
-      voiceRing.classList.remove('active');
-      if (connected && !isResponding && interactionMode === 'speak' && recognitionAllowed) {
-        recognitionTimer = window.setTimeout(startOpenAiListening, 380);
-      }
-    };
-  }
-  if (recognitionRunning) return;
-  recognition.lang = replayLocale();
-  try { recognition.start(); } catch (error) { console.warn('Speech recognition failed:',error); }
-}
-
-async function speakWithOpenAi(text, signal) {
-  if (!openAiAvatarVoice || !anamClient || !connected) return;
-  const clean = String(text || '').trim();
-  if (!clean) return;
-  stopOpenAiListening();
-  const agentStream = anamClient.createAgentAudioInputStream({
-    encoding:'pcm_s16le',sampleRate:24000,channels:1
-  });
-  agentAudioStream = agentStream;
-  let bytes = 0, gotAudio = false, complete = false;
-  const start = Date.now();
-  try {
-    const response = await fetch('/openai-voice', {
-      method:'POST', headers:{'Content-Type':'application/json'},signal,
-      body:JSON.stringify({text:clean,targetLanguage})
-    });
-    if (!response.ok || !response.body) throw Error('OpenAI voice HTTP '+response.status);
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let pending = '';
-    while (true) {
-      const {done,value}=await reader.read();
-      if (done) break;
-      pending += decoder.decode(value,{stream:true});
-      let pos;
-      while ((pos=pending.indexOf('\n\n'))!==-1) {
-        const line=pending.slice(0,pos).trim();
-        pending=pending.slice(pos+2);
-        if (!line.startsWith('data: ')) continue;
-        const base64=line.slice(6).trim();
-        if (!base64) continue;
-        agentStream.sendAudioChunk(base64);
-        bytes += Math.floor(base64.length * 3 / 4);
-        gotAudio = true;
-      }
-    }
-    if (!gotAudio) throw Error('OpenAI provided no voice output');
-    complete = true;
-  } finally {
-    try { agentStream.endSequence(); } catch(error) { console.warn('Audio sequence could not close',error); }
-    if (agentAudioStream === agentStream) agentAudioStream = null;
-    if (complete) {
-      const duration=Math.max(950,bytes/48);
-      resumeVoiceAfter=Date.now()+Math.max(700,duration-(Date.now()-start)+950);
-    }
-  }
-}
-
 function applyInteractionAudioState() {
   if (!anamClient || !connected) return;
-  if (openAiAvatarVoice) {
-    if (interactionMode === 'speak') startOpenAiListening();
-    else stopOpenAiListening();
-    return;
-  }
+
   try {
     if (interactionMode === 'speak') {
       anamClient.unmuteInputAudio();
@@ -1828,7 +1695,7 @@ async function sendTypedTurn(text, inputKind = 'type') {
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    if (!openAiAvatarVoice) talkStream = anamClient.createTalkMessageStream();
+    talkStream = anamClient.createTalkMessageStream();
 
     while (true) {
       const { done, value } = await reader.read();
@@ -1841,11 +1708,10 @@ async function sendTypedTurn(text, inputKind = 'type') {
       const limited = limitCamilleReply(full);
       renderLiveDutch(limited.text, chunk);
       schedulePartialTranslation(limited.text, personaId);
-      if (talkStream) await talkStream.streamMessageChunk(chunk, false);
+      await talkStream.streamMessageChunk(chunk, false);
     }
 
-    if (talkStream) await talkStream.endMessage();
-    if (openAiAvatarVoice) await speakWithOpenAi(limitCamilleReply(full).text, activeChatAbort.signal);
+    await talkStream.endMessage();
 
     full = limitCamilleReply(full).text;
     const english = await translateToEnglish(full);
@@ -1868,10 +1734,7 @@ async function sendTypedTurn(text, inputKind = 'type') {
   } finally {
     activeChatAbort = null;
     isResponding = false;
-    if (connected) {
-      setStatus(languageConfig().ready);
-      if (openAiAvatarVoice) startOpenAiListening();
-    }
+    if (connected) setStatus(languageConfig().ready);
   }
 }
 
@@ -1905,8 +1768,7 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    if (!openAiAvatarVoice) activeTalkStream = anamClient.createTalkMessageStream();
-    let full = '';
+    activeTalkStream = anamClient.createTalkMessageStream();
 
     while (true) {
       const { done, value } = await reader.read();
@@ -1915,29 +1777,10 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
       const chunk = decoder.decode(value, { stream: true });
       if (!chunk) continue;
 
-      full += chunk;
-      if (openAiAvatarVoice) {
-        renderLiveDutch(limitCamilleReply(full).text, chunk);
-      } else {
-        await activeTalkStream.streamMessageChunk(chunk, false);
-      }
+      await activeTalkStream.streamMessageChunk(chunk, false);
     }
 
-    if (activeTalkStream) await activeTalkStream.endMessage();
-    if (openAiAvatarVoice && full.trim()) {
-      const clean = limitCamilleReply(full).text;
-      const messageId = `intro-emma-${Date.now()}`;
-      activeSubtitleMessageId = messageId;
-      await speakWithOpenAi(clean, activeChatAbort.signal);
-      const translation = await translateToEnglish(clean);
-      if (translation) translationByMessageId.set(messageId, translation);
-      setSubtitle(clean, translation);
-      lastSubtitlePair = { nl: clean, en: translation };
-      upsertConversationTurn({ id: messageId, role: 'persona', content: clean });
-      saveCurrentHistory();
-      renderMessages(currentMessages);
-      if (interactionMode === 'button') requestQuickChoices(clean);
-    }
+    await activeTalkStream.endMessage();
   } catch (error) {
     if (error?.name !== 'AbortError') {
       console.error('Emma response error:', error);
@@ -1948,15 +1791,12 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
     activeTalkStream = null;
     isResponding = false;
 
-    if (connected) {
-      setStatus(languageConfig().ready);
-      if (openAiAvatarVoice) startOpenAiListening();
-    }
+    if (connected) setStatus(languageConfig().ready);
   }
 }
 
 async function handleMessagesUpdated(messages) {
-  if (replayingAudio || openAiAvatarVoice) return;
+  if (replayingAudio) return;
   mergeAnamHistory(messages);
   saveCurrentHistory();
   renderMessages(currentMessages);
@@ -1975,7 +1815,7 @@ async function handleMessagesUpdated(messages) {
 }
 
 function handleStreamEvent(event) {
-  if (openAiAvatarVoice || !event?.id || typeof event?.content !== 'string') return;
+  if (!event?.id || typeof event?.content !== 'string') return;
   if (replayingAudio && event.role === 'persona') return;
 
   const previous = streamBuffers.get(event.id) || '';
@@ -2193,14 +2033,10 @@ async function connect() {
       throw new Error(detail);
     }
 
-    openAiAvatarVoice = data.mode === 'openai-passthrough';
-    if (voiceProviderNotice) voiceProviderNotice.textContent = openAiAvatarVoice
-      ? 'Voice: OpenAI Sage (calm, mature AI-generated speech). Anam lip-sync is enabled.'
-      : 'Voice: Anam AI (fallback). OpenAI speech is not active in this session.';
-    customLlmMode = data.mode === 'custom-llm' || openAiAvatarVoice;
+    customLlmMode = data.mode === 'custom-llm';
 
     anamClient = createClient(data.sessionToken, {
-      disableInputAudio: openAiAvatarVoice,
+      disableInputAudio: false,
       voiceDetection: {
         endOfSpeechSensitivity: 0.55
       }
@@ -2261,9 +2097,6 @@ function resetUiAfterDisconnect() {
   connecting = false;
   document.body.classList.remove('conversation-live', 'level-expanded');
   customLlmMode = false;
-  openAiAvatarVoice = false;
-  stopOpenAiListening();
-  recognition = null;
   runtimeContextApplied = false;
   lastProcessedUserMessageId = null;
   isResponding = false;
@@ -2280,8 +2113,6 @@ function resetUiAfterDisconnect() {
   lastPartialTranslationAt = 0;
 
   try { activeChatAbort?.abort(); } catch {}
-  try { agentAudioStream?.endSequence(); } catch {}
-  agentAudioStream = null;
   activeChatAbort = null;
   activeTalkStream = null;
 
@@ -2316,10 +2147,6 @@ async function disconnect() {
 micButton.addEventListener('click', () => {
   primePopAudio();
   if (!connected && !connecting) connect();
-  else if (connected && openAiAvatarVoice && interactionMode === 'speak') {
-    recognitionAllowed = true;
-    startOpenAiListening();
-  }
 });
 
 typeToggle?.addEventListener('click', () => setInteractionMode('type'));
