@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="icon" type="image/png" href="/favicon-64.png" />
   <title>Emma — Language Coach</title>
-  <link rel="stylesheet" href="/styles.css?v=emma-warm-20261026-b" />
+  <link rel="stylesheet" href="/styles.css?v=emma-compact-20261026" />
 </head>
 <body>
   <main class="app-shell">
@@ -51,11 +51,7 @@
           <div class="stage-vignette"></div>
           <div id="voiceRing" class="voice-ring"></div>
 
-                    <div class="interaction-mode-bar" role="group" aria-label="Conversation input mode">
-            <button id="speakModeButton" class="interaction-mode-button" type="button" data-mode="speak" aria-pressed="true">Speak</button>
-            <button id="typeModeButton" class="interaction-mode-button" type="button" data-mode="type" aria-pressed="false">Type</button>
-            <button id="buttonModeButton" class="interaction-mode-button" type="button" data-mode="button" aria-pressed="false">Button</button>
-          </div>
+                    
 
           <div id="successBalloon" class="success-balloon avatar-balloon" aria-hidden="true">
             <span class="balloon-body"></span>
@@ -178,6 +174,12 @@
             <button id="typeSend" type="submit">Send</button>
           </form>
 
+          <div class="interaction-mode-bar" role="group" aria-label="Conversation input mode">
+            <button id="speakModeButton" class="interaction-mode-button" type="button" data-mode="speak" aria-pressed="true">Speak</button>
+            <button id="typeModeButton" class="interaction-mode-button" type="button" data-mode="type" aria-pressed="false">Type</button>
+            <button id="buttonModeButton" class="interaction-mode-button" type="button" data-mode="button" aria-pressed="false">Button</button>
+          </div>
+
           <button id="sessionHistoryButton" class="session-history-button" type="button">Recent Talks</button>
         </section>
       </section>
@@ -265,6 +267,6 @@
     </form>
   </dialog>
 
-  <script src="/app.bundle.js?v=emma-dark-20261026" type="module"></script>
+  <script src="/app.bundle.js?v=emma-compact-20261026" type="module"></script>
 </body>
 </html>
