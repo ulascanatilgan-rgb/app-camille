@@ -21,6 +21,9 @@ app.use((req, res, next) => {
 app.use(express.static(__dirname));
 
 const ANAM_API_BASE = 'https://api.anam.ai/v1';
+ // Explicitly select the Emma avatar for Camille. Keep this independent of
+ // the previously configured ANAM_PERSONA_ID environment variable.
+const CAMILLE_ANAM_PERSONA_ID = '132ee9b2-3fd7-47ba-9318-c1da8e017f47';
 
 const tutorInstructions = [
   "You are Camille, Ulas Atilgan's long-term language conversation coach and practical speaking partner.",
@@ -264,11 +267,11 @@ function safeAnamError(error) {
 
 app.post('/anam-session', async (_req, res) => {
   const apiKey = process.env.ANAM_API_KEY;
-  const personaId = process.env.ANAM_PERSONA_ID;
+  const personaId = CAMILLE_ANAM_PERSONA_ID;
 
   if (!apiKey || !personaId) {
     return res.status(500).json({
-      error: 'ANAM_API_KEY or ANAM_PERSONA_ID is missing on the server.'
+      error: 'ANAM_API_KEY is missing on the server.'
     });
   }
 
@@ -289,7 +292,7 @@ app.post('/anam-session', async (_req, res) => {
 
 app.get('/anam-health', async (_req, res) => {
   const apiKey = process.env.ANAM_API_KEY;
-  const personaId = process.env.ANAM_PERSONA_ID;
+  const personaId = CAMILLE_ANAM_PERSONA_ID;
 
   if (!apiKey || !personaId) {
     return res.status(500).json({
@@ -725,7 +728,7 @@ app.get('/health', (_req, res) => {
   res.json({
     ok: true,
     openai: Boolean(process.env.OPENAI_API_KEY),
-    anam: Boolean(process.env.ANAM_API_KEY && process.env.ANAM_PERSONA_ID)
+    anam: Boolean(process.env.ANAM_API_KEY && CAMILLE_ANAM_PERSONA_ID)
   });
 });
 
