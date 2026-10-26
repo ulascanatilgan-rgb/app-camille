@@ -4219,3 +4219,117 @@ body,
     padding-right: 2px !important;
   }
 }
+
+/* Three bilingual quick replies and one-tap Tip */
+.quick-reply-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 7px;
+}
+.quick-reply-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  min-height: 48px;
+  padding: 7px 6px;
+  white-space: normal;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+.quick-reply-target {
+  display: block;
+  font-size: 12px;
+  line-height: 1.22;
+  font-weight: 600;
+}
+.quick-reply-english {
+  display: block;
+  font-size: 10px;
+  line-height: 1.2;
+  color: #746b5e;
+  font-weight: 400;
+}
+.live-exchange-card { position: relative; }
+.live-exchange-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+}
+.live-tip-button {
+  width: 36px;
+  height: 36px;
+  font-size: 11px !important;
+  font-weight: 650;
+  letter-spacing: -.02em;
+}
+.live-tip-button[hidden], .tip-panel[hidden] { display: none !important; }
+.live-tip-button[aria-expanded="true"] {
+  background: #ece6d9;
+  border-color: #8e8170;
+}
+.tip-panel {
+  position: absolute;
+  top: 67px;
+  right: 16px;
+  z-index: 20;
+  width: min(310px, calc(100% - 32px));
+  padding: 15px 38px 16px 17px;
+  background: #fffdfa;
+  border: 1px solid #c6baaa;
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(43,37,29,.16);
+  text-align: left;
+}
+.tip-close-button {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #6f6659;
+  font-size: 23px;
+  line-height: 1;
+  cursor: pointer;
+}
+.tip-close-button:hover { background: #f1ece4; }
+.tip-label {
+  margin-bottom: 9px;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: .09em;
+  color: #8c7c67;
+}
+.tip-target {
+  color: #302c27;
+  font-size: 15px;
+  line-height: 1.45;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+.tip-english {
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #796f62;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .quick-reply-bar { gap: 5px; margin-top: 10px; padding-top: 9px; }
+  .quick-reply-button { min-height: 46px; padding: 6px 4px; }
+  .quick-reply-target { font-size: 10.5px; }
+  .quick-reply-english { font-size: 9px; }
+  .live-exchange-actions { gap: 6px; }
+  .tip-panel { top: 52px; right: 10px; width: min(285px, calc(100% - 20px)); }
+}
