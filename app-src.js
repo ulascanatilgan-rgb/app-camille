@@ -635,6 +635,82 @@ function normalizedRole(role) {
   return role === 'user' ? 'user' : 'persona';
 }
 
+// Anam's history updates can omit manually typed answers or arrive before the
+// final speech transcript. Keep an additive, ordered transcript for all input modes.
+function transcriptText(role, value) {
+  const text = String(value || '').trim();
+  return normalizedRole(role) === 'persona' ? limitCamilleReply(text).text : text;
+}
+
+function findTranscriptMatch(turn, from = 0) {
+  if (turn.id) {
+    const byId = currentMessages.findIndex((entry, index) =>
+      index >= from && entry.id === turn.id && normalizedRole(entry.role) === turn.role);
+    if (byId !== -1) return byId;
+  }
+  return currentMessages.findIndex((entry, index) =>
+    index >= from && normalizedRole(entry.role) === turn.role &&
+    transcriptText(entry.role, entry.content) === turn.content);
+}
+
+function upsertConversationTurn(turn, { from = 0, insertAt = null } = {}) {
+  const role = normalizedRole(turn?.role);
+  const content = transcriptText(role, turn?.content);
+  if (!content || (role === 'user' && content === 'Listening…')) return -1;
+
+  const id = turn?.id || `transcript-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const normalized = { id, role, content };
+  const index = findTranscriptMatch(normalized, from);
+  if (index !== -1) {
+    const existing = currentMessages[index];
+    // Don't downgrade complete speech to an earlier partial SDK snapshot.
+    if (content.length >= existing.content.trim().length) existing.content = content;
+    if (!existing.id) existing.id = id;
+    return index;
+  }
+
+  const position = insertAt === null
+    ? currentMessages.length
+    : Math.min(currentMessages.length, Math.max(from, insertAt));
+  currentMessages.splice(position, 0, normalized);
+  return position;
+}
+
+function mergeAnamHistory(messages) {
+  if (!Array.isArray(messages)) return;
+  const incoming = messages
+    .filter(message => message && typeof message.content === 'string' && message.content.trim())
+    .map((message, index) => ({
+      id: message.id || `anam-snapshot-${index}-${normalizedRole(message.role)}`,
+      role: normalizedRole(message.role),
+      content: transcriptText(message.role, message.content)
+    }))
+    .filter(message => message.content);
+
+  let from = 0;
+  for (let i = 0; i < incoming.length; i++) {
+    const turn = incoming[i];
+    let match = findTranscriptMatch(turn, from);
+
+    if (match === -1) {
+      // When a delayed SDK snapshot supplies an earlier turn, place it before
+      // the next existing turn rather than moving it to the end of the talk.
+      let nextKnown = null;
+      for (let j = i + 1; j < incoming.length; j++) {
+        const next = findTranscriptMatch(incoming[j], from);
+        if (next !== -1) {
+          nextKnown = next;
+          break;
+        }
+      }
+      match = upsertConversationTurn(turn, { from, insertAt: nextKnown });
+    } else {
+      match = upsertConversationTurn(turn, { from });
+    }
+    if (match !== -1) from = match + 1;
+  }
+}
+
 function renderMessages(messages) {
   const isMobile = window.matchMedia('(max-width: 760px)').matches;
   const previousTop = messagesEl.scrollTop;
@@ -718,6 +794,10 @@ async function finalizeUserTranslation(text, messageId) {
 
   if (seq === userTranslationSeq && pinnedUserMessageId === messageId) {
     lastUserPinEn.textContent = english || '';
+    if (english) {
+      translationByMessageId.set(messageId, english);
+      saveCurrentHistory();
+    }
   }
 }
 
@@ -1204,7 +1284,7 @@ function saveCurrentHistory() {
   session.difficulty = difficulty;
   session.messages = currentMessages
     .filter(message => message?.content?.trim())
-    .slice(-80)
+    .slice(-200)
     .map(message => ({
       id: message.id,
       role: normalizedRole(message.role),
@@ -1321,7 +1401,7 @@ function renderSessionHistoryDialog() {
     }
 
     const english = message.en || (message.id ? translationByMessageId.get(message.id) : '');
-    if (role !== 'user' && english) {
+    if (english) {
       const en = document.createElement('div');
       en.className = 'session-history-en';
       en.textContent = english;
@@ -1405,7 +1485,7 @@ function renderHistoryDialog() {
           body.appendChild(sentenceRow);
         }
 
-        if (message.role !== 'user' && message.en) {
+        if (message.en) {
           const en = document.createElement('div');
           en.className = 'archive-english';
           en.textContent = message.en;
@@ -1579,11 +1659,7 @@ async function sendTypedTurn(text, inputKind = 'type') {
   setLastUserPin(clean, userId);
   finalizeUserTranslation(clean, userId);
 
-  currentMessages = [
-    ...currentMessages.filter(message => message?.content?.trim()),
-    { id: userId, role: 'user', content: clean }
-  ];
-
+  upsertConversationTurn({ id: userId, role: 'user', content: clean });
   saveCurrentHistory();
   renderMessages(currentMessages);
 
@@ -1642,10 +1718,7 @@ async function sendTypedTurn(text, inputKind = 'type') {
 
     setSubtitle(full, english);
 
-    currentMessages = [
-      ...currentMessages,
-      { id: personaId, role: 'persona', content: full }
-    ];
+    upsertConversationTurn({ id: personaId, role: 'persona', content: full });
 
     processVocabularyProgress(personaId, full, true);
     saveCurrentHistory();
@@ -1723,7 +1796,7 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
 
 async function handleMessagesUpdated(messages) {
   if (replayingAudio) return;
-  currentMessages = Array.isArray(messages) ? [...messages] : [];
+  mergeAnamHistory(messages);
   saveCurrentHistory();
   renderMessages(currentMessages);
 
@@ -1765,6 +1838,9 @@ function handleStreamEvent(event) {
 
     if (event.endOfSpeech) {
       streamBuffers.delete(event.id);
+      upsertConversationTurn({ id: event.id, role: 'user', content: next });
+      saveCurrentHistory();
+      renderMessages(currentMessages);
       finalizeUserTranslation(next, event.id);
     }
     return;
@@ -1802,6 +1878,8 @@ function handleStreamEvent(event) {
 
     if (event.endOfSpeech || limited.limited) {
       streamBuffers.delete(event.id);
+      upsertConversationTurn({ id: event.id, role: 'persona', content: limited.text });
+      saveCurrentHistory();
       partialTranslationSeq += 1;
       lastPartialTranslationAt = 0;
       finalizeSubtitle(limited.text, event.id);
