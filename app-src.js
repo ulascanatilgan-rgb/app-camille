@@ -983,6 +983,9 @@ function startOpenAiListening() {
     };
     recognition.onend = () => {
       recognitionRunning = false;
+      // iOS Safari can stop delivering SpeechRecognition events after video plays.
+      // Use a fresh recognizer on each turn instead of recycling a stalled instance.
+      recognition = null;
       voiceRing.classList.remove('active');
       if (connected && !isResponding && interactionMode === 'speak' && recognitionAllowed) {
         recognitionTimer = window.setTimeout(startOpenAiListening, 380);
@@ -2192,7 +2195,7 @@ async function connect() {
 
     openAiAvatarVoice = data.mode === 'openai-passthrough';
     if (voiceProviderNotice) voiceProviderNotice.textContent = openAiAvatarVoice
-      ? 'Voice: OpenAI Marin (calm, mature AI-generated speech). Anam lip-sync is enabled.'
+      ? 'Voice: OpenAI Sage (calm, mature AI-generated speech). Anam lip-sync is enabled.'
       : 'Voice: Anam AI (fallback). OpenAI speech is not active in this session.';
     customLlmMode = data.mode === 'custom-llm' || openAiAvatarVoice;
 
