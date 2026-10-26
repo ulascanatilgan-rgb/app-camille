@@ -1,10 +1,11 @@
-const CACHE = 'camille-pwa-conversation-history-v35';
+const CACHE = 'emma-dark-portrait-v36';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/styles.css',
   '/app.bundle.js',
   '/manifest.webmanifest',
+  '/emma-portrait.jpg',
   '/icon-192.png',
   '/icon-512.png',
   '/apple-touch-icon.png',
@@ -32,7 +33,7 @@ self.addEventListener('fetch', event => {
 
   if (
     url.origin === self.location.origin &&
-    ['/anam-session', '/anam-health', '/chat', '/choices', '/translate', '/health', '/vocab'].includes(url.pathname)
+    ['/anam-session', '/anam-health', '/chat', '/choices', '/tip', '/translate', '/health', '/vocab'].includes(url.pathname)
   ) {
     return;
   }
