@@ -4333,3 +4333,322 @@ body,
   .live-exchange-actions { gap: 6px; }
   .tip-panel { top: 52px; right: 10px; width: min(285px, calc(100% - 20px)); }
 }
+
+
+/* Emma dark portrait-led responsive interface, 26 October 2026.
+   Existing conversation/history storage and interactions are untouched. */
+:root {
+  color-scheme: dark;
+  --bg:#101214;
+  --paper:#16191b;
+  --cream:#23272a;
+  --ink:#f4f0e9;
+  --anthracite:#202427;
+  --muted:#a7aaa9;
+  --soft:#8e938f;
+  --line:#32373a;
+  --line-dark:#41464a;
+  --english:#c0b4a5;
+  --control:#ede7dd;
+  --control-text:#f2ece3;
+  --yellow:#c8a976;
+  --yellow-deep:#c8a976;
+}
+html,body,.app-shell,.workspace,.conversation-column {
+  background:#121416 !important;
+  color:#efeae1 !important;
+}
+.topbar,.controls {
+  background:rgba(18,20,22,.98) !important;
+  border-color:#34393b !important;
+}
+.topbar { border-bottom:1px solid #363a3e !important; }
+.center-brand {
+  color:#f4eee5 !important;
+  font-weight:600 !important;
+  letter-spacing:-.04em !important;
+}
+.nav-button,.icon-button,.language-toggle,.text-button,.status,
+.difficulty-toggle,.difficulty-name,.difficulty-value,.level-word {
+  color:#e5dfd5 !important;
+}
+.status,.live-exchange-label,.live-speaker-label,.eyebrow,.control-label {
+  color:#a9ada9 !important;
+}
+.language-toggle,.nav-button,.difficulty-toggle {
+  background:#24292c !important;
+  border:1px solid #43494b !important;
+}
+.avatar-column {
+  background:#0f1113 !important;
+  border-color:#35383c !important;
+}
+.portrait-wrap {
+  background:#0d0f10 !important;
+  border-color:#33383b !important;
+  border-radius:14px !important;
+}
+.avatar-placeholder {
+  background:#0e1012 !important;
+  overflow:hidden !important;
+}
+.emma-placeholder-image {
+  width:100%;
+  height:100%;
+  position:absolute;
+  inset:0;
+  object-fit:contain;
+  object-position:center;
+  background:#0d0f10;
+}
+.placeholder-text {
+  position:absolute;
+  bottom:42px;
+  z-index:3;
+  width:80%;
+  padding:9px 14px;
+  background:rgba(14,16,18,.64);
+  color:#f3ece1 !important;
+  border-radius:10px;
+  backdrop-filter:blur(8px);
+}
+.anam-video {
+  object-fit:contain !important;
+  object-position:center center !important;
+  background:#101214 !important;
+}
+.stage-vignette {
+  background:linear-gradient(0deg,rgba(6,8,9,.5),transparent 18%) !important;
+}
+.portrait-wrap > .interaction-mode-bar {
+  position:absolute !important;
+  z-index:12 !important;
+  right:13px !important;
+  top:47% !important;
+  left:auto !important;
+  bottom:auto !important;
+  transform:translateY(-50%);
+  display:grid !important;
+  grid-template-columns:1fr !important;
+  grid-template-rows:repeat(3,auto);
+  align-items:center;
+  width:70px !important;
+  max-width:70px;
+  padding:5px !important;
+  margin:0 !important;
+  gap:8px !important;
+  background:rgba(15,17,19,.54) !important;
+  border:1px solid rgba(245,239,230,.17);
+  border-radius:19px;
+  backdrop-filter:blur(14px);
+}
+.portrait-wrap .interaction-mode-button {
+  width:100% !important;
+  min-width:0 !important;
+  height:49px !important;
+  min-height:49px !important;
+  padding:0 3px !important;
+  border-radius:13px !important;
+  font-size:11px !important;
+  font-weight:600 !important;
+  letter-spacing:.01em;
+  color:#f4efe7 !important;
+}
+.portrait-wrap .interaction-mode-button.active {
+  background:#476d5a !important;
+  border-color:#688c75 !important;
+}
+.portrait-wrap .interaction-mode-button.inactive {
+  background:rgba(44,49,52,.90) !important;
+  border-color:#50575a !important;
+}
+.portrait-wrap .interaction-mode-button:focus-visible {
+  outline:2px solid #e0c7a7;
+}
+.controls {
+  grid-template-columns:minmax(0,1fr) auto auto !important;
+  grid-template-areas:"actions session level" "composer composer composer" !important;
+  gap:8px !important;
+  margin-top:auto !important;
+}
+.conversation-head { border-color:#353a3c !important; }
+.live-exchange-card {
+  background:#1c2022 !important;
+  color:#f4efe7 !important;
+  border:1px solid #3a3f42 !important;
+  box-shadow:none !important;
+}
+.live-exchange-card .dutch-line,
+.live-user .last-user-text,
+.archive-sentence,.session-history-main { color:#f0ece6 !important; }
+.live-exchange-card .english-line,
+.last-user-en,.archive-english,.session-history-en { color:#bdb2a5 !important; }
+.live-speaker + .live-speaker {
+  border-color:#404447 !important;
+}
+.live-user {
+  background:#272c2f !important;
+  border-radius:12px !important;
+}
+.live-user .live-speaker-label { color:#b1b9bb !important; }
+.quick-reply-bar { border-top-color:#44484a !important; }
+.quick-reply-button {
+  background:#2d3335 !important;
+  border-color:#485052 !important;
+  color:#f0ede8 !important;
+}
+.quick-reply-button:hover { background:#3a4143 !important; }
+.quick-reply-target { color:#f0ece5 !important; }
+.quick-reply-english { color:#bcb2a5 !important; }
+.audio-replay-button,.live-tip-button {
+  background:#303638 !important;
+  border-color:#53585a !important;
+  color:#eee8df !important;
+}
+.audio-replay-button:hover { background:#454c4e !important; }
+.tip-panel {
+  background:#262b2e !important;
+  border-color:#52595b !important;
+  box-shadow:0 12px 35px rgba(0,0,0,.6) !important;
+}
+.tip-label,.tip-english,.tip-close-button { color:#c4b7a7 !important; }
+.tip-target { color:#f6f0e8 !important; }
+.type-composer,.type-composer input {
+  background:#24292b !important;
+  color:#f4eee6 !important;
+  border-color:#444c4d !important;
+}
+.type-composer input::placeholder { color:#a8acae !important; }
+.type-composer button { background:#5a7565 !important;color:#fff !important; }
+.mic-button {
+  background:#314c3b !important;
+  color:#f3f0e8 !important;
+}
+.end-button { color:#e5a6a0 !important; border-color:#89595a !important; }
+.session-history-button {
+  background:#303a38 !important;
+  border-color:#52635b !important;
+  color:#e1eee2 !important;
+}
+.difficulty-panel,body.level-expanded .difficulty-panel {
+  background:#262b2e !important;
+  border-color:#485154 !important;
+  color:#f4eee6 !important;
+}
+.session-history-dialog,
+.session-history-dialog::backdrop,
+.session-history-shell,
+.session-history-header,
+.archive-dialog,.archive-shell,.archive-content,.archive-header,.history-date {
+  background:#171b1d !important;
+  color:#f0ede6 !important;
+}
+.session-history-header,.archive-header {
+  border-color:#3f4648 !important;
+}
+.session-history-message,.archive-message,.history-session {
+  border-color:#394144 !important;
+}
+.session-history-role,.session-history-count,.archive-role,.history-date,.history-session-meta {
+  color:#b4aca0 !important;
+}
+.session-history-back,.dialog-close {
+  background:#303638 !important;
+  color:#f2eae2 !important;
+  border-color:#53585c !important;
+}
+.session-history-content .audio-replay-button { background:#303638 !important; border-color:#53585c !important; }
+.word-list-row,.word-list-pair,.word-list-date,.word-list-nl,.word-list-en {
+  color:#f1eae0 !important;
+}
+.word-list-row { border-color:#3c4245 !important; }
+.word-list-en { color:#baafa4 !important; }
+.word-card { background:#272c2f !important;color:#ede7dd !important; border-color:#51585a !important; }
+.settings-card,.install-card { background:#23282b !important; color:#f1ebe1 !important; }
+input,select { accent-color:#759a80; }
+@media (max-width:760px) {
+  .workspace {
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) !important;
+    grid-template-rows:minmax(0,60%) minmax(0,40%) !important;
+    grid-template-areas:"avatar" "conversation" !important;
+    height:calc(100dvh - 56px) !important;
+    min-height:0 !important;
+  }
+  .avatar-column {
+    grid-area:avatar !important;
+    padding:4px 8px 3px !important;
+    min-height:0 !important;
+    border-right:0 !important;
+  }
+  .portrait-wrap {
+    height:100% !important;
+    border-radius:12px !important;
+  }
+  .conversation-column {
+    grid-area:conversation !important;
+    padding:7px 9px 0 !important;
+    height:100% !important;
+    overflow-y:auto !important;
+    min-height:0 !important;
+    border:0 !important;
+    border-top:1px solid #383f41 !important;
+  }
+  .conversation-head { display:none !important; }
+  .live-exchange-card {
+    margin:4px 4px 0 !important;
+    padding:10px 12px 12px !important;
+    border-radius:12px !important;
+  }
+  .live-exchange-card .dutch-line {
+    font-size:clamp(15px,4.2vw,19px) !important;
+    line-height:1.4 !important;
+  }
+  .live-exchange-card .english-line { font-size:12px !important; }
+  .live-exchange-toolbar { margin-bottom:9px !important; }
+  .live-speaker {
+    display:grid !important;
+    grid-template-columns:58px minmax(0,1fr) !important;
+    gap:8px !important;
+  }
+  .live-speaker + .live-speaker { margin-top:9px !important;padding-top:9px !important; }
+  .portrait-wrap > .interaction-mode-bar {
+    top:46% !important;
+    right:9px !important;
+    width:64px !important;
+    max-width:64px !important;
+    gap:6px !important;
+    padding:4px !important;
+  }
+  .portrait-wrap .interaction-mode-button {
+    height:45px !important;
+    min-height:45px !important;
+    font-size:10px !important;
+  }
+  .controls {
+    margin:0 -9px !important;
+    padding:8px 10px calc(8px + env(safe-area-inset-bottom)) !important;
+    grid-template-columns:minmax(0,1fr) auto auto !important;
+    grid-template-areas:"actions session level" "composer composer composer" !important;
+    column-gap:6px !important;
+    row-gap:6px !important;
+  }
+  body.type-input-mode .workspace {
+    height:var(--stable-workspace-height, calc(100dvh - 56px)) !important;
+    min-height:0 !important;
+  }
+  body.type-input-mode .type-composer {
+    position:fixed !important;
+    left:8px !important;
+    right:8px !important;
+    bottom:calc(var(--keyboard-offset,0px) + 7px) !important;
+    background:#24292b !important;
+    border:1px solid #4a5355 !important;
+  }
+  .placeholder-text { bottom:24px; font-size:11px; }
+}
+@media (max-width:380px) {
+ .workspace { grid-template-rows:minmax(0,57%) minmax(0,43%) !important; }
+ .portrait-wrap > .interaction-mode-bar { width:58px !important; max-width:58px !important; right:6px !important; }
+ .portrait-wrap .interaction-mode-button { font-size:9px !important; }
+}
