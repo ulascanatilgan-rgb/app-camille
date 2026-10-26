@@ -4335,195 +4335,144 @@ body,
 }
 
 
-/* Emma portrait layout — classic warm-paper interface, dark avatar only */
-.avatar-column {
-  background: #151718 !important;
-  border-right-color: #c9c0b1 !important;
+
+/* Emma compact avatar v2 — classic paper UI, more room to read */
+@media (min-width:761px) {
+ .workspace { grid-template-columns:minmax(280px,38%) minmax(0,62%) !important; }
+ .avatar-column { padding:10px 0 10px 10px !important; }
 }
+.avatar-column { background:#fcfbf7 !important; border-color:#e1d8ca !important; }
 .portrait-wrap {
-  position: relative;
-  background: #111315 !important;
-  border: 1px solid #373534 !important;
-  border-radius: 14px !important;
-  overflow: hidden;
+ position:relative;
+ border:1px solid #d3c6b5 !important;
+ border-radius:13px !important;
+ overflow:hidden;
+ background:#292625 !important;
 }
-.avatar-placeholder {
-  background: #111315 !important;
-  overflow: hidden;
-}
+.avatar-placeholder { background:#292625 !important; overflow:hidden; }
 .emma-placeholder-image {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: center;
-  background: #111315;
+ position:absolute;inset:0;display:block;width:100%;height:100%;
+ object-fit:cover;object-position:50% 41%;background:#292625;
 }
 .placeholder-text {
-  position: absolute;
-  z-index: 3;
-  bottom: 36px;
-  max-width: 82%;
-  padding: 8px 12px;
-  border-radius: 10px;
-  color: #f7f2e9 !important;
-  background: rgba(15,17,19,.63) !important;
-  backdrop-filter: blur(8px);
+ position:absolute; z-index:3; bottom:24px;
+ max-width:80%;padding:8px 12px;
+ background:rgba(25,22,21,.65) !important;
+ color:#fff8ec !important;
+ border-radius:9px;backdrop-filter:blur(8px);
 }
 .anam-video {
-  background: #111315 !important;
-  object-fit: contain !important;
-  object-position: center center !important;
+ background:#292625 !important;
+ object-fit:cover !important;
+ object-position:50% 40% !important;
 }
-.portrait-wrap > .interaction-mode-bar {
-  position: absolute !important;
-  z-index: 12 !important;
-  top: 46% !important;
-  right: 12px !important;
-  bottom: auto !important;
-  left: auto !important;
-  transform: translateY(-50%);
-  display: grid !important;
-  grid-template-columns: 1fr !important;
-  grid-template-rows: repeat(3,auto);
-  justify-items: stretch;
-  gap: 7px !important;
-  width: 70px !important;
-  max-width: 70px !important;
-  margin: 0 !important;
-  padding: 5px !important;
-  background: rgba(22,24,25,.60) !important;
-  border: 1px solid rgba(255,255,255,.18);
-  border-radius: 17px;
-  backdrop-filter: blur(11px);
-}
-.portrait-wrap .interaction-mode-button {
-  min-height: 46px !important;
-  height: 46px !important;
-  width: 100% !important;
-  min-width: 0 !important;
-  padding: 0 3px !important;
-  font-size: 11px !important;
-  color: #fffaf2 !important;
-  border-radius: 11px !important;
-}
-.portrait-wrap .interaction-mode-button.active {
-  background: #4d8a67 !important;
-  border-color: #41785a !important;
-}
-.portrait-wrap .interaction-mode-button.inactive {
-  background: #535454 !important;
-  border-color: #727272 !important;
-}
-.portrait-wrap .interaction-mode-button:focus-visible {
-  outline: 2px solid #f3e8ce;
-  outline-offset: 2px;
-}
-/* Controls remain below the conversation; modes are now on the avatar. */
 .controls {
-  grid-template-columns: minmax(0,1fr) auto auto !important;
+ grid-template-columns:minmax(0,1fr) auto auto !important;
+ grid-template-areas:
+  "modes modes modes"
+  "actions session level"
+  "composer composer composer" !important;
+ row-gap:7px !important;
+ column-gap:8px !important;
+}
+.controls .interaction-mode-bar {
+ display:grid !important;
+ grid-area:modes !important;
+ grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+ grid-template-rows:auto !important;
+ width:min(420px,100%) !important;
+ max-width:100% !important;
+ justify-self:stretch !important;
+ position:static !important;
+ transform:none !important;
+ margin:0 !important;
+ padding:0 !important;
+ gap:7px !important;
+ background:transparent !important;
+ border:0 !important;
+ border-radius:0 !important;
+}
+.controls .interaction-mode-button {
+ min-height:34px !important;
+ height:34px !important;
+ border-radius:9px !important;
+ font-size:11px !important;
+ padding:0 10px !important;
+}
+@media (max-width:760px) {
+ .workspace {
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) !important;
+  grid-template-rows:minmax(0,39%) minmax(0,61%) !important;
+  grid-template-areas:"avatar" "conversation" !important;
+  height:calc(100dvh - 56px) !important;
+  min-height:0 !important;
+ }
+ .avatar-column {
+  grid-area:avatar !important;
+  height:100% !important;min-height:0 !important;
+  padding:4px 7px 3px !important;
+  border-right:0 !important;
+  background:#fcfbf7 !important;
+ }
+ .portrait-wrap {
+  height:100% !important;min-height:0 !important;
+  border-radius:10px !important;
+ }
+ .conversation-column {
+  grid-area:conversation !important;
+  background:#fcfbf7 !important;
+  padding:6px 9px 0 !important;
+  height:100% !important;min-height:0 !important;
+  overflow-y:auto !important;
+  border-top:1px solid #e1d8ca !important;
+ }
+ .conversation-head { display:none !important; }
+ .live-exchange-card {
+  margin:4px 4px 0 !important;
+  padding:10px 12px 12px !important;
+  border-radius:11px !important;
+ }
+ .live-exchange-card .dutch-line {
+  font-size:clamp(16px,4.2vw,20px) !important;
+  line-height:1.42 !important;
+ }
+ .live-exchange-card .english-line { font-size:12px !important; }
+ .live-exchange-toolbar { margin-bottom:10px !important; }
+ .live-speaker { grid-template-columns:58px minmax(0,1fr) !important; gap:8px !important; }
+ .live-speaker + .live-speaker { margin-top:10px !important; padding-top:10px !important; }
+ .controls {
+  margin:0 -9px !important;
+  padding:7px 10px calc(8px + env(safe-area-inset-bottom)) !important;
+  grid-template-columns:minmax(0,1fr) auto auto !important;
   grid-template-areas:
-    "actions session level"
-    "composer composer composer" !important;
-  column-gap: 8px !important;
+   "modes modes modes"
+   "actions session level"
+   "composer composer composer" !important;
+  gap:6px !important;
+ }
+ .controls .interaction-mode-bar {
+  grid-area:modes !important;
+  width:100% !important;
+  gap:5px !important;
+ }
+ .controls .interaction-mode-button {
+  min-height:32px !important;height:32px !important;
+  font-size:10px !important;padding:0 7px !important;
+ }
+ body.type-input-mode .workspace {
+  height:var(--stable-workspace-height,calc(100dvh - 56px)) !important;
+  min-height:0 !important;
+ }
+ body.type-input-mode .type-composer {
+  position:fixed !important;
+  left:8px !important;right:8px !important;
+  bottom:calc(var(--keyboard-offset,0px) + 7px) !important;
+  background:#faf5ea !important;
+  border:1px solid #d1c1aa !important;
+ }
+ .placeholder-text { bottom:18px; font-size:11px; }
 }
-@media (max-width: 760px) {
-  .workspace {
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) !important;
-    grid-template-rows: minmax(0, 60%) minmax(0, 40%) !important;
-    grid-template-areas: "avatar" "conversation" !important;
-    height: calc(100dvh - 56px) !important;
-    min-height: 0 !important;
-  }
-  .avatar-column {
-    grid-area: avatar !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    padding: 4px 8px 3px !important;
-    border-right: 0 !important;
-  }
-  .portrait-wrap {
-    height: 100% !important;
-    min-height: 0 !important;
-    border-radius: 12px !important;
-  }
-  .conversation-column {
-    grid-area: conversation !important;
-    padding: 7px 9px 0 !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    overflow-y: auto !important;
-    border-top: 1px solid #ded3c1 !important;
-    background: #fcfbf7 !important;
-  }
-  .conversation-head { display: none !important; }
-  .live-exchange-card {
-    margin: 4px 4px 0 !important;
-    padding: 10px 12px 12px !important;
-    border-radius: 12px !important;
-  }
-  .live-exchange-card .dutch-line {
-    font-size: clamp(15px,4.2vw,19px) !important;
-    line-height: 1.4 !important;
-  }
-  .live-exchange-card .english-line { font-size: 12px !important; }
-  .live-exchange-toolbar { margin-bottom: 9px !important; }
-  .live-speaker {
-    display: grid !important;
-    grid-template-columns: 58px minmax(0,1fr) !important;
-    gap: 8px !important;
-  }
-  .live-speaker + .live-speaker {
-    margin-top: 9px !important;
-    padding-top: 9px !important;
-  }
-  .portrait-wrap > .interaction-mode-bar {
-    right: 9px !important;
-    width: 64px !important;
-    max-width: 64px !important;
-    gap: 6px !important;
-    padding: 4px !important;
-  }
-  .portrait-wrap .interaction-mode-button {
-    min-height: 45px !important;
-    height: 45px !important;
-    font-size: 10px !important;
-  }
-  .controls {
-    margin: 0 -9px !important;
-    padding: 8px 10px calc(8px + env(safe-area-inset-bottom)) !important;
-    grid-template-columns: minmax(0,1fr) auto auto !important;
-    grid-template-areas:
-      "actions session level"
-      "composer composer composer" !important;
-    column-gap: 6px !important;
-    row-gap: 6px !important;
-  }
-  body.type-input-mode .workspace {
-    height: var(--stable-workspace-height,calc(100dvh - 56px)) !important;
-    min-height: 0 !important;
-  }
-  body.type-input-mode .type-composer {
-    position: fixed !important;
-    left: 8px !important;
-    right: 8px !important;
-    bottom: calc(var(--keyboard-offset,0px) + 7px) !important;
-    background: #faf5ea !important;
-    border: 1px solid #d1c1aa !important;
-  }
-  .placeholder-text { bottom: 24px; font-size: 11px; }
-}
-@media (max-width: 380px) {
-  .workspace {
-    grid-template-rows: minmax(0,57%) minmax(0,43%) !important;
-  }
-  .portrait-wrap > .interaction-mode-bar {
-    width: 58px !important;
-    max-width: 58px !important;
-    right: 6px !important;
-  }
-  .portrait-wrap .interaction-mode-button { font-size: 9px !important; }
+@media (max-width:380px) {
+ .workspace { grid-template-rows:minmax(0,36%) minmax(0,64%) !important; }
 }
