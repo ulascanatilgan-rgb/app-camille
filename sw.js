@@ -1,4 +1,4 @@
-const CACHE = 'emma-dark-portrait-v36';
+const CACHE = 'emma-warm-paper-v37';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
