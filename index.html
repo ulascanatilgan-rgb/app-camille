@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="icon" type="image/png" href="/favicon-64.png" />
   <title>Camille - Flemish Agent for Ulas Atilgan</title>
-  <link rel="stylesheet" href="/styles.css?v=warm-20261021bb" />
+  <link rel="stylesheet" href="/styles.css?v=tip-20261026" />
 </head>
 <body>
   <main class="app-shell">
@@ -87,7 +87,17 @@
         <section id="subtitlePanel" class="live-exchange-card" aria-live="polite">
           <div class="live-exchange-toolbar">
             <div class="live-exchange-label">LIVE CONVERSATION</div>
-            <button id="liveReplayButton" class="audio-replay-button live-audio-replay" type="button" aria-label="Replay Camille sentence" title="Replay Camille sentence">🎧</button>
+            <div class="live-exchange-actions">
+              <button id="tipButton" class="audio-replay-button live-tip-button" type="button" aria-label="Show a suggested answer" aria-controls="tipPanel" aria-expanded="false" title="Suggested answer">Tip</button>
+              <button id="liveReplayButton" class="audio-replay-button live-audio-replay" type="button" aria-label="Replay Camille sentence" title="Replay Camille sentence">🎧</button>
+            </div>
+          </div>
+
+          <div id="tipPanel" class="tip-panel" hidden role="status" aria-live="polite">
+            <button id="tipCloseButton" class="tip-close-button" type="button" aria-label="Close suggestion">×</button>
+            <div class="tip-label">SUGGESTED ANSWER</div>
+            <div id="tipTarget" class="tip-target"></div>
+            <div id="tipEnglish" class="tip-english"></div>
           </div>
 
           <div class="live-speaker live-camille">
@@ -255,6 +265,6 @@
     </form>
   </dialog>
 
-  <script src="/app.bundle.js?v=warm-20261021" type="module"></script>
+  <script src="/app.bundle.js?v=tip-20261026" type="module"></script>
 </body>
 </html>
