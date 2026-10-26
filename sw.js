@@ -1,4 +1,4 @@
-const CACHE = 'emma-compact-openai-voice-v38';
+const CACHE = 'emma-anam-native-voice-v39';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -33,7 +33,7 @@ self.addEventListener('fetch', event => {
 
   if (
     url.origin === self.location.origin &&
-    ['/anam-session', '/anam-health', '/chat', '/choices', '/tip', '/openai-voice', '/translate', '/health', '/vocab'].includes(url.pathname)
+    ['/anam-session', '/anam-health', '/chat', '/choices', '/tip', '/translate', '/health', '/vocab'].includes(url.pathname)
   ) {
     return;
   }
