@@ -15,6 +15,11 @@ const captionsToggle = document.getElementById('captionsToggle');
 const subtitleNl = document.getElementById('subtitleNl');
 const subtitleEn = document.getElementById('subtitleEn');
 const liveReplayButton = document.getElementById('liveReplayButton');
+const tipButton = document.getElementById('tipButton');
+const tipPanel = document.getElementById('tipPanel');
+const tipCloseButton = document.getElementById('tipCloseButton');
+const tipTarget = document.getElementById('tipTarget');
+const tipEnglish = document.getElementById('tipEnglish');
 const avatarVideo = document.getElementById('avatarVideo');
 const avatarPlaceholder = document.getElementById('avatarPlaceholder');
 const avatarPlaceholderText = document.getElementById('avatarPlaceholderText');
@@ -100,6 +105,9 @@ let interactionMode = ['speak', 'type', 'button'].includes(savedInputMode)
 let choiceModeEnabled = interactionMode === 'button';
 let choiceGenerationSeq = 0;
 let lastChoiceSource = '';
+let tipRequestSeq = 0;
+let tipAbortController = null;
+let cachedTip = null;
 let stableViewportHeight = window.innerHeight;
 let stableWorkspaceHeight = workspaceEl?.getBoundingClientRect().height || 0;
 let replaySequence = 0;
@@ -819,6 +827,8 @@ function updateInteractionModeUi() {
   updateTypeModeLayout();
 
   if (interactionMode !== 'button') clearQuickChoices();
+  if (tipButton) tipButton.hidden = interactionMode === 'button';
+  hideTip();
   if (interactionMode === 'type' && connected) {
     captureStableTypeViewport();
     setTimeout(() => typeInput?.focus({ preventScroll: true }), 80);
@@ -898,6 +908,62 @@ function setInteractionMode(mode) {
   }
 }
 
+function hideTip() {
+  tipRequestSeq += 1;
+  if (tipAbortController) tipAbortController.abort();
+  tipAbortController = null;
+  if (tipPanel) tipPanel.hidden = true;
+  if (tipButton) tipButton.setAttribute('aria-expanded', 'false');
+}
+
+async function showTip() {
+  if (!tipPanel || interactionMode === 'button') return;
+  if (!tipPanel.hidden) { hideTip(); return; }
+
+  const source = subtitleNl?.textContent?.trim() || lastSubtitlePair.nl || '';
+  if (!source) return;
+  const cacheKey = `${targetLanguage}:${source}`;
+  const seq = ++tipRequestSeq;
+  tipPanel.hidden = false;
+  tipButton?.setAttribute('aria-expanded', 'true');
+  tipTarget.textContent = 'Finding a suggestion…';
+  tipEnglish.textContent = '';
+
+  if (cachedTip?.key === cacheKey) {
+    tipTarget.textContent = cachedTip.text;
+    tipEnglish.textContent = targetLanguage === 'en' ? '' : cachedTip.english;
+    return;
+  }
+
+  const controller = new AbortController();
+  tipAbortController = controller;
+  try {
+    const recentMessages = currentMessages
+      .filter(message => message?.content?.trim())
+      .slice(-6)
+      .map(message => ({ role: normalizedRole(message.role), content: message.content.trim() }));
+    const response = await fetch('/tip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({ text: source, targetLanguage, recentMessages })
+    });
+    if (!response.ok) throw new Error('Tip unavailable');
+    const data = await response.json();
+    if (seq !== tipRequestSeq || tipPanel.hidden) return;
+    if (!data.tip?.text) throw new Error('Missing tip');
+    cachedTip = { key: cacheKey, text: String(data.tip.text).trim(), english: String(data.tip.english || '').trim() };
+    tipTarget.textContent = cachedTip.text;
+    tipEnglish.textContent = targetLanguage === 'en' ? '' : cachedTip.english;
+  } catch (error) {
+    if (error?.name === 'AbortError' || seq !== tipRequestSeq) return;
+    tipTarget.textContent = 'No suggestion available. Try again.';
+    tipEnglish.textContent = '';
+  } finally {
+    if (seq === tipRequestSeq) tipAbortController = null;
+  }
+}
+
 function clearQuickChoices() {
   choiceGenerationSeq += 1;
   lastChoiceSource = '';
@@ -907,20 +973,31 @@ function clearQuickChoices() {
 }
 
 function renderQuickChoices(choices) {
-  if (!quickReplyBar || interactionMode !== 'button' || !Array.isArray(choices) || choices.length < 2) {
+  if (!quickReplyBar || interactionMode !== 'button' || !Array.isArray(choices) || choices.length !== 3) {
     clearQuickChoices();
     return;
   }
 
   quickReplyBar.innerHTML = '';
-  for (const choice of choices.slice(0, 2)) {
-    const text = String(choice || '').trim();
+  for (const choice of choices) {
+    const text = String(typeof choice === 'string' ? choice : choice?.text || '').trim();
+    const english = String(typeof choice === 'string' ? '' : choice?.english || '').trim();
     if (!text) continue;
 
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'quick-reply-button';
-    button.textContent = text;
+    const target = document.createElement('span');
+    target.className = 'quick-reply-target';
+    target.textContent = text;
+    button.appendChild(target);
+    if (targetLanguage !== 'en' && english) {
+      const translation = document.createElement('span');
+      translation.className = 'quick-reply-english';
+      translation.textContent = english;
+      button.appendChild(translation);
+    }
+    button.setAttribute('aria-label', targetLanguage !== 'en' && english ? `${text} — ${english}` : text);
     button.addEventListener('click', () => {
       if (!connected || isResponding) return;
       clearQuickChoices();
@@ -929,7 +1006,7 @@ function renderQuickChoices(choices) {
     quickReplyBar.appendChild(button);
   }
 
-  quickReplyBar.hidden = quickReplyBar.children.length !== 2;
+  quickReplyBar.hidden = quickReplyBar.children.length !== 3;
 }
 
 async function requestQuickChoices(camilleText) {
@@ -978,7 +1055,7 @@ function choiceModeInstruction() {
     return 'BUTTON REPLY MODE is off.';
   }
 
-  return 'BUTTON REPLY MODE is ON. End each reply with exactly one short, concrete question that can naturally be answered by two distinct one- or two-word choices. Do not say or list the choices; the interface will show them. A button answer is already a complete intentional answer. NEVER restate or correct it with formulas like “Tu veux dire”, “Mieux”, “Je bedoelt”, “Beter”, “You mean” or “So you mean”. React to its meaning instead. Vary naturally: agree, disagree politely, show curiosity, make a tiny comment or suggestion, contrast the idea, or go directly to the next question. Do not repeat the same opening pattern.';
+  return 'BUTTON REPLY MODE is ON. End each reply with exactly one short, concrete question that can naturally be answered by three distinct short choices. Do not say or list the choices; the interface will show them. A button answer is already a complete intentional answer. NEVER restate or correct it with formulas like “Tu veux dire”, “Mieux”, “Je bedoelt”, “Beter”, “You mean” or “So you mean”. React to its meaning instead. Vary naturally: agree, disagree politely, show curiosity, make a tiny comment or suggestion, contrast the idea, or go directly to the next question. Do not repeat the same opening pattern.';
 }
 
 function buildRuntimeContext() {
@@ -1492,6 +1569,7 @@ async function sendTypedTurn(text, inputKind = 'type') {
   if (!clean || !anamClient || !connected || isResponding) return;
 
   clearQuickChoices();
+  hideTip();
   celebrateUserTurn();
 
   const userId = `typed-user-${Date.now()}`;
@@ -1697,6 +1775,7 @@ function handleStreamEvent(event) {
     activeSubtitleMessageId = event.id;
 
     if (isNewMessage) {
+      hideTip();
       partialTranslationSeq += 1;
       lastPartialTranslationAt = 0;
       if (captionsToggle.checked) subtitleEn.textContent = '…';
@@ -1934,6 +2013,7 @@ function resetUiAfterDisconnect() {
   window.speechSynthesis?.cancel?.();
   replayingAudio = false;
   clearQuickChoices();
+  hideTip();
   connected = false;
   connecting = false;
   document.body.classList.remove('conversation-live', 'level-expanded');
@@ -2017,6 +2097,9 @@ settingsButton.addEventListener('click', () => {
   settingsDialog.showModal();
 });
 
+tipButton?.addEventListener('click', showTip);
+tipCloseButton?.addEventListener('click', hideTip);
+
 liveReplayButton?.addEventListener('click', () => {
   const text = subtitleNl?.textContent?.trim() || lastSubtitlePair.nl || '';
   const highlightTarget = captionsToggle.checked ? subtitleNl : null;
@@ -2073,6 +2156,8 @@ languageToggle?.addEventListener('click', async () => {
 
   learnedWords = loadJson(wordsKey(), []);
   clearQuickChoices();
+  hideTip();
+  cachedTip = null;
   currentMessages = [];
   translationByMessageId.clear();
   streamBuffers.clear();
