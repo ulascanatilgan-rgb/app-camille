@@ -642,25 +642,26 @@ function transcriptText(role, value) {
   return normalizedRole(role) === 'persona' ? limitCamilleReply(text).text : text;
 }
 
-function findTranscriptMatch(turn, from = 0) {
+function findTranscriptMatch(turn, from = 0, matchContent = false) {
   if (turn.id) {
     const byId = currentMessages.findIndex((entry, index) =>
       index >= from && entry.id === turn.id && normalizedRole(entry.role) === turn.role);
     if (byId !== -1) return byId;
   }
+  if (!matchContent) return -1;
   return currentMessages.findIndex((entry, index) =>
     index >= from && normalizedRole(entry.role) === turn.role &&
     transcriptText(entry.role, entry.content) === turn.content);
 }
 
-function upsertConversationTurn(turn, { from = 0, insertAt = null } = {}) {
+function upsertConversationTurn(turn, { from = 0, insertAt = null, matchContent = false } = {}) {
   const role = normalizedRole(turn?.role);
   const content = transcriptText(role, turn?.content);
   if (!content || (role === 'user' && content === 'Listening…')) return -1;
 
   const id = turn?.id || `transcript-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const normalized = { id, role, content };
-  const index = findTranscriptMatch(normalized, from);
+  const index = findTranscriptMatch(normalized, from, matchContent);
   if (index !== -1) {
     const existing = currentMessages[index];
     // Don't downgrade complete speech to an earlier partial SDK snapshot.
@@ -690,22 +691,22 @@ function mergeAnamHistory(messages) {
   let from = 0;
   for (let i = 0; i < incoming.length; i++) {
     const turn = incoming[i];
-    let match = findTranscriptMatch(turn, from);
+    let match = findTranscriptMatch(turn, from, true);
 
     if (match === -1) {
       // When a delayed SDK snapshot supplies an earlier turn, place it before
       // the next existing turn rather than moving it to the end of the talk.
       let nextKnown = null;
       for (let j = i + 1; j < incoming.length; j++) {
-        const next = findTranscriptMatch(incoming[j], from);
+        const next = findTranscriptMatch(incoming[j], from, true);
         if (next !== -1) {
           nextKnown = next;
           break;
         }
       }
-      match = upsertConversationTurn(turn, { from, insertAt: nextKnown });
+      match = upsertConversationTurn(turn, { from, insertAt: nextKnown, matchContent: true });
     } else {
-      match = upsertConversationTurn(turn, { from });
+      match = upsertConversationTurn(turn, { from, matchContent: true });
     }
     if (match !== -1) from = match + 1;
   }
