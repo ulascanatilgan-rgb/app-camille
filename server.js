@@ -21,12 +21,12 @@ app.use((req, res, next) => {
 app.use(express.static(__dirname));
 
 const ANAM_API_BASE = 'https://api.anam.ai/v1';
- // Explicitly select the Emma avatar for Camille. Keep this independent of
+ // Explicitly select the Emma avatar for Emma. Keep this independent of
  // the previously configured ANAM_PERSONA_ID environment variable.
 const CAMILLE_ANAM_PERSONA_ID = '132ee9b2-3fd7-47ba-9318-c1da8e017f47';
 
 const tutorInstructions = [
-  "You are Camille, Ulas Atilgan's long-term language conversation coach and practical speaking partner.",
+  "You are Emma, Ulas Atilgan's long-term language conversation coach and practical speaking partner.",
   "The core teaching method stays consistent across Dutch/Flemish, French and English, but the style changes: Dutch/French prioritize natural everyday speech; English prioritizes fluent professional communication.",
   "Your job is to make Ulas comfortable speaking the selected target language in real daily life, not to teach schoolbook grammar.",
   "For Dutch/French, Ulas is around A2 and needs simple natural speech. His English is stronger and should be coached toward fluent professional communication. He may speak or type in the selected target language or English. You MUST understand English.",
@@ -434,7 +434,7 @@ app.post('/chat', async (req, res) => {
     if (!response.ok) {
       const detail = await response.text();
       console.error('OpenAI chat error:', detail);
-      return res.status(response.status || 500).send('Could not generate Camille response.');
+      return res.status(response.status || 500).send('Could not generate Emma response.');
     }
 
     res.status(200);
@@ -451,7 +451,7 @@ app.post('/chat', async (req, res) => {
     }
 
     if (!response.body) {
-      return res.end('Could not generate Camille response.');
+      return res.end('Could not generate Emma response.');
     }
 
     const reader = response.body.getReader();
@@ -483,9 +483,9 @@ app.post('/chat', async (req, res) => {
 
     res.end();
   } catch (error) {
-    console.error('Camille chat streaming error:', error);
+    console.error('Emma chat streaming error:', error);
     if (!res.headersSent) {
-      return res.status(500).send('Could not generate Camille response.');
+      return res.status(500).send('Could not generate Emma response.');
     }
     res.end();
   }
@@ -498,7 +498,7 @@ app.post('/choices', async (req, res) => {
   const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
   const recentMessages = Array.isArray(req.body?.recentMessages)
     ? req.body.recentMessages.filter(m => m && typeof m.content === 'string')
-        .slice(-6).map(m => `${m.role === 'user' ? 'USER' : 'CAMILLE'}: ${m.content.trim()}`).join('\n')
+        .slice(-6).map(m => `${m.role === 'user' ? 'USER' : 'EMMA'}: ${m.content.trim()}`).join('\n')
     : '';
   if (!text) return res.json({ choices: [] });
   const language = targetLanguage === 'fr' ? 'natural everyday French'
@@ -513,7 +513,7 @@ app.post('/choices', async (req, res) => {
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: [
-            'Create exactly THREE distinct, plausible, very short replies to Camille’s latest question.',
+            'Create exactly THREE distinct, plausible, very short replies to Emma’s latest question.',
             `Each text must be in ${language} and use only 1–4 words.`,
             'Each english property must give the accurate natural English translation in 1–6 words.',
             'Provide genuinely different answers, not three synonyms. No emojis, labels, commentary or trailing punctuation.',
@@ -553,7 +553,7 @@ app.post('/tip', async (req, res) => {
   if (!text) return res.json({ tip: null });
   const recentMessages = Array.isArray(req.body?.recentMessages)
     ? req.body.recentMessages.filter(m => m && typeof m.content === 'string')
-        .slice(-6).map(m => `${m.role === 'user' ? 'USER' : 'CAMILLE'}: ${m.content.trim()}`).join('\n')
+        .slice(-6).map(m => `${m.role === 'user' ? 'USER' : 'EMMA'}: ${m.content.trim()}`).join('\n')
     : '';
   const language = targetLanguage === 'fr' ? 'French' : targetLanguage === 'en' ? 'English' : 'Belgian Dutch/Flemish';
   try {
@@ -565,7 +565,7 @@ app.post('/tip', async (req, res) => {
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: [
-            `Generate ONE natural response in ${language} that the learner could say or type to reply to Camille.`,
+            `Generate ONE natural response in ${language} that the learner could say or type to reply to Emma.`,
             'Keep it concise, ideally 3–10 words and at most 12. If the latest message is not a question, offer a brief natural reaction.',
             'Match the learner’s language level. Provide its accurate natural English translation.',
             'Do not take any action on behalf of the learner. Output JSON only: {"tip":{"text":"...","english":"..."}}.'
@@ -733,5 +733,5 @@ app.get('/health', (_req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Camille is ready at http://localhost:${port}`);
+  console.log(`Emma is ready at http://localhost:${port}`);
 });
