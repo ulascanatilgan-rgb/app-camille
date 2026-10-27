@@ -381,6 +381,7 @@ app.post('/chat', async (req, res) => {
   const difficulty = Math.max(1, Math.min(5, Number(req.body?.difficulty) || 2));
   const kickoff = Boolean(req.body?.kickoff);
   const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
+  const activePersonaName = selectedPersona(req.body?.persona).name;
   const choiceModeEnabled = Boolean(req.body?.choiceModeEnabled);
   const interactionMode = ['speak', 'type', 'button'].includes(req.body?.interactionMode)
     ? req.body.interactionMode
@@ -412,7 +413,7 @@ app.post('/chat', async (req, res) => {
   }
 
   const systemPrompt = [
-    tutorInstructions,
+    tutorInstructions.replaceAll('Emma',activePersonaName),
     targetLanguageInstruction(targetLanguage),
     difficultyInstruction(difficulty, targetLanguage),
     inputKind === 'button' ? '' : correctionInstruction(correctionLevel, targetLanguage),
@@ -561,6 +562,7 @@ async function generatePracticeObject(systemText, conversationText, maxTokens) {
 
 app.post('/choices', async (req, res) => {
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({ choices: [] });
+  const activePersonaName = selectedPersona(req.body?.persona).name;
   const question = String(req.body?.text || '').trim().slice(0, 900);
   const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
   if (!question) return res.json({ choices: [] });
@@ -568,7 +570,7 @@ app.post('/choices', async (req, res) => {
   const language = practiceLanguageName(targetLanguage);
   const conversationText =
     `RECENT DIALOGUE (context only):\n${recentLearningConversation(req.body?.recentMessages) || '(new conversation)'}` +
-    `\n\nEMMA'S CURRENT QUESTION: ${question}`;
+    `\n\n${activePersonaName.toUpperCase()}'S CURRENT QUESTION: ${question}`;
   const systemText = [
     'You generate UI reply buttons for a language-learning conversation with Emma.',
     `Each option.text MUST be written exclusively in ${language}, in the Latin alphabet.`,
@@ -582,7 +584,7 @@ app.post('/choices', async (req, res) => {
     'Avoid trailing punctuation, numbering, markdown, quotes, explanations and labels.',
     'If Emma asks an open question, give three concrete plausible replies rather than just yes/no.',
     'Return only JSON: {"choices":[{"text":"...","english":"..."},{"text":"...","english":"..."},{"text":"...","english":"..."}]}.'
-  ].join(' ');
+  ].join(' ').replaceAll('Emma',activePersonaName).replaceAll('EMMA',activePersonaName.toUpperCase());
 
   try {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -611,6 +613,7 @@ app.post('/choices', async (req, res) => {
 
 app.post('/tip', async (req, res) => {
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({ tip: null });
+  const activePersonaName = selectedPersona(req.body?.persona).name;
   const question = String(req.body?.text || '').trim().slice(0, 900);
   const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
   if (!question) return res.json({ tip: null });
@@ -630,7 +633,7 @@ app.post('/tip', async (req, res) => {
     'Answer Emma’s specific latest message rather than giving a generic unrelated response.',
     'Use calm, simple, natural daily language: 3–10 words, maximum 12.',
     'Return nothing except this JSON object: {"tip":{"text":"...","english":"..."}}.'
-  ].join(' ');
+  ].join(' ').replaceAll('Emma',activePersonaName).replaceAll('EMMA',activePersonaName.toUpperCase());
 
   try {
     for (let attempt = 0; attempt < 2; attempt++) {
