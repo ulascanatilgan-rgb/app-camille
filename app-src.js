@@ -989,7 +989,7 @@ function setInteractionMode(mode) {
 
 // Never display foreign-script or corrupted model output in a Latin-language lesson.
 function readablePracticeText(value) {
-  const clean = typeof value === 'string' ? value.normalize('NFC').trim() : '';
+  const clean = typeof value === 'string' ? value.normalize('NFC').trim().replace(/\s+/g, ' ') : '';
   return Boolean(clean && clean.length <= 180 &&
     /\p{Script=Latin}/u.test(clean) &&
     /^[\p{Script=Latin}\p{Mark}0-9 .,!?;:'’"()\-–—]+$/u.test(clean));
@@ -1003,10 +1003,32 @@ function primeButtonChoices() {
     requestQuickChoices(last.content);
     return;
   }
-  // A brand-new Anam session has no transcript yet. The greeting shown in
-  // Live Conversation is a real question, so Button mode can work immediately.
-  // When Emma says the actual first question, replace these starter choices.
-  if (!activeSubtitleMessageId) requestQuickChoices(languageConfig().greeting);
+  // Display three usable replies immediately on the first connection, even
+  // before the Anam provider delivers its first transcript or OpenAI replies.
+  // The real first spoken question replaces these starter choices automatically.
+  if (!activeSubtitleMessageId) {
+    const greeting = languageConfig().greeting;
+    if (lastChoiceSource === greeting && quickReplyBar && !quickReplyBar.hidden) return;
+    const initial = {
+      fr: [
+        { text: 'Très bien', english: 'Very well' },
+        { text: 'Ça va', english: 'I’m okay' },
+        { text: 'Pas très bien', english: 'Not very well' }
+      ],
+      nl: [
+        { text: 'Goed, dank je', english: 'Good, thank you' },
+        { text: 'Gaat wel', english: 'So-so' },
+        { text: 'Niet zo goed', english: 'Not so good' }
+      ],
+      en: [
+        { text: 'Project updates', english: '' },
+        { text: 'Planning', english: '' },
+        { text: 'Meetings', english: '' }
+      ]
+    };
+    lastChoiceSource = greeting;
+    renderQuickChoices(initial[targetLanguage] || initial.nl);
+  }
 }
 
 function hideTip() {
@@ -1891,7 +1913,19 @@ function handleStreamEvent(event) {
       hideTip();
       // Remove any starter-greeting options as soon as Emma starts speaking
       // her actual next question. Fresh options appear on completion.
-      if (interactionMode === 'button') clearQuickChoices();
+      if (interactionMode === 'button') {
+        clearQuickChoices();
+        const startedMessageId = event.id;
+        window.setTimeout(() => {
+          // Some Anam personas do not deliver endOfSpeech on their first
+          // response. Use the actual visible subtitle as the fallback.
+          if (!connected || interactionMode !== 'button' ||
+              activeSubtitleMessageId !== startedMessageId ||
+              !quickReplyBar?.hidden || isResponding) return;
+          const latest = subtitleNl?.textContent?.trim();
+          if (latest) requestQuickChoices(latest);
+        }, 4500);
+      }
       partialTranslationSeq += 1;
       lastPartialTranslationAt = 0;
       if (captionsToggle.checked) subtitleEn.textContent = '…';
