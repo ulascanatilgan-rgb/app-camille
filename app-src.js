@@ -1354,6 +1354,7 @@ function beginHistorySession() {
   const history = loadJson(historyKey(), []);
   history.push({
     id: currentHistorySessionId,
+    persona: selectedPersona,
     startedAt: new Date().toISOString(),
     endedAt: null,
     difficulty,
@@ -1372,6 +1373,7 @@ function saveCurrentHistory() {
   if (!session) return;
 
   session.difficulty = difficulty;
+  session.persona = selectedPersona;
   session.messages = currentMessages
     .filter(message => message?.content?.trim())
     .slice(-200)
@@ -1441,6 +1443,7 @@ function getLatestSessionMessages() {
 
   const latest = loadJson(historyKey(), [])
     .filter(session => (!session.language || session.language === targetLanguage))
+    .filter(session => (session.persona || 'emma') === selectedPersona)
     .filter(session => Array.isArray(session.messages) && session.messages.length)
     .slice(-1)[0];
 
@@ -1469,7 +1472,7 @@ function renderSessionHistoryDialog() {
 
     const label = document.createElement('div');
     label.className = 'session-history-role';
-    label.textContent = role === 'user' ? 'YOU' : 'EMMA';
+    label.textContent = role === 'user' ? 'YOU' : personaName().toUpperCase();
 
     const body = document.createElement('div');
     body.className = 'session-history-body';
@@ -1547,7 +1550,7 @@ function renderHistoryDialog() {
       const meta = document.createElement('div');
       meta.className = 'history-session-meta';
       const end = session.endedAt ? `–${formatTime(session.endedAt)}` : '';
-      meta.textContent = `${formatTime(session.startedAt)}${end} · Level ${session.difficulty || 2}`;
+      meta.textContent = `${formatTime(session.startedAt)}${end} · ${personaName(session.persona || 'emma')} · Level ${session.difficulty || 2}`;
       card.appendChild(meta);
 
       for (const message of session.messages) {
@@ -1556,7 +1559,7 @@ function renderHistoryDialog() {
 
         const role = document.createElement('span');
         role.className = 'archive-role';
-        role.textContent = message.role === 'user' ? 'ULAS' : 'EMMA';
+        role.textContent = message.role === 'user' ? 'ULAS' : personaName(session.persona || 'emma').toUpperCase();
 
         const body = document.createElement('div');
         body.className = 'archive-body';
