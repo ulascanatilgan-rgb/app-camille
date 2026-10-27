@@ -2111,6 +2111,7 @@ function attachAnamListeners(client) {
   });
 
   client.addListener(AnamEvent.CONNECTION_CLOSED, () => {
+    if(client !== anamClient) return; // late close from previously chosen persona
     endHistorySession();
     resetUiAfterDisconnect();
   });
@@ -2124,24 +2125,25 @@ async function connect() {
   if (connected || connecting) return;
 
   connecting = true;
+  updatePersonaUi();
   runtimeContextApplied = false;
   micButton.disabled = true;
   endButton.disabled = true;
   micLabel.textContent = 'Connecting…';
   setStatus('Connecting Anam…');
   avatarBadge.textContent = 'CONNECTING';
-  avatarPlaceholderText.textContent = 'Connecting Emma…';
+  avatarPlaceholderText.textContent = 'Connecting '+personaName()+'…';
 
   try {
     const response = await fetch('/anam-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: '{}',
+      body: JSON.stringify({persona:selectedPersona}),
       cache: 'no-store'
     });
 
     const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.sessionToken) {
+    if (!response.ok || !data.sessionToken || data.persona?.toLowerCase() !== selectedPersona) {
       const detail = data.anamMessage
         ? `${data.error || 'Anam error'} — ${data.anamMessage}`
         : (data.error || 'Could not create Anam session.');
@@ -2163,6 +2165,7 @@ async function connect() {
     if (!connected) {
       connected = true;
       connecting = false;
+      updatePersonaUi();
       document.body.classList.add('conversation-live');
       document.body.classList.remove('level-expanded');
       micButton.disabled = false;
@@ -2193,6 +2196,7 @@ async function connect() {
     connecting = false;
     connected = false;
     customLlmMode = false;
+    updatePersonaUi();
     micButton.disabled = false;
     micLabel.textContent = 'Try again';
     endButton.disabled = true;
@@ -2263,6 +2267,29 @@ async function disconnect() {
 micButton.addEventListener('click', () => {
   primePopAudio();
   if (!connected && !connecting) connect();
+});
+
+async function choosePersona(key) {
+  if(!Object.hasOwn(PERSONA_NAMES,key) || selectedPersona===key || switchingPersona || connecting) return;
+  switchingPersona = true;
+  // update button states without replacing any current video stream
+  for(const b of personaButtons)b.disabled=true;
+  const live=connected || Boolean(anamClient);
+  try {
+    if(live) await disconnect();
+    selectedPersona=key;
+    localStorage.setItem(PERSONA_KEY,key);
+    updateLanguageUi(true);
+    updatePersonaUi();
+    if(live) await connect();
+  } finally {
+    switchingPersona=false;
+    updatePersonaUi();
+  }
+}
+personaPicker?.addEventListener('click',event=>{
+  const button=event.target.closest('button[data-persona]');
+  if(button && personaPicker.contains(button)) choosePersona(button.dataset.persona);
 });
 
 typeToggle?.addEventListener('click', () => setInteractionMode('type'));
@@ -2435,6 +2462,7 @@ updateDifficultyUi();
 updateLanguageUi(true);
 updateInteractionModeUi();
 setAvatarLive(false);
+updatePersonaUi();
 
 // ---- PWA install support ----
 const installButton = document.getElementById('installButton');
