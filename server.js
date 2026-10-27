@@ -498,100 +498,148 @@ app.post('/chat', async (req, res) => {
 });
 
 
-app.post('/choices', async (req, res) => {
-  if (!process.env.OPENAI_API_KEY) return res.status(500).json({ choices: [] });
-  const text = String(req.body?.text || '').trim();
-  const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
-  const recentMessages = Array.isArray(req.body?.recentMessages)
-    ? req.body.recentMessages.filter(m => m && typeof m.content === 'string')
-        .slice(-6).map(m => `${m.role === 'user' ? 'USER' : 'EMMA'}: ${m.content.trim()}`).join('\n')
+
+/**
+ * The user is learning a Latin-script language. Reject model replies with
+ * Chinese/Japanese/Korean, Arabic, Cyrillic, emoji or control characters
+ * instead of accidentally displaying those glyphs as a learner suggestion.
+ */
+function cleanPracticePhrase(value, maxWords = 12) {
+  if (typeof value !== 'string') return '';
+  const text = value.normalize('NFC').trim().replace(/\s+/g, ' ');
+  if (!text || text.length > 180) return '';
+  if (!/^[\p{Script=Latin}\p{Mark}0-9 .,!?;:'’"()\-–—]+$/u.test(text)) return '';
+  if (!/\p{Script=Latin}/u.test(text)) return '';
+  if (text.split(/\s+/).length > maxWords) return '';
+  return text;
+}
+
+function recentLearningConversation(raw) {
+  return Array.isArray(raw)
+    ? raw.filter(m => m && typeof m.content === 'string')
+      .slice(-6)
+      .map(m => `${m.role === 'user' ? 'USER' : 'EMMA'}: ${String(m.content).trim().slice(0, 500)}`)
+      .join('\n')
     : '';
-  if (!text) return res.json({ choices: [] });
-  const language = targetLanguage === 'fr' ? 'natural everyday French'
-    : targetLanguage === 'en' ? 'natural contextual English'
-    : 'natural everyday Belgian Dutch/Flemish';
+}
+
+function practiceLanguageName(code) {
+  return code === 'fr' ? 'French (France)' : code === 'en' ? 'English' : 'Belgian Dutch (Flemish)';
+}
+
+async function generatePracticeObject(systemText, conversationText, maxTokens) {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      temperature: 0.25,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: systemText },
+        { role: 'user', content: conversationText }
+      ],
+      max_tokens: maxTokens
+    })
+  });
+  if (!response.ok) throw new Error(`OpenAI returned HTTP ${response.status}`);
+  const data = await response.json();
+  return JSON.parse(data.choices?.[0]?.message?.content || '{}');
+}
+
+app.post('/choices', async (req, res) => {
+  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ choices: [] });
+  const question = String(req.body?.text || '').trim().slice(0, 900);
+  const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
+  if (!question) return res.json({ choices: [] });
+
+  const language = practiceLanguageName(targetLanguage);
+  const conversationText =
+    `RECENT DIALOGUE (context only):\n${recentLearningConversation(req.body?.recentMessages) || '(new conversation)'}` +
+    `\n\nEMMA'S CURRENT QUESTION: ${question}`;
+  const systemText = [
+    'You generate UI reply buttons for a language-learning conversation with Emma.',
+    `Each option.text MUST be written exclusively in ${language}, in the Latin alphabet.`,
+    'Each option.english MUST be its exact natural English translation (unless the target is English).',
+    'Only produce normal Latin characters: accents such as é, à, ë and ç are allowed.',
+    'Never output Chinese, Japanese, Korean, Cyrillic, Arabic, Greek, emojis, other scripts, or phonetic symbols.',
+    'Regardless of the language used in the conversation context, obey the specified TARGET language.',
+    'Return EXACTLY THREE distinct, meaningful, directly usable responses to Emma’s latest question.',
+    'Each answer must be short: 1–4 words; English translation 1–6 words.',
+    'Offer genuinely different positions or replies (not close synonyms).',
+    'Avoid trailing punctuation, numbering, markdown, quotes, explanations and labels.',
+    'If Emma asks an open question, give three concrete plausible replies rather than just yes/no.',
+    'Return only JSON: {"choices":[{"text":"...","english":"..."},{"text":"...","english":"..."},{"text":"...","english":"..."}]}.'
+  ].join(' ');
+
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini', temperature: 0.35,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: [
-            'Create exactly THREE distinct, plausible, very short replies to Emma’s latest question.',
-            `Each text must be in ${language} and use only 1–4 words.`,
-            'Each english property must give the accurate natural English translation in 1–6 words.',
-            'Provide genuinely different answers, not three synonyms. No emojis, labels, commentary or trailing punctuation.',
-            'If no plausible direct answer exists, return {"choices":[]}.',
-            'Otherwise output only JSON: {"choices":[{"text":"...","english":"..."},{"text":"...","english":"..."},{"text":"...","english":"..."}]}.'
-          ].join(' ') },
-          { role: 'user', content: `Recent dialogue:\n${recentMessages || '(none)'}\n\nCamille just said:\n${text}` }
-        ],
-        max_tokens: 200
-      })
-    });
-    if (!response.ok) return res.json({ choices: [] });
-    const data = await response.json();
-    let parsed = {};
-    try { parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}'); } catch {}
-    const choices = [], seen = new Set();
-    for (const choice of Array.isArray(parsed.choices) ? parsed.choices : []) {
-      if (!choice || typeof choice !== 'object') continue;
-      const text = String(choice.text || '').trim().replace(/[.!?;,]+$/g, '').split(/\s+/).slice(0,4).join(' ');
-      const english = String(choice.english || '').trim().replace(/[.!?;,]+$/g, '').split(/\s+/).slice(0,6).join(' ');
-      if (!text || (targetLanguage !== 'en' && !english) || seen.has(text.toLocaleLowerCase())) continue;
-      seen.add(text.toLocaleLowerCase());
-      choices.push({ text, english: targetLanguage === 'en' ? '' : english });
-      if (choices.length === 3) break;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const parsed = await generatePracticeObject(
+        systemText + (attempt ? ' Previous answer failed validation. Respect the target language and Latin script strictly.' : ''),
+        conversationText, 210
+      );
+      const seen = new Set(), choices = [];
+      for (const option of Array.isArray(parsed.choices) ? parsed.choices : []) {
+        const text = cleanPracticePhrase(option?.text, 4).replace(/[.!?;,]+$/g, '');
+        const english = cleanPracticePhrase(option?.english, 6).replace(/[.!?;,]+$/g, '');
+        if (!text || (targetLanguage !== 'en' && !english)) continue;
+        const key = text.toLocaleLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        choices.push({ text, english: targetLanguage === 'en' ? '' : english });
+      }
+      if (choices.length === 3) return res.json({ choices });
     }
-    return res.json({ choices: choices.length === 3 ? choices : [] });
+    return res.json({ choices: [] });
   } catch (error) {
-    console.error('Quick reply generation failed:', error);
-    return res.status(500).json({ choices: [] });
+    console.error('Quick-reply generation failed:', error);
+    return res.status(502).json({ choices: [] });
   }
 });
 
 app.post('/tip', async (req, res) => {
-  if (!process.env.OPENAI_API_KEY) return res.status(500).json({ tip: null });
-  const text = String(req.body?.text || '').trim().slice(0, 900);
+  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ tip: null });
+  const question = String(req.body?.text || '').trim().slice(0, 900);
   const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
-  if (!text) return res.json({ tip: null });
-  const recentMessages = Array.isArray(req.body?.recentMessages)
-    ? req.body.recentMessages.filter(m => m && typeof m.content === 'string')
-        .slice(-6).map(m => `${m.role === 'user' ? 'USER' : 'EMMA'}: ${m.content.trim()}`).join('\n')
-    : '';
-  const language = targetLanguage === 'fr' ? 'French' : targetLanguage === 'en' ? 'English' : 'Belgian Dutch/Flemish';
+  if (!question) return res.json({ tip: null });
+
+  const language = practiceLanguageName(targetLanguage);
+  const conversationText =
+    `RECENT DIALOGUE (context only):\n${recentLearningConversation(req.body?.recentMessages) || '(new conversation)'}` +
+    `\n\nEMMA'S LATEST MESSAGE: ${question}`;
+  const systemText = [
+    'You are the small optional TIP feature in the Emma language-learning application.',
+    `Suggest exactly ONE SHORT answer the learner could personally SPEAK or TYPE in ${language}.`,
+    'The field tip.text MUST be exclusively in the target language using its normal Latin alphabet.',
+    'The field tip.english MUST be the accurate English translation.',
+    'Never answer in Mandarin, Chinese, Japanese, Korean, Cyrillic, Arabic, Greek, other scripts, emoji or phonetic transcription.',
+    'Accented Latin letters are fine. NEVER copy foreign scripts even if present in conversation context.',
+    'Do not confuse the target language with the language of any quoted context.',
+    'Answer Emma’s specific latest message rather than giving a generic unrelated response.',
+    'Use calm, simple, natural daily language: 3–10 words, maximum 12.',
+    'Return nothing except this JSON object: {"tip":{"text":"...","english":"..."}}.'
+  ].join(' ');
+
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini', temperature: 0.45,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: [
-            `Generate ONE natural response in ${language} that the learner could say or type to reply to Emma.`,
-            'Keep it concise, ideally 3–10 words and at most 12. If the latest message is not a question, offer a brief natural reaction.',
-            'Match the learner’s language level. Provide its accurate natural English translation.',
-            'Do not take any action on behalf of the learner. Output JSON only: {"tip":{"text":"...","english":"..."}}.'
-          ].join(' ') },
-          { role: 'user', content: `Recent dialogue:\n${recentMessages || '(none)'}\n\nCamille just said:\n${text}` }
-        ],
-        max_tokens: 130
-      })
-    });
-    if (!response.ok) return res.status(502).json({ tip: null });
-    const data = await response.json();
-    let parsed = {};
-    try { parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}'); } catch {}
-    const answer = String(parsed.tip?.text || '').trim();
-    const english = String(parsed.tip?.english || '').trim();
-    if (!answer || (targetLanguage !== 'en' && !english)) return res.json({ tip: null });
-    return res.json({ tip: { text: answer, english: targetLanguage === 'en' ? '' : english } });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const parsed = await generatePracticeObject(
+        systemText + (attempt ? ' REPAIR: previous output had wrong script or language. Latin script only, chosen target language only.' : ''),
+        conversationText, 140
+      );
+      const text = cleanPracticePhrase(parsed?.tip?.text, 12);
+      const english = cleanPracticePhrase(parsed?.tip?.english, 18);
+      if (text && (targetLanguage === 'en' || english)) {
+        return res.json({ tip: { text, english: targetLanguage === 'en' ? '' : english } });
+      }
+    }
+    // Never display garbled or mismatched characters; the optional Tip can fail safely.
+    return res.json({ tip: null });
   } catch (error) {
     console.error('Tip generation failed:', error);
-    return res.status(500).json({ tip: null });
+    return res.status(502).json({ tip: null });
   }
 });
 
