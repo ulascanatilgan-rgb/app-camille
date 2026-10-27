@@ -1,4 +1,4 @@
-const CACHE = 'emma-initial-buttons-tip-v40';
+const CACHE = 'ecl-triple-persona-v41';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -6,6 +6,9 @@ const STATIC_ASSETS = [
   '/app.bundle.js',
   '/manifest.webmanifest',
   '/emma-portrait.jpg',
+  '/ecl-avatar-image/emma.jpg',
+  '/ecl-avatar-image/charlotte.jpg',
+  '/ecl-avatar-image/louis.jpg',
   '/icon-192.png',
   '/icon-512.png',
   '/apple-touch-icon.png',
