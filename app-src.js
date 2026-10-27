@@ -254,7 +254,7 @@ function updateLanguageUi(resetSubtitle = false) {
   practiceDescription.textContent = cfg.description;
   if (avatarGoal) avatarGoal.textContent = cfg.goal;
   levelLabel.textContent = cfg.level;
-  modeHint.textContent = cfg.hint;
+  modeHint.textContent = cfg.hint.replaceAll('Emma',personaName());
   typeInput.placeholder = cfg.placeholder;
   const displayMeta = targetLanguage === 'en' ? englishDifficultyMeta[difficulty] : difficultyMeta[difficulty];
   difficultyName.textContent = `${displayMeta.cefr} · ${displayMeta.name}`;
@@ -988,7 +988,7 @@ function syncRecentConversationContext() {
     .filter(message => message?.content?.trim())
     .slice(-8)
     .map(message => {
-      const role = message.role === 'persona' ? 'EMMA' : 'ULAS';
+      const role = message.role === 'persona' ? personaName().toUpperCase() : 'ULAS';
       return `${role}: ${message.content.trim()}`;
     })
     .join('\n');
@@ -1108,7 +1108,7 @@ async function showTip() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
-      body: JSON.stringify({ text: source, targetLanguage, recentMessages })
+      body: JSON.stringify({ text: source, targetLanguage, persona:selectedPersona, recentMessages })
     });
     if (!response.ok) throw new Error('Tip unavailable');
     const data = await response.json();
@@ -1203,6 +1203,7 @@ async function requestQuickChoices(camilleText) {
       body: JSON.stringify({
         text: clean,
         targetLanguage,
+        persona:selectedPersona,
         recentMessages
       })
     });
@@ -1320,7 +1321,7 @@ function buildRuntimeContext() {
     'Every few turns, proactively introduce one stronger or more natural alternative and one reusable phrase. Then ask exactly one simple question.',
     `On every user turn, first restate the ENTIRE intended sentence in natural spoken ${target}, not just one word. Then answer immediately.`,
     'Use his real life naturally when useful: ING/IT, Hondinn, job interviews, project work, investing, business, cars and renovation.'
-  ].join(' ');
+  ].join(' ').replaceAll('Emma',personaName());
 }
 
 function pushLearningContext() {
@@ -1698,7 +1699,7 @@ function renderWordsDialog() {
   if (!learnedWords.length) {
     const empty = document.createElement('div');
     empty.className = 'empty-state';
-    empty.textContent = 'New words from Emma will appear here.';
+    empty.textContent = 'New words from ECL conversations will appear here.';
     wordsContent.appendChild(empty);
     return;
   }
@@ -1757,7 +1758,7 @@ async function sendTypedTurn(text, inputKind = 'type') {
   renderMessages(currentMessages);
 
   isResponding = true;
-  setStatus('Emma denkt…');
+  setStatus(personaName()+' denkt…');
   activeChatAbort = new AbortController();
   activeSubtitleMessageId = personaId;
 
@@ -1775,6 +1776,7 @@ async function sendTypedTurn(text, inputKind = 'type') {
         difficulty,
         correctionLevel: correctionLevel.value || 'medium',
         targetLanguage,
+        persona:selectedPersona,
         choiceModeEnabled,
         interactionMode,
         inputKind
@@ -1834,7 +1836,7 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
   if (!anamClient || !customLlmMode || isResponding) return;
 
   isResponding = true;
-  setStatus('Emma denkt…');
+  setStatus(personaName()+' denkt…');
   activeChatAbort = new AbortController();
 
   try {
@@ -1848,6 +1850,7 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
         difficulty,
         correctionLevel: correctionLevel.value || 'medium',
         targetLanguage,
+        persona:selectedPersona,
         choiceModeEnabled,
         interactionMode,
         inputKind: 'speak'
