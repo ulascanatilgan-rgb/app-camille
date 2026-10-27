@@ -24,6 +24,10 @@ const avatarVideo = document.getElementById('avatarVideo');
 const avatarPlaceholder = document.getElementById('avatarPlaceholder');
 const avatarPlaceholderText = document.getElementById('avatarPlaceholderText');
 const avatarBadge = document.getElementById('avatarBadge');
+const personaPreview = document.getElementById('personaPreview');
+const personaPicker = document.getElementById('personaPicker');
+const personaButtons = [...document.querySelectorAll('.persona-select')];
+const personaVoiceNotice = document.getElementById('personaVoiceNotice');
 
 const difficultySlider = document.getElementById('difficultySlider');
 const difficultyValue = document.getElementById('difficultyValue');
@@ -79,6 +83,12 @@ const LEVEL_KEY = 'camille.difficulty.v1';
 const LANGUAGE_KEY = 'camille.targetLanguage.v1';
 const CHOICE_MODE_KEY = 'camille.choiceMode.v1';
 const INPUT_MODE_KEY = 'camille.inputMode.v1';
+const PERSONA_KEY = 'ecl.selectedPersona.v1';
+const PERSONA_NAMES = Object.freeze({emma:'Emma',charlotte:'Charlotte',louis:'Louis'});
+const storedPersona = localStorage.getItem(PERSONA_KEY);
+let selectedPersona = Object.hasOwn(PERSONA_NAMES,storedPersona) ? storedPersona : 'emma';
+let switchingPersona = false;
+function personaName(key=selectedPersona){return PERSONA_NAMES[key] || 'Emma';}
 
 let anamClient = null;
 let connected = false;
@@ -203,6 +213,35 @@ function languageConfig() {
   return languageUi[targetLanguage] || languageUi.nl;
 }
 
+function updatePersonaUi() {
+  const name = personaName();
+  for(const button of personaButtons){
+    const active = button.dataset.persona === selectedPersona;
+    button.classList.toggle('active',active);
+    button.setAttribute('aria-pressed',String(active));
+    button.disabled = switchingPersona || connecting;
+  }
+  document.querySelector('.avatar-column')?.setAttribute('aria-label', name+' live Anam avatar');
+  if(personaPreview){
+    personaPreview.onerror = () => {
+      personaPreview.onerror = null;
+      const fallback = selectedPersona === 'emma' ? '/emma-portrait.jpg' :
+        'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 520">'+
+          '<rect width="360" height="520" fill="#292725"/>'+
+          '<circle cx="180" cy="188" r="70" fill="#766e65"/>'+
+          '<path d="M66 505v-70c0-78 51-130 114-130s114 52 114 130v70" fill="#766e65"/>'+
+          '<text x="180" y="492" fill="#fff5e8" font-family="sans-serif" font-size="26" text-anchor="middle">'+name+'</text></svg>');
+      personaPreview.src = fallback;
+    };
+    personaPreview.src = '/ecl-avatar-image/'+selectedPersona+'.jpg?v=3';
+    personaPreview.alt = name+' avatar';
+  }
+  const label=document.querySelector('.live-camille .live-speaker-label');
+  if(label)label.textContent=name.toUpperCase();
+  if(personaVoiceNotice)personaVoiceNotice.textContent='Voice provided by '+name+'\'s own Anam persona.';
+  if(!connected && !connecting && avatarPlaceholderText)avatarPlaceholderText.textContent=name+' is ready to talk.';
+}
 function updateLanguageUi(resetSubtitle = false) {
   const cfg = languageConfig();
   document.documentElement.lang = targetLanguage;
