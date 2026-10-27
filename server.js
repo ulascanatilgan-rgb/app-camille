@@ -621,7 +621,7 @@ app.post('/tip', async (req, res) => {
   const language = practiceLanguageName(targetLanguage);
   const conversationText =
     `RECENT DIALOGUE (context only):\n${recentLearningConversation(req.body?.recentMessages) || '(new conversation)'}` +
-    `\n\nEMMA'S LATEST MESSAGE: ${question}`;
+    `\n\n${activePersonaName.toUpperCase()}'S LATEST MESSAGE: ${question}`;
   const systemText = [
     'You are the small optional TIP feature in the Emma language-learning application.',
     `Suggest exactly ONE SHORT answer the learner could personally SPEAK or TYPE in ${language}.`,
