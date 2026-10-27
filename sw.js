@@ -1,4 +1,4 @@
-const CACHE = 'emma-anam-native-voice-v39';
+const CACHE = 'emma-initial-buttons-tip-v40';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
