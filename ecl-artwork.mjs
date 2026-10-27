@@ -75,7 +75,7 @@ function photoUrlCandidates(obj) {
   const d=obj.data || obj.persona || obj.avatar || obj;
   const props=['imageUrl','imageURL','image_url','thumbnailUrl','thumbnail_url',
     'previewImageUrl','preview_image_url','avatarImageUrl','avatar_image_url',
-    'photoUrl','photo_url','portraitUrl','portrait_url','image','thumbnail','previewImage'];
+    'photoUrl','photo_url','portraitUrl','portrait_url','sourceImageUrl','source_image_url','image','thumbnail','previewImage'];
   const urls=[];
   for (const node of [obj,d,d.avatar,d.assets,d.media,d.preview,d.metadata]) {
     if(!node || typeof node!=='object') continue;
