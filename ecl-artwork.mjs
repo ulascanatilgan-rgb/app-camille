@@ -52,7 +52,8 @@ async function composeIcon(photoMap, size) {
     <text x="256" y="459" text-anchor="middle" font-family="Arial, Helvetica, sans-serif"
       font-size="67" font-weight="700" letter-spacing="13" fill="#f8f2e8">ECL</text>
   </svg>`);
-  return sharp(background).composite(images).resize(size,size).png().toBuffer();
+  const composed=await sharp(background).composite(images).png().toBuffer();
+  return sharp(composed).resize(size,size).png().toBuffer();
 }
 
 export async function writeEclArtwork(overrides={}) {
