@@ -23,7 +23,14 @@ app.use(express.static(__dirname));
 const ANAM_API_BASE = 'https://api.anam.ai/v1';
  // Explicitly select the Emma avatar for Emma. Keep this independent of
  // the previously configured ANAM_PERSONA_ID environment variable.
-const EMMA_ANAM_PERSONA_ID = '132ee9b2-3fd7-47ba-9318-c1da8e017f47';
+const ECL_PERSONAS = Object.freeze({
+  emma: { name: 'Emma', personaId: 'dfaf9983-7b1c-4f02-a51b-d536625e0765' },
+  charlotte: { name: 'Charlotte', personaId: '06768d11-b37e-4b11-ab7f-c59660a33f10' },
+  louis: { name: 'Louis', personaId: '50a21ccf-fddf-444a-b303-8ac067bd6be2' }
+});
+function selectedPersona(key) {
+  return ECL_PERSONAS[typeof key === 'string' ? key.toLowerCase() : ''] || ECL_PERSONAS.emma;
+}
 
 const tutorInstructions = [
   "You are Emma, Ulas Atilgan's long-term language conversation coach and practical speaking partner.",
@@ -267,14 +274,15 @@ function safeAnamError(error) {
   };
 }
 
-app.post('/anam-session', async (_req, res) => {
+app.post('/anam-session', async (req, res) => {
   // Each Start creates a new Anam session token from the current published
   // Emma persona. Never reuse an earlier session after its Lab settings change.
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
   const apiKey = process.env.ANAM_API_KEY;
-  const personaId = EMMA_ANAM_PERSONA_ID;
+  const persona = selectedPersona(req.body?.persona);
+  const personaId = persona.personaId;
 
   if (!apiKey || !personaId) {
     return res.status(500).json({
@@ -284,7 +292,7 @@ app.post('/anam-session', async (_req, res) => {
 
   try {
     const session = await buildAnamSession(apiKey, personaId);
-    return res.json(session);
+    return res.json({ ...session, persona: persona.name });
   } catch (error) {
     const safe = safeAnamError(error);
     console.error('Anam session error:', error?.detail || error);
@@ -296,9 +304,9 @@ app.post('/anam-session', async (_req, res) => {
   }
 });
 
-app.get('/anam-health', async (_req, res) => {
+app.get('/anam-health', async (req, res) => {
   const apiKey = process.env.ANAM_API_KEY;
-  const personaId = EMMA_ANAM_PERSONA_ID;
+  const personaId = selectedPersona(req.query?.persona).personaId;
 
   if (!apiKey || !personaId) {
     return res.status(500).json({
@@ -782,7 +790,7 @@ app.get('/health', (_req, res) => {
   res.json({
     ok: true,
     openai: Boolean(process.env.OPENAI_API_KEY),
-    anam: Boolean(process.env.ANAM_API_KEY && EMMA_ANAM_PERSONA_ID)
+    anam: Boolean(process.env.ANAM_API_KEY && ECL_PERSONAS.emma.personaId)
   });
 });
 
