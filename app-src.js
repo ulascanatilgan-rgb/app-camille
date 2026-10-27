@@ -105,6 +105,7 @@ let interactionMode = ['speak', 'type', 'button'].includes(savedInputMode)
 let choiceModeEnabled = interactionMode === 'button';
 let choiceGenerationSeq = 0;
 let lastChoiceSource = '';
+let pendingChoiceSource = '';
 let tipRequestSeq = 0;
 let tipAbortController = null;
 let cachedTip = null;
@@ -982,11 +983,30 @@ function setInteractionMode(mode) {
     } catch {}
     pushLearningContext();
 
-    if (mode === 'button' && !isResponding) {
-      const currentCamilleText = subtitleNl?.textContent?.trim() || '';
-      if (currentCamilleText) requestQuickChoices(currentCamilleText);
-    }
+    if (mode === 'button' && !isResponding) primeButtonChoices();
   }
+}
+
+// Never display foreign-script or corrupted model output in a Latin-language lesson.
+function readablePracticeText(value) {
+  const clean = typeof value === 'string' ? value.normalize('NFC').trim() : '';
+  return Boolean(clean && clean.length <= 180 &&
+    /\p{Script=Latin}/u.test(clean) &&
+    /^[\p{Script=Latin}\p{Mark}0-9 .,!?;:'’"()\-–—]+$/u.test(clean));
+}
+
+function primeButtonChoices() {
+  if (!connected || interactionMode !== 'button' || isResponding) return;
+  const last = currentMessages[currentMessages.length - 1];
+  if (last?.role === 'user') return; // A new answer is still being processed.
+  if (last?.role === 'persona') {
+    requestQuickChoices(last.content);
+    return;
+  }
+  // A brand-new Anam session has no transcript yet. The greeting shown in
+  // Live Conversation is a real question, so Button mode can work immediately.
+  // When Emma says the actual first question, replace these starter choices.
+  if (!activeSubtitleMessageId) requestQuickChoices(languageConfig().greeting);
 }
 
 function hideTip() {
@@ -1032,13 +1052,16 @@ async function showTip() {
     if (!response.ok) throw new Error('Tip unavailable');
     const data = await response.json();
     if (seq !== tipRequestSeq || tipPanel.hidden) return;
-    if (!data.tip?.text) throw new Error('Missing tip');
+    if (!data.tip?.text || !readablePracticeText(data.tip.text) ||
+        (targetLanguage !== 'en' && !readablePracticeText(data.tip.english))) {
+      throw new Error('Invalid or unavailable suggestion');
+    }
     cachedTip = { key: cacheKey, text: String(data.tip.text).trim(), english: String(data.tip.english || '').trim() };
     tipTarget.textContent = cachedTip.text;
     tipEnglish.textContent = targetLanguage === 'en' ? '' : cachedTip.english;
   } catch (error) {
     if (error?.name === 'AbortError' || seq !== tipRequestSeq) return;
-    tipTarget.textContent = 'No suggestion available. Try again.';
+    tipTarget.textContent = 'No valid suggestion. Tap Tip to retry.';
     tipEnglish.textContent = '';
   } finally {
     if (seq === tipRequestSeq) tipAbortController = null;
@@ -1048,6 +1071,7 @@ async function showTip() {
 function clearQuickChoices() {
   choiceGenerationSeq += 1;
   lastChoiceSource = '';
+  pendingChoiceSource = '';
   if (!quickReplyBar) return;
   quickReplyBar.innerHTML = '';
   quickReplyBar.hidden = true;
@@ -1063,7 +1087,8 @@ function renderQuickChoices(choices) {
   for (const choice of choices) {
     const text = String(typeof choice === 'string' ? choice : choice?.text || '').trim();
     const english = String(typeof choice === 'string' ? '' : choice?.english || '').trim();
-    if (!text) continue;
+    if (!readablePracticeText(text) ||
+        (targetLanguage !== 'en' && !readablePracticeText(english))) continue;
 
     const button = document.createElement('button');
     button.type = 'button';
@@ -1097,9 +1122,10 @@ async function requestQuickChoices(camilleText) {
     return;
   }
 
-  if (clean === lastChoiceSource && quickReplyBar && !quickReplyBar.hidden) return;
+  if (clean === pendingChoiceSource ||
+      (clean === lastChoiceSource && quickReplyBar && !quickReplyBar.hidden)) return;
   lastChoiceSource = clean;
-
+  pendingChoiceSource = clean;
   const seq = ++choiceGenerationSeq;
   try {
     const recentMessages = currentMessages
@@ -1128,6 +1154,8 @@ async function requestQuickChoices(camilleText) {
   } catch (error) {
     if (seq === choiceGenerationSeq) clearQuickChoices();
     console.warn('Quick reply generation failed:', error);
+  } finally {
+    if (pendingChoiceSource === clean) pendingChoiceSource = '';
   }
 }
 
@@ -1801,6 +1829,14 @@ async function handleMessagesUpdated(messages) {
   saveCurrentHistory();
   renderMessages(currentMessages);
 
+  // Published Anam personas may deliver the first turn via history events,
+  // without a matching end-of-speech stream event. Generate Button replies
+  // for that first completed Emma turn as well.
+  if (interactionMode === 'button' && !isResponding &&
+      currentMessages[currentMessages.length - 1]?.role === 'persona') {
+    primeButtonChoices();
+  }
+
   if (!customLlmMode) return;
 
   const latestUserMessage = [...currentMessages]
@@ -1853,6 +1889,9 @@ function handleStreamEvent(event) {
 
     if (isNewMessage) {
       hideTip();
+      // Remove any starter-greeting options as soon as Emma starts speaking
+      // her actual next question. Fresh options appear on completion.
+      if (interactionMode === 'button') clearQuickChoices();
       partialTranslationSeq += 1;
       lastPartialTranslationAt = 0;
       if (captionsToggle.checked) subtitleEn.textContent = '…';
@@ -1925,6 +1964,8 @@ function attachAnamListeners(client) {
     applyInteractionAudioState();
     try { anamClient?.addContext(interactionModeInstruction()); } catch {}
     setStatus(languageConfig().ready);
+    // Works even when Button was selected before Start was pressed.
+    window.setTimeout(primeButtonChoices, 250);
   });
 
   client.addListener(AnamEvent.VIDEO_PLAY_STARTED, () => {
@@ -1936,6 +1977,7 @@ function attachAnamListeners(client) {
       try { anamClient?.addContext(liveLanguageLockInstruction()); } catch {}
       pushLearningContext();
     }, 160);
+    window.setTimeout(primeButtonChoices, 500);
   });
 
   client.addListener(AnamEvent.MESSAGE_STREAM_EVENT_RECEIVED, handleStreamEvent);
@@ -2062,6 +2104,7 @@ async function connect() {
 
     beginHistorySession();
     saveCurrentHistory();
+    window.setTimeout(primeButtonChoices, 350);
     try { anamClient?.addContext(liveLanguageLockInstruction()); } catch {}
     pushLearningContext();
     setTimeout(pushLearningContext, 180);
