@@ -6,13 +6,13 @@
   <meta name="theme-color" content="#fcfbf7" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="Emma" />
+  <meta name="apple-mobile-web-app-title" content="ECL" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="icon" type="image/png" href="/favicon-64.png" />
-  <title>Emma — Language Coach</title>
-  <link rel="stylesheet" href="/styles.css?v=emma-anam-voice-20261026" />
+  <title>ECL — Emma, Charlotte &amp; Louis</title>
+  <link rel="stylesheet" href="/styles.css?v=ecl-three-personas-20261027" />
 </head>
 <body>
   <main class="app-shell">
@@ -26,8 +26,13 @@
         </button>
       </div>
 
-      <div class="center-brand" aria-label="Emma">
-        <span>Emma</span>
+      <div class="center-brand ecl-brand" aria-label="ECL language companions">
+        <span class="ecl-wordmark">ECL</span>
+        <div id="personaPicker" class="persona-picker" role="group" aria-label="Choose avatar">
+          <button class="persona-select active" type="button" data-persona="emma" aria-pressed="true">Emma</button>
+          <button class="persona-select" type="button" data-persona="charlotte" aria-pressed="false">Charlotte</button>
+          <button class="persona-select" type="button" data-persona="louis" aria-pressed="false">Louis</button>
+        </div>
       </div>
 
       <div class="header-status">
@@ -40,10 +45,10 @@
     </header>
 
     <section class="workspace">
-      <section class="avatar-column" aria-label="Emma live avatar">
+      <section id="avatarColumn" class="avatar-column" aria-label="Selected Anam live avatar">
         <div id="portraitWrap" class="portrait-wrap">
           <div id="avatarPlaceholder" class="avatar-placeholder">
-            <img class="emma-placeholder-image" src="/emma-portrait.jpg" alt="Emma portrait" />
+            <img id="personaPreview" class="emma-placeholder-image" src="/emma-portrait.jpg" alt="Emma portrait" />
             <div id="avatarPlaceholderText" class="placeholder-text">Emma is ready to talk.</div>
           </div>
 
@@ -263,11 +268,11 @@
         <input id="captionsToggle" type="checkbox" checked />
         Show bilingual subtitles
       </label>
-      <p class="voice-provider-notice">Voice provided by Emma’s Anam avatar.</p>
+      <p id="personaVoiceNotice" class="voice-provider-notice">Voice provided by your selected Anam avatar.</p>
       <button class="close-settings">Close</button>
     </form>
   </dialog>
 
-  <script src="/app.bundle.js?v=emma-start-buttons-tip-20261027" type="module"></script>
+  <script src="/app.bundle.js?v=ecl-three-personas-20261027" type="module"></script>
 </body>
 </html>
