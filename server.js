@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { refreshAnamEclArtwork } from './ecl-artwork.mjs';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -11,7 +12,7 @@ const port = process.env.PORT || 3000;
 app.use(express.json({ limit: '1mb' }));
 // Prevent installed iOS PWAs from keeping old HTML, scripts and styles.
 app.use((req, res, next) => {
-  if (req.method === 'GET' && (/^\/$/.test(req.path) || /\.(?:html|js|css|webmanifest)$/.test(req.path) || req.path === '/sw.js')) {
+  if (req.method === 'GET' && (/^\/$/.test(req.path) || /\.(?:html|js|css|webmanifest|png|jpg|jpeg)$/.test(req.path) || req.path === '/sw.js')) {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
@@ -795,5 +796,10 @@ app.get('/health', (_req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Emma is ready at http://localhost:${port}`);
+  console.log(`ECL — Emma, Charlotte & Louis ready at http://localhost:${port}`);
+  // Fetch the actual, account-specific avatar photos when Anam exposes them.
+  // This enriches the PWA icon without delaying first conversation startup.
+  void refreshAnamEclArtwork(process.env.ANAM_API_KEY, ECL_PERSONAS)
+    .then(keys => console.log('ECL Anam profile photos refreshed:',keys.join(', ')||'none available'))
+    .catch(error => console.warn('ECL avatar artwork refresh unavailable:',error.message));
 });
