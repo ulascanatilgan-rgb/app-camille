@@ -399,7 +399,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       button.className='news-history-item';
       const heading=document.createElement('strong');heading.textContent=story.title;
       const meta=document.createElement('span');meta.textContent=
-        (story.source||'News')+' · '+new Date(story.archivedAt||story.publishedAt||Date.now()).toLocaleDateString();
+        (story.source||'News')+' · '+new Date(story.publishedAt||story.archivedAt||Date.now()).toLocaleDateString();
       button.append(heading,meta);
       button.addEventListener('click',()=>{
         dialog.close();stopNews();archiveStory=story;newsReaderIndex=-1;
@@ -416,6 +416,10 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   });
   function renderNewsReader() {
     const article=currentArticle();if(!article)return;
+    wordLookupSeq++;
+    info('newsStatus',archiveStory
+      ? 'News History · Saved article · Replay any sentence or select words'
+      : 'Today\'s lesson · Select a sentence or press Run');
     $('newsStoryList').hidden=true;
     const reader=$('newsReader');reader.hidden=false;
     info('newsReaderTitle',article.title);
