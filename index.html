@@ -17,6 +17,12 @@
 <body>
   <main class="app-shell">
     <header class="topbar">
+      <nav id="studyNav" class="study-nav" aria-label="ECL learning sections">
+        <button id="talkTab" class="study-nav-button selected" type="button" data-page="talk" aria-current="page"><span aria-hidden="true">🎙</span> Talk</button>
+        <button id="slideTab" class="study-nav-button" type="button" data-page="slide"><span aria-hidden="true">⇆</span> Slide</button>
+        <button id="newsTab" class="study-nav-button" type="button" data-page="news"><span aria-hidden="true">▤</span> News</button>
+      </nav>
+
       <div class="header-left">
         <div class="uca-lab-logo header-uca" aria-label="UCA Lab">
           <img src="/uca-lab-logo.png" alt="UCA Lab" />
@@ -36,11 +42,6 @@
       </div>
 
       <div class="header-status">
-        <nav id="studyNav" class="study-nav" aria-label="ECL learning sections">
-          <button id="talkTab" class="study-nav-button selected" type="button" data-page="talk" aria-current="page"><span aria-hidden="true">🎙</span> Talk</button>
-          <button id="slideTab" class="study-nav-button" type="button" data-page="slide"><span aria-hidden="true">⇆</span> Slide</button>
-          <button id="newsTab" class="study-nav-button" type="button" data-page="news"><span aria-hidden="true">▤</span> News</button>
-        </nav>
         <button id="historyButton" class="nav-button" type="button">History</button>
         <button id="wordsButton" class="nav-button" type="button">Words</button>
         <span id="status" class="status">Ready</span>
@@ -263,6 +264,7 @@
         <div class="study-header-actions">
           <button id="newsUpdateButton" class="study-primary-button" type="button">Update</button>
           <button id="newsWordsButton" class="study-secondary-button" type="button">News Words</button>
+          <button id="newsHistoryButton" class="study-secondary-button" type="button">History</button>
         </div>
       </header>
       <div id="newsStatus" class="study-message" role="status"></div>
@@ -272,17 +274,32 @@
           <button id="newsBackButton" class="study-inline-button" type="button">← All stories</button>
           <div class="news-player-controls">
             <button id="newsRunButton" class="study-primary-button" type="button">▶ Run</button>
-            <button id="newsPauseButton" class="study-secondary-button" type="button">Pause</button>
+            <button id="newsPrevButton" class="study-secondary-button" type="button" aria-label="Previous sentence">←</button>
+          <button id="newsPauseButton" class="study-secondary-button" type="button">Stop</button>
+          <button id="newsNextButton" class="study-secondary-button" type="button" aria-label="Next sentence">→</button>
+          <button id="newsCompleteButton" class="study-secondary-button" type="button" aria-pressed="false">Complete text</button>
           </div>
         </div>
         <h2 id="newsReaderTitle"></h2>
         <div id="newsReaderSource" class="news-source-line"></div>
         <div id="newsReadTarget" class="news-read-target" aria-live="off"></div>
         <div id="newsReadEnglish" class="news-read-english"></div>
+        <div id="newsWordDetail" class="news-word-detail" hidden aria-live="polite">
+          <div class="news-detail-heading"><strong id="newsWordTitle"></strong><button id="newsWordClose" type="button" aria-label="Close word details">×</button></div>
+          <p id="newsWordMeaning"></p><p id="newsWordDefinition"></p><p id="newsWordExample"></p>
+          <div class="news-detail-actions"><button id="newsWordPlay" type="button" class="study-secondary-button">♫ Word</button><button id="newsExamplePlay" type="button" class="study-secondary-button">♫ Sentence</button></div>
+        </div>
         <div class="news-vocab-section"><h3>New Words</h3><div id="newsReaderWords" class="news-vocab-list"></div></div>
       </section>
     </section>
   </main>
+
+  <dialog id="newsHistoryDialog" class="study-words-dialog">
+    <div class="study-words-shell">
+      <header class="study-words-heading"><div><div class="eyebrow">NEWS ARCHIVE</div><h2>Previous articles</h2></div><button id="newsHistoryClose" class="study-secondary-button" type="button">Close</button></header>
+      <div id="newsHistoryList" class="study-words-list"></div>
+    </div>
+  </dialog>
 
   <dialog id="studyWordsDialog" class="study-words-dialog">
     <div class="study-words-shell">
