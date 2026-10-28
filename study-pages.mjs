@@ -455,13 +455,13 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     $('newsCompleteButton').textContent=completeNews?'Focused text':'Complete text';
   }
   const stripToken=text=>String(text||'')
-    .replace(/^[^\\p{L}\\p{N}]+|[^\\p{L}\\p{N}]+$/gu,'').toLocaleLowerCase(locale[getLanguage()]||'en');
+    .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,'').toLocaleLowerCase(locale[getLanguage()]||'en');
   let focusedWord=null,focusedSentence=0,focusedChar=0;
   async function showNewsWordDetails(token,sentenceIndex,charStart){
     const article=currentArticle();if(!article)return;
     stopNews();
     focusedSentence=sentenceIndex;focusedChar=charStart;
-    const word=String(token||'').replace(/^[^\\p{L}\\p{N}]+|[^\\p{L}\\p{N}]+$/gu,'');
+    const word=String(token||'').replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,'');
     if(!word)return;
     const panel=$('newsWordDetail');panel.hidden=false;
     focusedWord=word;
@@ -519,10 +519,10 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       line.append(replay);
       line.addEventListener('click',()=>seekNews(i,0,true));
       // One selectable span per word, with accurate character positions.
-      const tokens=sentence.target.split(/(\\s+)/);let pos=0;
+      const tokens=sentence.target.split(/(\s+)/);let pos=0;
       for(const token of tokens){
         if(!token)continue;
-        if(/^\\s+$/.test(token)){line.append(document.createTextNode(token));pos+=token.length;continue;}
+        if(/^\s+$/.test(token)){line.append(document.createTextNode(token));pos+=token.length;continue;}
         const span=document.createElement('span');span.className='news-token';
         span.textContent=token;span.dataset.charStart=String(pos);
         span.tabIndex=0;span.setAttribute('role','button');
@@ -603,7 +603,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     utterance.lang=locale[getLanguage()]||'nl-BE';utterance.rate=.84;
     if(newsHighlightTimer){clearInterval(newsHighlightTimer);newsHighlightTimer=null;}
     let sawWordBoundary=false;
-    const words=[...sentence.matchAll(/\\S+/g)].map(x=>x.index+offset);
+    const words=[...sentence.matchAll(/\S+/g)].map(x=>x.index+offset);
     let estimatedWord=0;
     newsHighlightTimer=setInterval(()=>{
       if(seq!==speechSeq||!newsPlaying){
