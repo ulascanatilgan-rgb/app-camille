@@ -7,6 +7,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   const locale={fr:'fr-FR',nl:'nl-BE',en:'en-GB'};
   let currentPage='talk', cards=[], cardIndex=0, deckLang='', pendingDeck=false;
   let newsData=null,newsLang='',newsReaderIndex=-1,newsPlaying=false,newsPaused=false;
+  let archiveStory=null,completeNews=false,wordLookupSeq=0,newsGeneration=0;
   let speechIndex=0,speechSeq=0,wordHighlight=-1;
   let newsHighlightTimer=null;
   let lastUpdateCacheKey='';
@@ -17,6 +18,17 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   const validWords=()=>getTalkWords().filter(w=>w?.nl&&w?.en&&(!w.language||w.language===getLanguage())).slice(-800);
   const score=()=>read(key('slide.results'),[]);
   const newsWords=()=>read(key('news.words'),[]);
+  const newsArchive=()=>read(key('news.archive'),[]);
+  const currentArticle=()=>archiveStory||newsData?.stories?.[newsReaderIndex];
+  function saveNewsArchive(stories){
+    const archive=newsArchive(),ids=new Set(archive.map(a=>a.id));
+    for(const story of stories) {
+      if(!story?.id||ids.has(story.id))continue;
+      archive.push({...story,archivedAt:new Date().toISOString()});ids.add(story.id);
+    }
+    archive.sort((a,b)=>String(b.archivedAt||b.publishedAt||'').localeCompare(String(a.archivedAt||a.publishedAt||'')));
+    store(key('news.archive'),archive);
+  }
   const safeDate=()=>new Date().toISOString().slice(0,10);
   const say=(text)=>{
     if(!('speechSynthesis' in window))return;
@@ -319,12 +331,14 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   function renderNews() {
     const lang=getLanguage(),today=safeDate();
     if(newsLang!==lang){
-      stopNews();newsLang=lang;newsReaderIndex=-1;
+      stopNews();newsLang=lang;newsReaderIndex=-1;archiveStory=null;
       const saved=read(key('news.daily',lang),null);
+      if(saved?.stories?.length)saveNewsArchive(saved.stories);
       newsData=saved?.updatedAt?.slice(0,10)===today?saved:null;
     }
     const stories=$('newsStoryList');
     stories.replaceChildren();
+    if(archiveStory) {renderNewsReader();return;}
     if(!newsData?.stories?.length){
       $('newsReader').hidden=true;
       info('newsStatus','Tap Update to load today\'s three articles in '+({nl:'Dutch',fr:'French',en:'English'}[lang])+'.');
@@ -349,7 +363,8 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     const cached=read(key('news.daily',lang),null);
     // One dated update per language per day. Reopening uses saved content.
     if(cached?.updatedAt?.startsWith(today)){
-      newsData=cached;newsLang=lang;newsReaderIndex=-1;renderNews();return;
+      saveNewsArchive(cached.stories||[]);
+      newsData=cached;newsLang=lang;newsReaderIndex=-1;archiveStory=null;renderNews();return;
     }
     $('newsUpdateButton').disabled=true;info('newsStatus','Loading headlines and building accessible reading articles…');
     try{
@@ -358,16 +373,48 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       if(!resp.ok)throw new Error(data?.error||'News unavailable');
       if(!Array.isArray(data.stories)||data.stories.length!==3)throw new Error('Incomplete news update');
       store(key('news.daily',lang),data);
-      if(lang===getLanguage()){newsData=data;newsLang=lang;newsReaderIndex=-1;renderNews();}
+      if(lang===getLanguage()){
+        saveNewsArchive(data.stories);
+        newsData=data;newsLang=lang;newsReaderIndex=-1;archiveStory=null;renderNews();
+      }
     }catch(error){info('newsStatus',String(error.message||'News update could not finish'))}
     finally{$('newsUpdateButton').disabled=false;}
   }
   $('newsUpdateButton').addEventListener('click',()=>void updateNews());
   $('newsBackButton').addEventListener('click',()=>{
-    stopNews();newsReaderIndex=-1;renderNews();
+    stopNews();newsReaderIndex=-1;archiveStory=null;renderNews();
+  });
+  function openNewsArchive(){
+    stopNews();
+    const dialog=$('newsHistoryDialog'),list=$('newsHistoryList');
+    list.replaceChildren();
+    const history=newsArchive();
+    if(!history.length){
+      const empty=document.createElement('p');empty.textContent='No past news yet. Tap Update to save your first articles.';
+      list.append(empty);
+    }
+    history.forEach(story=>{
+      const button=document.createElement('button');button.type='button';
+      button.className='news-history-item';
+      const heading=document.createElement('strong');heading.textContent=story.title;
+      const meta=document.createElement('span');meta.textContent=
+        (story.source||'News')+' · '+new Date(story.archivedAt||story.publishedAt||Date.now()).toLocaleDateString();
+      button.append(heading,meta);
+      button.addEventListener('click',()=>{
+        dialog.close();stopNews();archiveStory=story;newsReaderIndex=-1;
+        renderNewsReader();
+      });
+      list.append(button);
+    });
+    dialog.showModal();
+  }
+  $('newsHistoryButton').addEventListener('click',openNewsArchive);
+  $('newsHistoryClose').addEventListener('click',()=>$('newsHistoryDialog').close());
+  $('newsHistoryDialog').addEventListener('click',e=>{
+    if(e.target===$('newsHistoryDialog'))e.target.close();
   });
   function renderNewsReader() {
-    const article=newsData?.stories?.[newsReaderIndex];if(!article)return;
+    const article=currentArticle();if(!article)return;
     $('newsStoryList').hidden=true;
     const reader=$('newsReader');reader.hidden=false;
     info('newsReaderTitle',article.title);
@@ -387,9 +434,14 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       btn.addEventListener('click',()=>say(w.word));
       vocab.append(btn);
     }
-    speechIndex=0;renderArticleText(article);
+    stopNews();speechIndex=0;wordHighlight=-1;
+    $('newsWordDetail').hidden=true;
+    renderArticleText(article);
     info('newsReadEnglish',article.sentences[0]?.english||'');
     $('newsRunButton').textContent='▶ Run';
+    $('newsPauseButton').textContent='Stop';
+    $('newsCompleteButton').setAttribute('aria-pressed',String(completeNews));
+    $('newsCompleteButton').textContent=completeNews?'Focused text':'Complete text';
   }
   function renderArticleText(article) {
     const target=$('newsReadTarget');target.replaceChildren();
@@ -414,7 +466,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     target.querySelector('.active-sentence')?.scrollIntoView({block:'nearest',behavior:'smooth'});
   }
   function setSpeechIndex(i,word=-1) {
-    const story=newsData?.stories?.[newsReaderIndex];if(!story)return;
+    const story=currentArticle();if(!story)return;
     speechIndex=i;wordHighlight=word;
     const lines=[...$('newsReadTarget').querySelectorAll('.news-sentence')];
     lines.forEach((line,n)=>{
@@ -429,7 +481,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   }
   function speakCurrent(seq) {
     if(seq!==speechSeq||!newsPlaying||newsPaused)return;
-    const story=newsData?.stories?.[newsReaderIndex];
+    const story=currentArticle();
     if(!story||speechIndex>=story.sentences.length){stopNews();return;}
     if(!window.speechSynthesis){info('newsStatus','Speech playback is not available in this browser.');stopNews();return;}
     const sentence=story.sentences[speechIndex].target;
@@ -466,7 +518,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     window.speechSynthesis.speak(u);
   }
   $('newsRunButton').addEventListener('click',()=>{
-    const story=newsData?.stories?.[newsReaderIndex];if(!story)return;
+    const story=currentArticle();if(!story)return;
     if(newsPlaying&&!newsPaused){stopNews();return}
     if(speechIndex>=story.sentences.length)speechIndex=0;
     newsPlaying=true;newsPaused=false;speechSeq++;
@@ -484,7 +536,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   function refreshLanguage(){
     stopNews();
     if(currentPage==='slide'){cards=[];cardIndex=0;void loadSlide();}
-    if(currentPage==='news'){newsLang='';newsReaderIndex=-1;renderNews();}
+    if(currentPage==='news'){newsLang='';newsReaderIndex=-1;archiveStory=null;renderNews();}
   }
   return {refreshLanguage,stopNews,getPage:()=>currentPage};
 }
