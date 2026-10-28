@@ -8,7 +8,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   let currentPage='talk', cards=[], cardIndex=0, deckLang='', pendingDeck=false;
   let newsData=null,newsLang='',newsReaderIndex=-1,newsPlaying=false,newsPaused=false;
   let archiveStory=null,completeNews=false,wordLookupSeq=0,newsGeneration=0;
-  let speechIndex=0,speechSeq=0,wordHighlight=-1;
+  let speechIndex=0,speechSeq=0,wordHighlight=-1,speechOffset=0;
   let newsHighlightTimer=null;
   let lastUpdateCacheKey='';
   const info=(id,msg)=>{const e=$(id);if(e)e.textContent=msg};
@@ -41,7 +41,8 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     newsPlaying=false;newsPaused=false;speechSeq++;
     if(newsHighlightTimer){clearInterval(newsHighlightTimer);newsHighlightTimer=null;}
     window.speechSynthesis?.cancel?.();
-    const btn=$('newsRunButton');if(btn)btn.textContent='▶ Run';
+    const btn=$('newsRunButton');if(btn)btn.textContent='▶ Continue';
+    const pause=$('newsPauseButton');if(pause)pause.textContent='Continue';
   }
   function updateCounts() {
     const r=score();
@@ -434,7 +435,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       btn.addEventListener('click',()=>say(w.word));
       vocab.append(btn);
     }
-    stopNews();speechIndex=0;wordHighlight=-1;
+    stopNews();speechIndex=0;speechOffset=0;wordHighlight=-1;
     $('newsWordDetail').hidden=true;
     renderArticleText(article);
     info('newsReadEnglish',article.sentences[0]?.english||'');
@@ -556,59 +557,92 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     info('newsReadEnglish',story.sentences[i]?.english||'');
     lines[i]?.scrollIntoView({block:'nearest',behavior:'smooth'});
   }
-  function speakCurrent(seq) {
-    if(seq!==speechSeq||!newsPlaying||newsPaused)return;
+  function seekNews(index,offset=0,autoplay=true){
+    const story=currentArticle();
+    if(!story?.sentences?.length)return;
+    stopNews();
+    speechIndex=Math.max(0,Math.min(story.sentences.length-1,index));
+    speechOffset=Math.max(0,Math.min(story.sentences[speechIndex].target.length-1,offset));
+    setSpeechIndex(speechIndex,speechOffset);
+    $('newsWordDetail').hidden=true;
+    if(autoplay)startNews();
+  }
+  function startNews(){
+    const story=currentArticle();if(!story)return;
+    if(speechIndex>=story.sentences.length){speechIndex=0;speechOffset=0;}
+    newsPlaying=true;newsPaused=false;
+    const seq=++speechSeq;
+    window.speechSynthesis?.cancel?.();
+    $('newsRunButton').textContent='■ Stop';
+    $('newsPauseButton').textContent='Stop';
+    speakCurrent(seq);
+  }
+  function speakCurrent(seq){
+    if(seq!==speechSeq||!newsPlaying)return;
     const story=currentArticle();
     if(!story||speechIndex>=story.sentences.length){stopNews();return;}
-    if(!window.speechSynthesis){info('newsStatus','Speech playback is not available in this browser.');stopNews();return;}
-    const sentence=story.sentences[speechIndex].target;
-    setSpeechIndex(speechIndex,-1);
-    const u=new SpeechSynthesisUtterance(sentence);
-    u.lang=locale[getLanguage()]||'nl-BE';u.rate=.84;
+    if(!window.speechSynthesis){
+      info('newsStatus','Speech playback is not available in this browser.');
+      stopNews();return;
+    }
+    const fullSentence=story.sentences[speechIndex].target;
+    const offset=Math.max(0,Math.min(fullSentence.length-1,speechOffset));
+    const sentence=fullSentence.slice(offset);
+    setSpeechIndex(speechIndex,offset);
+    const utterance=new SpeechSynthesisUtterance(sentence);
+    utterance.lang=locale[getLanguage()]||'nl-BE';utterance.rate=.84;
     if(newsHighlightTimer){clearInterval(newsHighlightTimer);newsHighlightTimer=null;}
     let sawWordBoundary=false;
-    // Safari sometimes omits SpeechSynthesis word-boundary events.
-    // Use a conservative timed fallback, and stop it once true boundaries
-    // arrive, so learners always see some word-by-word progress.
-    const words=[...sentence.matchAll(/\\S+/g)].map(x=>x.index);
+    const words=[...sentence.matchAll(/\\S+/g)].map(x=>x.index+offset);
     let estimatedWord=0;
     newsHighlightTimer=setInterval(()=>{
-      if(seq!==speechSeq || !newsPlaying){clearInterval(newsHighlightTimer);newsHighlightTimer=null;return;}
-      if(newsPaused||sawWordBoundary)return;
-      if(estimatedWord<words.length)setSpeechIndex(speechIndex,words[estimatedWord++]);
-    },460);
-    u.onboundary=e=>{
+      if(seq!==speechSeq||!newsPlaying){
+        clearInterval(newsHighlightTimer);newsHighlightTimer=null;return;
+      }
+      if(sawWordBoundary)return;
+      if(estimatedWord<words.length){
+        speechOffset=words[estimatedWord++];
+        setSpeechIndex(speechIndex,speechOffset);
+      }
+    },430);
+    utterance.onboundary=event=>{
       if(seq!==speechSeq)return;
       sawWordBoundary=true;
-      if(e.name==='word'||typeof e.charIndex==='number')setSpeechIndex(speechIndex,e.charIndex);
+      if(event.name==='word'||typeof event.charIndex==='number'){
+        speechOffset=offset+event.charIndex;
+        setSpeechIndex(speechIndex,speechOffset);
+      }
     };
-    u.onend=()=>{
+    utterance.onend=()=>{
       if(newsHighlightTimer){clearInterval(newsHighlightTimer);newsHighlightTimer=null;}
-      if(seq!==speechSeq||!newsPlaying||newsPaused)return;
-      speechIndex+=1;
-      if(speechIndex<story.sentences.length)speakCurrent(seq);else stopNews();
+      if(seq!==speechSeq||!newsPlaying)return;
+      speechIndex++;speechOffset=0;
+      if(speechIndex<story.sentences.length)speakCurrent(seq);
+      else {
+        stopNews();speechIndex=story.sentences.length-1;
+        speechOffset=0;$('newsRunButton').textContent='▶ Replay';
+        $('newsPauseButton').textContent='Continue';
+      }
     };
-    u.onerror=()=>{
+    utterance.onerror=event=>{
       if(newsHighlightTimer){clearInterval(newsHighlightTimer);newsHighlightTimer=null;}
-      if(seq===speechSeq){info('newsStatus','Audio interrupted. Tap Run to resume.');stopNews()}
+      if(seq===speechSeq){
+        info('newsStatus','Playback stopped. Select a sentence or tap Continue.');
+        stopNews();
+      }
     };
-    window.speechSynthesis.speak(u);
+    window.speechSynthesis.speak(utterance);
   }
   $('newsRunButton').addEventListener('click',()=>{
-    const story=currentArticle();if(!story)return;
-    if(newsPlaying&&!newsPaused){stopNews();return}
-    if(speechIndex>=story.sentences.length)speechIndex=0;
-    newsPlaying=true;newsPaused=false;speechSeq++;
-    window.speechSynthesis.cancel();
-    $('newsRunButton').textContent='■ Stop';
-    speakCurrent(speechSeq);
+    if(newsPlaying)stopNews();else startNews();
   });
   $('newsPauseButton').addEventListener('click',()=>{
-    if(!newsPlaying)return;
-    newsPaused=!newsPaused;
-    if(newsPaused)window.speechSynthesis.pause();
-    else window.speechSynthesis.resume();
-    $('newsPauseButton').textContent=newsPaused?'Resume':'Pause';
+    if(newsPlaying)stopNews();else startNews();
+  });
+  $('newsPrevButton').addEventListener('click',()=>seekNews(Math.max(0,speechIndex-1),0,newsPlaying));
+  $('newsNextButton').addEventListener('click',()=>{
+    const story=currentArticle();if(!story)return;
+    seekNews(Math.min(story.sentences.length-1,speechIndex+1),0,newsPlaying);
   });
   function refreshLanguage(){
     stopNews();
