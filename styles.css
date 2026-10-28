@@ -5194,3 +5194,35 @@ body.type-input-mode .workspace{height:calc(100dvh - 189px) !important;}
   .news-player-controls .study-secondary-button{padding:7px 9px !important;}
   .study-header-actions{flex-wrap:wrap;justify-content:flex-end;}
 }
+
+
+/* Expandable words and replayable News archive */
+.news-history-item {
+  display:flex;flex-direction:column;align-items:flex-start;gap:8px;
+  width:100%;text-align:left;
+  border:0;border-bottom:1px solid #e7dfd3;
+  background:transparent;padding:17px 9px;color:#353b32;
+  cursor:pointer;
+}
+.news-history-item strong {font-family:Comfortaa,sans-serif;font-size:13px;line-height:1.5;}
+.news-history-item span {color:#807667;font-size:11px;}
+.news-history-item:hover,.news-history-item:focus-visible {background:#f2ebde;border-radius:8px;}
+.news-vocab-item {align-items:center;gap:7px;}
+.news-vocab-detail-button {
+  border:0;background:transparent;min-width:0;flex:1;
+  display:flex;justify-content:space-between;align-items:center;
+  text-align:left;gap:10px;color:#34392f;
+  padding:2px;cursor:pointer;
+}
+.news-vocab-detail-button strong {font-size:12px;}
+.news-vocab-detail-button span {font-size:11px;color:#80705f;}
+.news-vocab-item .study-word-audio {min-width:35px;height:34px;font-size:14px;flex:0 0 auto;}
+#newsCompleteButton[aria-pressed="true"]{
+  border:1px solid #53745e;background:#e2e9df;color:#34533e;
+}
+#newsReadEnglish:empty {display:none;}
+.study-word-expand:hover{text-decoration:underline;text-underline-offset:3px;}
+@media(max-width:760px){
+  .news-player-controls{row-gap:7px;}
+  .news-player-controls .study-primary-button{min-width:67px;}
+}
