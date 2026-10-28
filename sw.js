@@ -1,4 +1,4 @@
-const CACHE = 'ecl-button-first-type-dock-v42';
+const CACHE = 'ecl-language-lock-v43';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
