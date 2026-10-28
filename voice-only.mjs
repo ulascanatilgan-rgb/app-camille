@@ -76,7 +76,7 @@ export async function createVoiceOnlySession({
     try{peer?.close();}catch{}
     micStream?.getTracks().forEach(track=>track.stop());
     if(remoteAudio){remoteAudio.pause();remoteAudio.srcObject=null;remoteAudio.remove();}
-    notify(onClosed);
+    onClosed?.();
   }
   try {
     notify(onStatus,'Connecting OpenAI voice…');
@@ -100,7 +100,16 @@ export async function createVoiceOnlySession({
     setMuted(inputMode !== 'speak');
     channel=peer.createDataChannel('oai-events');
     channel.addEventListener('message',handleEvent);
-    channel.addEventListener('open',()=>{sessionReady=true;notify(onStatus,'Voice connected');});
+    channel.addEventListener('open',()=>{
+      sessionReady=true;
+      notify(onStatus,'Voice connected');
+      // Model begins the speaking lesson itself; no microphone input required.
+      send({type:'response.create',response:{
+        instructions:context
+          ? 'Continue the preceding conversation in the selected language and current theme. Ask one short practical follow-up question. Do not restart from scratch.'
+          : 'Start the selected ECL theme lesson now. Say only one short natural greeting or practical question in the selected language, then invite the learner to answer. Keep it concise.'
+      }});
+    });
     channel.addEventListener('close',()=>{if(!closed)notify(onClosed);});
     peer.addEventListener('connectionstatechange',()=>{
       if(!closed&&['failed','closed'].includes(peer.connectionState))
@@ -126,6 +135,13 @@ export async function createVoiceOnlySession({
     if(!sdp.startsWith('v=0'))throw new Error('OpenAI did not return a valid WebRTC answer');
     if(closed)throw new Error('Session closed');
     await peer.setRemoteDescription({type:'answer',sdp});
+    // Do not display "Live" before the authenticated OpenAI channel is ready.
+    await new Promise((resolve,reject)=>{
+      if(channel.readyState==='open')return resolve();
+      const timeout=setTimeout(()=>reject(new Error('OpenAI voice channel timed out')),12000);
+      channel.addEventListener('open',()=>{clearTimeout(timeout);resolve();},{once:true});
+      channel.addEventListener('error',()=>{clearTimeout(timeout);reject(new Error('OpenAI voice channel failed'));},{once:true});
+    });
     return {sendText,setMuted,close,isReady:()=>sessionReady,startedAt:sentAt};
   } catch(error){
     await close();
