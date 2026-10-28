@@ -405,7 +405,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     const lang=getLanguage(),today=safeDate();
     if(newsLang!==lang){
       stopNews();newsLang=lang;newsReaderIndex=-1;archiveStory=null;
-      const saved=read(key('news.daily',lang),null);
+      const saved=read(key('news.daily.long.v2',lang),null);
       if(saved?.stories?.length)saveNewsArchive(saved.stories);
       newsData=saved?.updatedAt?.slice(0,10)===today?saved:null;
     }
@@ -433,7 +433,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   }
   async function updateNews() {
     const lang=getLanguage(),today=safeDate();
-    const cached=read(key('news.daily',lang),null);
+    const cached=read(key('news.daily.long.v2',lang),null);
     // One dated update per language per day. Reopening uses saved content.
     if(cached?.updatedAt?.startsWith(today)){
       saveNewsArchive(cached.stories||[]);
@@ -445,7 +445,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       const data=await resp.json();
       if(!resp.ok)throw new Error(data?.error||'News unavailable');
       if(!Array.isArray(data.stories)||data.stories.length!==3)throw new Error('Incomplete news update');
-      store(key('news.daily',lang),data);
+      store(key('news.daily.long.v2',lang),data);
       if(lang===getLanguage()){
         saveNewsArchive(data.stories);
         newsData=data;newsLang=lang;newsReaderIndex=-1;archiveStory=null;renderNews();
