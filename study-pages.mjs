@@ -8,6 +8,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   let currentPage='talk', cards=[], cardIndex=0, deckLang='', pendingDeck=false;
   let newsData=null,newsLang='',newsReaderIndex=-1,newsPlaying=false,newsPaused=false;
   let speechIndex=0,speechSeq=0,wordHighlight=-1;
+  let newsHighlightTimer=null;
   let lastUpdateCacheKey='';
   const info=(id,msg)=>{const e=$(id);if(e)e.textContent=msg};
   const store=(key,obj)=>{try{localStorage.setItem(key,JSON.stringify(obj))}catch{}};
@@ -26,6 +27,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   };
   function stopNews() {
     newsPlaying=false;newsPaused=false;speechSeq++;
+    if(newsHighlightTimer){clearInterval(newsHighlightTimer);newsHighlightTimer=null;}
     window.speechSynthesis?.cancel?.();
     const btn=$('newsRunButton');if(btn)btn.textContent='▶ Run';
   }
@@ -340,16 +342,33 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     setSpeechIndex(speechIndex,-1);
     const u=new SpeechSynthesisUtterance(sentence);
     u.lang=locale[getLanguage()]||'nl-BE';u.rate=.84;
+    if(newsHighlightTimer){clearInterval(newsHighlightTimer);newsHighlightTimer=null;}
+    let sawWordBoundary=false;
+    // Safari sometimes omits SpeechSynthesis word-boundary events.
+    // Use a conservative timed fallback, and stop it once true boundaries
+    // arrive, so learners always see some word-by-word progress.
+    const words=[...sentence.matchAll(/\\S+/g)].map(x=>x.index);
+    let estimatedWord=0;
+    newsHighlightTimer=setInterval(()=>{
+      if(seq!==speechSeq || !newsPlaying){clearInterval(newsHighlightTimer);newsHighlightTimer=null;return;}
+      if(newsPaused||sawWordBoundary)return;
+      if(estimatedWord<words.length)setSpeechIndex(speechIndex,words[estimatedWord++]);
+    },460);
     u.onboundary=e=>{
       if(seq!==speechSeq)return;
+      sawWordBoundary=true;
       if(e.name==='word'||typeof e.charIndex==='number')setSpeechIndex(speechIndex,e.charIndex);
     };
     u.onend=()=>{
+      if(newsHighlightTimer){clearInterval(newsHighlightTimer);newsHighlightTimer=null;}
       if(seq!==speechSeq||!newsPlaying||newsPaused)return;
       speechIndex+=1;
       if(speechIndex<story.sentences.length)speakCurrent(seq);else stopNews();
     };
-    u.onerror=()=>{if(seq===speechSeq){info('newsStatus','Audio interrupted. Tap Run to resume.');stopNews()}};
+    u.onerror=()=>{
+      if(newsHighlightTimer){clearInterval(newsHighlightTimer);newsHighlightTimer=null;}
+      if(seq===speechSeq){info('newsStatus','Audio interrupted. Tap Run to resume.');stopNews()}
+    };
     window.speechSynthesis.speak(u);
   }
   $('newsRunButton').addEventListener('click',()=>{
