@@ -688,6 +688,11 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     speechOffset=Math.max(0,offset);
     setSpeechIndex(i,speechOffset);
   }
+  newsAudio.addEventListener('play',()=>{
+    newsAudioActive=true;newsPlaying=true;
+    $('newsRunButton').textContent='■ Stop';
+    $('newsPauseButton').textContent='Stop';
+  });
   newsAudio.addEventListener('timeupdate',followNewsAudio);
   newsAudio.addEventListener('ended',()=>{
     newsPlaying=false;newsAudioActive=false;
