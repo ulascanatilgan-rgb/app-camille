@@ -4605,3 +4605,87 @@ body,
  .persona-select {font-size:10px !important;padding:7px 2px !important;}
  .ecl-brand.center-brand {gap:5px !important;}
 }
+
+
+/* ECL v42 — Type is a real footer field; never cover the lesson with an overlay */
+body.type-input-mode .conversation-column {
+  overflow-y:auto !important;
+  min-height:0 !important;
+  scroll-padding-bottom:10px;
+}
+body.type-input-mode .controls {
+  position:sticky !important;
+  bottom:0 !important;
+  z-index:5 !important;
+  margin-top:auto !important;
+  background:#fcfbf7 !important;
+  box-shadow:none !important;
+  flex-shrink:0 !important;
+}
+body.type-input-mode #typeComposer {
+  position:static !important;
+  inset:auto !important;
+  left:auto !important;
+  right:auto !important;
+  top:auto !important;
+  bottom:auto !important;
+  transform:none !important;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto !important;
+  width:100% !important;
+  max-width:100% !important;
+  min-height:0 !important;
+  margin:0 !important;
+  padding:5px !important;
+  border:1px solid #d8ccba !important;
+  border-radius:12px !important;
+  box-shadow:none !important;
+  backdrop-filter:none !important;
+  background:#f9f5ee !important;
+}
+body.type-input-mode #typeComposer[hidden] {display:none !important;}
+body.type-input-mode #typeInput {
+  min-width:0 !important;
+  width:100% !important;
+  min-height:38px !important;
+  font-size:16px !important; /* avoids iOS automatic zoom */
+  background:#fffdfa !important;
+}
+body.type-input-mode #typeSend {
+  min-height:38px !important;
+  padding:0 14px !important;
+  white-space:nowrap !important;
+}
+@media(max-width:760px) {
+  body.type-input-mode .workspace {
+    height:var(--ecl-visible-workspace-height,calc(100dvh - 100px)) !important;
+    min-height:0 !important;
+    max-height:var(--ecl-visible-workspace-height,calc(100dvh - 100px)) !important;
+    overflow:hidden !important;
+    grid-template-rows:minmax(0,30%) minmax(0,70%) !important;
+  }
+  body.type-input-mode.ecl-keyboard-visible .workspace {
+    grid-template-rows:minmax(0,16%) minmax(0,84%) !important;
+  }
+  body.type-input-mode .avatar-column,
+  body.type-input-mode .portrait-wrap {
+    height:100% !important;
+    min-height:0 !important;
+  }
+  body.type-input-mode .conversation-column {
+    height:100% !important;
+    min-height:0 !important;
+    overflow-y:auto !important;
+    padding-bottom:0 !important;
+  }
+  body.type-input-mode .controls {
+    padding:7px 10px calc(7px + env(safe-area-inset-bottom)) !important;
+    border-top:1px solid #e4dccf !important;
+  }
+  body.type-input-mode #typeComposer {
+    padding:4px !important;
+    border-radius:11px !important;
+  }
+  body.type-input-mode #typeInput,
+  body.type-input-mode #typeSend {min-height:36px !important;}
+}
