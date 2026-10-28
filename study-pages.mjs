@@ -428,12 +428,18 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     addNewsWords(article);
     const vocab=$('newsReaderWords');vocab.replaceChildren();
     for(const w of article.words){
-      const btn=document.createElement('button');btn.type='button';btn.className='news-vocab-item';
+      const item=document.createElement('div');item.className='news-vocab-item';
+      const btn=document.createElement('button');btn.type='button';btn.className='news-vocab-detail-button';
       const first=document.createElement('strong');first.textContent=w.word;
       const en=document.createElement('span');en.textContent=w.english;
-      btn.append(first,en);btn.title=w.definition+' · '+w.example;
-      btn.addEventListener('click',()=>say(w.word));
-      vocab.append(btn);
+      btn.append(first,en);btn.title='Show explanation and example for '+w.word;
+      btn.addEventListener('click',()=>{
+        const sentenceIndex=article.sentences.findIndex(x=>
+          x.target.toLocaleLowerCase().includes(w.word.toLocaleLowerCase()));
+        void showNewsWordDetails(w.word,Math.max(0,sentenceIndex),0);
+      });
+      const audio=createPlay('Hear '+w.word,w.word);
+      item.append(btn,audio);vocab.append(item);
     }
     stopNews();speechIndex=0;speechOffset=0;wordHighlight=-1;
     $('newsWordDetail').hidden=true;
@@ -649,5 +655,6 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     if(currentPage==='slide'){cards=[];cardIndex=0;void loadSlide();}
     if(currentPage==='news'){newsLang='';newsReaderIndex=-1;archiveStory=null;renderNews();}
   }
-  return {refreshLanguage,stopNews,getPage:()=>currentPage};
+  return {refreshLanguage,stopNews,getPage:()=>currentPage,openNewsArchive,
+    openWordLibrary};
 }
