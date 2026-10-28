@@ -123,6 +123,7 @@ let connected = false;
 let connecting = false;
 let customLlmMode = false;
 let sessionOpeningSeq = 0;
+let connectionEpoch = 0; // Cancel pending Anam or OpenAI connection when leaving Talk.
 let currentMessages = [];
 let lastProcessedUserMessageId = null;
 let isResponding = false;
@@ -2250,6 +2251,7 @@ async function speakLocalizedOpening(client = anamClient) {
 // Voice Only uses exclusively OpenAI Realtime; no Anam session is requested.
 async function connectVoiceOnly() {
   if(connected || connecting)return;
+  const epoch=++connectionEpoch;
   connecting=true;
   updatePersonaUi();
   updateTopicUi();
@@ -2312,7 +2314,8 @@ async function connectVoiceOnly() {
         setStatus('Voice error: '+String(message).slice(0,75));
       }
     });
-    if(selectedProvider!=='voice'||personaAtStart!==selectedPersona||
+    if(epoch!==connectionEpoch || studyPages?.getPage()!=='talk' ||
+      selectedProvider!=='voice'||personaAtStart!==selectedPersona||
       languageAtStart!==targetLanguage||themeAtStart!==selectedTopic){
       await session.close();
       return;
@@ -2356,6 +2359,7 @@ async function connect() {
   if (selectedProvider==='voice') return connectVoiceOnly();
   if (connected || connecting) return;
 
+  const epoch=++connectionEpoch;
   connecting = true;
   updatePersonaUi();
   languageToggle.disabled = true;
@@ -2380,6 +2384,7 @@ async function connect() {
     });
 
     const data = await response.json().catch(() => ({}));
+    if(epoch!==connectionEpoch || studyPages?.getPage()!=='talk')return;
     if (!response.ok || !data.sessionToken ||
         data.persona?.toLowerCase() !== requestedPersona ||
         data.language !== requestedLanguage || data.topic !== requestedTopic ||
@@ -2508,6 +2513,7 @@ function resetUiAfterDisconnect() {
 }
 
 async function disconnect() {
+  connectionEpoch += 1;
   endHistorySession();
 
   try { activeChatAbort?.abort(); } catch {}
