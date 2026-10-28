@@ -1,4 +1,4 @@
-const CACHE = 'ecl-themes-v44';
+const CACHE = 'ecl-voice-only-v45';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
