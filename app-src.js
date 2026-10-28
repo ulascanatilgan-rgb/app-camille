@@ -94,6 +94,7 @@ let anamClient = null;
 let connected = false;
 let connecting = false;
 let customLlmMode = false;
+let sessionOpeningSeq = 0;
 let currentMessages = [];
 let lastProcessedUserMessageId = null;
 let isResponding = false;
@@ -2112,11 +2113,43 @@ function attachAnamListeners(client) {
   });
 }
 
+// ECL owns the initial spoken sentence. Anam's automatic greeting is
+// disabled server-side so it cannot open in English when FR or NL is selected.
+async function speakLocalizedOpening(client = anamClient) {
+  if (!client || !connected || customLlmMode) return;
+  const sequence = ++sessionOpeningSeq;
+  const languageAtStart = targetLanguage;
+  const personaAtStart = selectedPersona;
+  const greeting = languageConfig();
+  const phrase = greeting.greeting;
+  if (!phrase) return;
+  try {
+    const stream = client.createTalkMessageStream();
+    await stream.streamMessageChunk(phrase, false);
+    await stream.endMessage();
+    if (sequence !== sessionOpeningSeq || client !== anamClient ||
+        languageAtStart !== targetLanguage || personaAtStart !== selectedPersona) return;
+    // The first visible / recorded message also obeys the selected language.
+    const id = `ecl-greeting-${Date.now()}-${sequence}`;
+    upsertConversationTurn({ id, role: 'persona', content: phrase });
+    setSubtitle(phrase, greeting.greetingEn || '');
+    saveCurrentHistory();
+    renderMessages(currentMessages);
+    if (interactionMode === 'button') requestQuickChoices(phrase);
+  } catch (error) {
+    console.warn('Localized ECL opening could not be played:', error);
+    // Never replace a missing French / Dutch opening with English speech.
+  }
+}
+
 async function connect() {
   if (connected || connecting) return;
 
   connecting = true;
   updatePersonaUi();
+  languageToggle.disabled = true;
+  const requestedLanguage = targetLanguage;
+  const requestedPersona = selectedPersona;
   runtimeContextApplied = false;
   micButton.disabled = true;
   endButton.disabled = true;
@@ -2129,12 +2162,15 @@ async function connect() {
     const response = await fetch('/anam-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({persona:selectedPersona}),
+      body: JSON.stringify({persona:requestedPersona, targetLanguage:requestedLanguage}),
       cache: 'no-store'
     });
 
     const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.sessionToken || data.persona?.toLowerCase() !== selectedPersona) {
+    if (!response.ok || !data.sessionToken ||
+        data.persona?.toLowerCase() !== requestedPersona ||
+        data.language !== requestedLanguage ||
+        requestedLanguage !== targetLanguage || requestedPersona !== selectedPersona) {
       const detail = data.anamMessage
         ? `${data.error || 'Anam error'} — ${data.anamMessage}`
         : (data.error || 'Could not create Anam session.');
@@ -2152,6 +2188,7 @@ async function connect() {
 
     attachAnamListeners(anamClient);
     await anamClient.streamToVideoElement('avatarVideo');
+    languageToggle.disabled = false;
 
     if (!connected) {
       connected = true;
@@ -2181,9 +2218,14 @@ async function connect() {
 
     if (customLlmMode) {
       setTimeout(() => streamCamilleResponse([], true), 450);
+    } else {
+      // Session has a locked language from its first token and uses the
+      // selected Anam voice to speak a deterministic localized greeting.
+      void speakLocalizedOpening(anamClient);
     }
   } catch (error) {
     console.error('Anam connection failed:', error);
+    languageToggle.disabled = false;
     connecting = false;
     connected = false;
     customLlmMode = false;
@@ -2199,6 +2241,8 @@ async function connect() {
 }
 
 function resetUiAfterDisconnect() {
+  sessionOpeningSeq += 1;
+  languageToggle.disabled = false;
   replaySequence += 1;
   window.speechSynthesis?.cancel?.();
   replayingAudio = false;
@@ -2357,41 +2401,46 @@ document.addEventListener('click', event => {
 });
 
 languageToggle?.addEventListener('click', async () => {
-  // Stop the previous Anam persona session before changing the language.
-  // Otherwise the live avatar can keep speaking in its old language.
+  if (languageToggle.disabled || connecting) return;
+  // A language change must never leave old-language audio playing.
+  // Close the old Anam stream first, update lesson stores, then reconnect
+  // immediately under a new language-locked session if we were live.
   languageToggle.disabled = true;
+  const wasLive = connected || Boolean(anamClient);
   try {
-    if (connected || connecting || anamClient) await disconnect();
+    if (wasLive) await disconnect();
     if (currentHistorySessionId) endHistorySession();
 
-  targetLanguage = targetLanguage === 'nl' ? 'fr' : targetLanguage === 'fr' ? 'en' : 'nl';
-  localStorage.setItem(LANGUAGE_KEY, targetLanguage);
+    targetLanguage = targetLanguage === 'nl' ? 'fr' : targetLanguage === 'fr' ? 'en' : 'nl';
+    localStorage.setItem(LANGUAGE_KEY, targetLanguage);
 
-  learnedWords = loadJson(wordsKey(), []);
-  clearQuickChoices();
-  hideTip();
-  cachedTip = null;
-  currentMessages = [];
-  translationByMessageId.clear();
-  streamBuffers.clear();
-  vocabProcessedIds.clear();
-  vocabSentenceCounts.clear();
-  activeSubtitleMessageId = null;
-  pinnedUserMessageId = null;
-  lastProcessedUserMessageId = null;
-  lastUserPin.hidden = true;
-  lastUserPinText.textContent = '';
-  if (lastUserPinEn) lastUserPinEn.textContent = '';
-  messagesEl.innerHTML = '';
+    learnedWords = loadJson(wordsKey(), []);
+    clearQuickChoices();
+    hideTip();
+    cachedTip = null;
+    currentMessages = [];
+    translationByMessageId.clear();
+    streamBuffers.clear();
+    vocabProcessedIds.clear();
+    vocabSentenceCounts.clear();
+    activeSubtitleMessageId = null;
+    pinnedUserMessageId = null;
+    lastProcessedUserMessageId = null;
+    lastUserPin.hidden = true;
+    lastUserPinText.textContent = '';
+    if (lastUserPinEn) lastUserPinEn.textContent = '';
+    messagesEl.innerHTML = '';
 
-  updateLanguageUi(true);
-  renderWordsDialog();
-  renderHistoryDialog();
-
-  // A new session is required for a different language. No context or speech
-  // history is reused across Dutch, French and English.
-  setStatus(languageConfig().ready);
-  avatarPlaceholderText.textContent = `Ready for ${languageConfig().name}. Press Start conversation.`;
+    updateLanguageUi(true);
+    renderWordsDialog();
+    renderHistoryDialog();
+    primeButtonChoices();
+    setStatus(languageConfig().ready);
+    avatarPlaceholderText.textContent = `Ready for ${languageConfig().name}. Press Start conversation.`;
+    if (wasLive) await connect();
+  } catch(error) {
+    console.error('Could not switch ECL lesson language:',error);
+    setStatus('Language switch unavailable');
   } finally {
     languageToggle.disabled = false;
   }
