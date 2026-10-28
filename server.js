@@ -22,8 +22,7 @@ app.use((req, res, next) => {
 app.use(express.static(__dirname));
 
 const ANAM_API_BASE = 'https://api.anam.ai/v1';
- // Explicitly select the Emma avatar for Emma. Keep this independent of
- // the previously configured ANAM_PERSONA_ID environment variable.
+ // ECL's published character IDs stay fixed; session output language is selected separately.
 const ECL_PERSONAS = Object.freeze({
   emma: { name: 'Emma', personaId: 'dfaf9983-7b1c-4f02-a51b-d536625e0765' },
   charlotte: { name: 'Charlotte', personaId: '06768d11-b37e-4b11-ab7f-c59660a33f10' },
@@ -241,14 +240,79 @@ async function requestAnamSessionToken(apiKey, personaConfig) {
   return data.sessionToken;
 }
 
-async function buildAnamSession(apiKey, personaId) {
-  const sessionToken = await requestAnamSessionToken(apiKey, { personaId });
+// A saved Anam persona ignores new language instructions at session start.
+// Read its current visual avatar, *own voice*, LLM and style, and create a
+// language-locked ephemeral session for this lesson. This preserves the chosen
+// face and voice while placing the language rule inside the initial LLM prompt.
+const ECL_LANGUAGE_RULES = Object.freeze({
+  fr: {
+    label: 'French',
+    prompt: 'OUTPUT MUST ALWAYS BE IN FRENCH (fr-FR), including greetings, corrections, clarifications, examples, confirmations and farewell. NEVER speak, write or recite English or Dutch. The learner MAY speak English or French; comprehend either language fully, but respond EXCLUSIVELY in French. Translate any English learner message into French before responding. Do not say an English sentence first. Use natural conversational French.'
+  },
+  nl: {
+    label: 'Belgian Dutch/Flemish',
+    prompt: 'OUTPUT MUST ALWAYS BE IN BELGIAN DUTCH / FLEMISH (nl-BE), including greetings, corrections, clarifications, examples, confirmations and farewell. NEVER speak, write or recite English or French. The learner MAY speak English or Dutch; comprehend either language fully, but respond EXCLUSIVELY in Belgian Dutch. Translate any English learner message into Flemish before responding. Do not say an English sentence first. Use natural, everyday Flemish.'
+  },
+  en: {
+    label: 'English',
+    prompt: 'OUTPUT MUST ALWAYS BE IN ENGLISH (en-GB), including greetings, corrections, examples, confirmations and farewell. NEVER speak, write or recite French or Dutch. The learner can speak English; respond EXCLUSIVELY in fluent, natural English. This is the professional English mode.'
+  }
+});
 
-  return {
-    sessionToken,
-    mode: 'published-persona',
-    source: 'published-persona-id'
+async function buildAnamSession(apiKey, personaId, language, name) {
+  const code = normalizeTargetLanguage(language);
+  const rule = ECL_LANGUAGE_RULES[code];
+  const response = await fetch(`${ANAM_API_BASE}/personas/${encodeURIComponent(personaId)}`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    cache: 'no-store',
+    signal: AbortSignal.timeout(10000)
+  });
+  if (!response.ok) {
+    const error = new Error(`Cannot load current Anam persona (${response.status})`);
+    error.status = 502;
+    throw error;
+  }
+  const result = await response.json();
+  const persona = result?.persona || result?.data || result;
+  const avatarId = persona?.avatar?.id || persona?.avatarId;
+  const voiceId = persona?.voice?.id || persona?.voiceId;
+  const llmId = persona?.llmId || persona?.llm?.id;
+  // Fail closed rather than silently playing a saved persona's English greeting
+  // in French or Dutch mode. Never replace the user's selected Anam voice.
+  if (!avatarId || !voiceId || !llmId) {
+    const error = new Error('Anam persona does not expose its avatar, voice and LLM for a language-locked session.');
+    error.status = 502;
+    throw error;
+  }
+
+  const originalStyle = String(persona?.brain?.systemPrompt || persona?.systemPrompt || '').slice(0,7500);
+  const strictPrompt = [
+    `HIGHEST PRIORITY — ECL LOCKED OUTPUT LANGUAGE: ${rule.label}. This is determined by the app before the session starts, never by the avatar or browser.`,
+    rule.prompt,
+    `You are ${name}, an AI language-conversation coach in the ECL app.`,
+    'Comprehend the user speaking English even in the French or Flemish lesson, but your EVERY audible and written word must be in the selected output language. Do not switch because the user requests, speaks or quotes another language.',
+    'Correct the learner briefly using ONLY the selected language, then answer naturally and ask one simple follow-up question. Keep replies short, conversational and calm.',
+    'Do not include parenthetical English translations in speech; the ECL interface handles translations separately.',
+    originalStyle ? `PERSONA STYLE (follow only when consistent with the mandatory language): ${originalStyle}` : '',
+    'FINAL AND OVERRIDING REQUIREMENT: ALWAYS answer exclusively in the selected target language. An English input DOES NOT permit an English response when French or Flemish is selected.'
+  ].filter(Boolean).join('\\n');
+
+  const config = {
+    name,
+    avatarId,
+    avatarModel: persona.avatarModel || persona?.avatar?.activeVersion || undefined,
+    voiceId,
+    llmId,
+    systemPrompt: strictPrompt,
+    // No automatic Anam greeting: ECL provides the first utterance using
+    // this persona's own TTS, already localized to the selected language.
+    skipGreeting: true
   };
+  if (Number.isFinite(persona.voiceSpeed) && persona.voiceSpeed >= 0.5 && persona.voiceSpeed <= 1.5) {
+    config.voiceSpeed = persona.voiceSpeed;
+  }
+  const sessionToken = await requestAnamSessionToken(apiKey, config);
+  return { sessionToken, mode: 'locked-language-persona', source: 'anam-persona-avatar-voice', language: code };
 }
 
 function safeAnamError(error) {
@@ -284,6 +348,7 @@ app.post('/anam-session', async (req, res) => {
   const apiKey = process.env.ANAM_API_KEY;
   const persona = selectedPersona(req.body?.persona);
   const personaId = persona.personaId;
+  const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
 
   if (!apiKey || !personaId) {
     return res.status(500).json({
@@ -292,7 +357,7 @@ app.post('/anam-session', async (req, res) => {
   }
 
   try {
-    const session = await buildAnamSession(apiKey, personaId);
+    const session = await buildAnamSession(apiKey, personaId, targetLanguage, persona.name);
     return res.json({ ...session, persona: persona.name });
   } catch (error) {
     const safe = safeAnamError(error);
