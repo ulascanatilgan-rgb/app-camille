@@ -35,6 +35,39 @@ function findFeeds(xml) {
     return {headline,link,description,source, publishedAt:Number.isFinite(Date.parse(pubDate))?new Date(pubDate).toISOString():null};
   }).filter(x=>x.headline&&x.link);
 }
+// Read public source pages only as factual reference material; never copy
+// source articles to ECL users. Some sites restrict scraping, so RSS-only
+// fallback must always remain usable.
+async function sourceContext(article){
+  try{
+    const address=new URL(article.link);
+    if(!['https:','http:'].includes(address.protocol) ||
+      /(^|\\.)news\\.google\\.com$/i.test(address.hostname))return '';
+    const response=await fetch(address.toString(),{
+      headers:{'User-Agent':'Mozilla/5.0 (compatible; ECL-learning-reader/1.0)',
+        'Accept':'text/html,application/xhtml+xml'},
+      signal:AbortSignal.timeout(7000)
+    });
+    if(!response.ok||!(response.headers.get('content-type')||'').includes('text/html'))return '';
+    const html=(await response.text()).slice(0,450000);
+    const clean=value=>safeText(decodeXml(String(value).replace(/<[^>]*>/g,' ')),4700);
+    const ld=html.match(/"articleBody"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"/i);
+    if(ld){
+      try{
+        const value=JSON.parse('"'+ld[1]+'"');
+        return clean(value).slice(0,4500);
+      }catch{}
+    }
+    const main=html.match(/<article\\b[^>]*>([\\s\\S]*?)<\\/article>/i)||
+      html.match(/<main\\b[^>]*>([\\s\\S]*?)<\\/main>/i);
+    if(!main)return '';
+    const body=main[1].replace(/<script\\b[^>]*>[\\s\\S]*?<\\/script>/gi,'')
+      .replace(/<style\\b[^>]*>[\\s\\S]*?<\\/style>/gi,'');
+    const paragraphs=[...body.matchAll(/<p\\b[^>]*>([\\s\\S]*?)<\\/p>/gi)]
+      .map(item=>clean(item[1])).filter(item=>item.length>60).slice(0,14);
+    return paragraphs.join(' ').slice(0,4500);
+  }catch{return ''}
+}
 function getDay() {return new Date().toISOString().slice(0,10)}
 function isValidWord(word) {return typeof word==='string'&&word.length>=1&&word.length<=60&&/\p{Script=Latin}/u.test(word)}
 async function jsonFromOpenAI(apiKey,system,user,maxTokens=3400) {
@@ -220,6 +253,10 @@ export function registerStudyRoutes(app) {
         if(!titles.includes(item))titles.push(item);
       }
       if(titles.length<3)throw new Error('Not enough public headlines available');
+      // Free-access publishers with substantive article text permit more
+      // detailed, grounded reports than headlines alone.
+      const contexts=await Promise.all(titles.map(sourceContext));
+      const facts=titles.map((item,i)=>({...item,backgroundExcerpt:contexts[i]}));
       const system=[
         'You are an engaging international newsroom writer creating ORIGINAL, longer magazine-style educational news articles in '+cfg.name+'.',
         'Use ONLY verifiable facts in the supplied feed headline, publisher, description and date; add clearly signposted general background and explanation, not fabricated event details.',
@@ -237,7 +274,7 @@ export function registerStudyRoutes(app) {
         'Return JSON {"stories":[{"title":"...","sentences":[{"target":"...","english":"..."}],"words":[{"word":"...","english":"...","definition":"...","example":"..."}]}]}.'
       ].join(' ');
       const generated=await jsonFromOpenAI(process.env.OPENAI_API_KEY,system,JSON.stringify({
-        language,day:getDay(),headlines:titles
+        language,day:getDay(),headlines:facts
       }),13000);
       const stories=(Array.isArray(generated.stories)?generated.stories:[]).slice(0,3).map((o,i)=>{
         const source=titles[i];if(!source)return null;
