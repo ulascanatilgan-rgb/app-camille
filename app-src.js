@@ -1164,9 +1164,13 @@ async function requestQuickChoices(camilleText) {
 
   if (clean === pendingChoiceSource ||
       (clean === lastChoiceSource && quickReplyBar && !quickReplyBar.hidden)) return;
-  lastChoiceSource = clean;
-  pendingChoiceSource = clean;
-  const seq = ++choiceGenerationSeq;
+  // Asynchronous AI generation must never remove all visible options.
+  if(quickReplyBar && (quickReplyBar.hidden || quickReplyBar.children.length!==3)) {
+    renderQuickChoices(defaultButtonChoices(clean===languageConfig().greeting?'opening':'generic'));
+  }
+  lastChoiceSource=clean;
+  pendingChoiceSource=clean;
+  const seq=++choiceGenerationSeq;
   try {
     const recentMessages = currentMessages
       .filter(message => message?.content?.trim())
@@ -1190,11 +1194,15 @@ async function requestQuickChoices(camilleText) {
     if (!response.ok) throw new Error('Could not generate quick replies.');
     const data = await response.json();
 
-    if (seq !== choiceGenerationSeq || interactionMode !== 'button') return;
-    renderQuickChoices(data.choices || []);
-  } catch (error) {
-    if (seq === choiceGenerationSeq) clearQuickChoices();
-    console.warn('Quick reply generation failed:', error);
+    if(seq!==choiceGenerationSeq || interactionMode!=='button')return;
+    // Malformed, empty and unavailable suggestions must leave fallbacks visible.
+    if(Array.isArray(data.choices) && data.choices.length===3) {
+      const valid=data.choices.every(v=>readablePracticeText(v?.text)&&
+        (targetLanguage==='en'||readablePracticeText(v?.english)));
+      if(valid)renderQuickChoices(data.choices);
+    }
+  } catch(error) {
+    console.warn('Quick reply generation failed; keeping usable options:',error);
   } finally {
     if (pendingChoiceSource === clean) pendingChoiceSource = '';
   }
@@ -1935,20 +1943,18 @@ function handleStreamEvent(event) {
 
     if (isNewMessage) {
       hideTip();
-      // Remove any starter-greeting options as soon as Emma starts speaking
-      // her actual next question. Fresh options appear on completion.
+      // Never clear the initial options on the first avatar word:
+      // some published Anam personas never send endOfSpeech.
       if (interactionMode === 'button') {
-        clearQuickChoices();
-        const startedMessageId = event.id;
-        window.setTimeout(() => {
-          // Some Anam personas do not deliver endOfSpeech on their first
-          // response. Use the actual visible subtitle as the fallback.
-          if (!connected || interactionMode !== 'button' ||
-              activeSubtitleMessageId !== startedMessageId ||
-              !quickReplyBar?.hidden || isResponding) return;
-          const latest = subtitleNl?.textContent?.trim();
-          if (latest) requestQuickChoices(latest);
-        }, 4500);
+        primeButtonChoices();
+        const startedMessageId=event.id;
+        window.setTimeout(()=>{
+          if(!connected || interactionMode!=='button' || isResponding ||
+             activeSubtitleMessageId!==startedMessageId)return;
+          const latest=subtitleNl?.textContent?.trim();
+          if(latest)requestQuickChoices(latest);
+          else primeButtonChoices();
+        },2200);
       }
       partialTranslationSeq += 1;
       lastPartialTranslationAt = 0;
