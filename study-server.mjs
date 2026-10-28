@@ -158,6 +158,7 @@ export function registerStudyRoutes(app) {
   // Natural narrated News, cached once per article per server lifetime.
   // All speech is generated with an AI voice, not a human newsreader.
   const newsAudioCache=new Map();
+  const narrationRate=new Map();
   app.post('/study-news-audio',async(req,res)=>{
     res.setHeader('Cache-Control','private, max-age=3600');
     if(!process.env.OPENAI_API_KEY)return res.status(503).json({error:'Voice API not configured.'});
@@ -168,6 +169,12 @@ export function registerStudyRoutes(app) {
     const voiceKey=language+':'+storyId+':'+text.length+':'+text.slice(0,38);
     const saved=newsAudioCache.get(voiceKey);
     if(saved){res.type('audio/mpeg');return res.send(saved);}
+    // Cap uncached paid syntheses per visitor to prevent accidental high API bills.
+    const ip=req.ip||'unknown',now=Date.now();
+    const windowed=(narrationRate.get(ip)||[]).filter(time=>now-time<600000);
+    if(windowed.length>=9)return res.status(429).json({error:'News narration limit reached. Retry later or use saved audio.'});
+    windowed.push(now);narrationRate.set(ip,windowed);
+    if(narrationRate.size>500)narrationRate.clear();
     try{
       // Speech endpoint is available currently; migration to Realtime audio
       // is needed before its announced 2027-01-06 retirement.
