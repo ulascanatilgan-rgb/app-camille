@@ -579,21 +579,25 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   $('newsWordClose').addEventListener('click',()=>{$('newsWordDetail').hidden=true;wordLookupSeq++;});
   function renderArticleText(article) {
     const target=$('newsReadTarget');target.replaceChildren();
+    const paragraphSize=6;
+    let paragraph=null;
     article.sentences.forEach((sentence,i)=>{
-      const line=document.createElement('p');line.className='news-sentence';
+      if(i%paragraphSize===0){
+        paragraph=document.createElement('p');
+        paragraph.className='news-paper-paragraph';
+        target.append(paragraph);
+      }
+      const line=document.createElement('span');line.className='news-sentence';
       line.dataset.sentence=String(i);
       if(i===speechIndex)line.classList.add('active-sentence');
-      const replay=document.createElement('button');replay.type='button';
-      replay.className='news-sentence-play';replay.textContent='▶';
-      replay.setAttribute('aria-label','Read sentence '+(i+1));
-      replay.addEventListener('click',ev=>{ev.stopPropagation();seekNews(i,0,true)});
-      line.append(replay);
+      // A continuous newspaper paragraph: sentences sit inline, not as rows.
       line.addEventListener('click',()=>seekNews(i,0,true));
-      // One selectable span per word, with accurate character positions.
-      const tokens=sentence.target.split(/(\s+)/);let pos=0;
+      const tokens=sentence.target.split(/(\\s+)/);let pos=0;
       for(const token of tokens){
         if(!token)continue;
-        if(/^\s+$/.test(token)){line.append(document.createTextNode(token));pos+=token.length;continue;}
+        if(/^\\s+$/.test(token)){
+          line.append(document.createTextNode(token));pos+=token.length;continue;
+        }
         const span=document.createElement('span');span.className='news-token';
         span.textContent=token;span.dataset.charStart=String(pos);
         span.tabIndex=0;span.setAttribute('role','button');
@@ -609,14 +613,17 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
         });
         line.append(span);pos+=token.length;
       }
-      target.append(line);
-      if(completeNews && getLanguage()!=='en'){
-        const english=document.createElement('p');english.className='news-complete-english';
-        english.textContent=sentence.english;
+      paragraph.append(line);
+      paragraph.append(document.createTextNode(' '));
+      if(completeNews && getLanguage()!=='en' &&
+        ((i+1)%paragraphSize===0 || i===article.sentences.length-1)){
+        const from=Math.floor(i/paragraphSize)*paragraphSize;
+        const english=document.createElement('p');
+        english.className='news-complete-english';
+        english.textContent=article.sentences.slice(from,i+1).map(x=>x.english).join(' ');
         target.append(english);
       }
     });
-    target.querySelector('.active-sentence')?.scrollIntoView({block:'nearest',behavior:'smooth'});
   }
   $('newsCompleteButton').addEventListener('click',()=>{
     completeNews=!completeNews;
