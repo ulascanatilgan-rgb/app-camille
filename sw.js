@@ -36,7 +36,7 @@ self.addEventListener('fetch', event => {
 
   if (
     url.origin === self.location.origin &&
-    ['/anam-session', '/anam-health', '/chat', '/choices', '/tip', '/translate', '/health', '/vocab'].includes(url.pathname)
+    ['/anam-session', '/anam-health', '/chat', '/choices', '/tip', '/translate', '/health', '/vocab', '/study-news', '/study-slide-deck'].includes(url.pathname)
   ) {
     return;
   }
