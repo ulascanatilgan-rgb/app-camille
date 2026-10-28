@@ -566,6 +566,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     stopNews();resumeAudioTime=null;speechIndex=0;speechOffset=0;wordHighlight=-1;
     $('newsWordDetail').hidden=true;
     $('newsAudioControls').hidden=true;
+    $('newsAudioControls').classList.remove('manual-playback');
     renderArticleText(article);
     info('newsReadEnglish',getLanguage()==='en'?'':(article.sentences[0]?.english||''));
     $('newsRunButton').textContent='▶ Run';
@@ -851,8 +852,12 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     $('newsAudioControls').hidden=false;
     try {
       await newsAudio.play();
+      $('newsAudioControls').hidden=true;
+      $('newsAudioControls').classList.remove('manual-playback');
     }catch(error){
       newsPlaying=false;newsAudioActive=false;
+      $('newsAudioControls').classList.add('manual-playback');
+      $('newsAudioControls').hidden=false;
       info('newsStatus','AI audio is ready. Tap Play on the audio player to start listening.');
       $('newsRunButton').textContent='▶ Continue';
       return;
