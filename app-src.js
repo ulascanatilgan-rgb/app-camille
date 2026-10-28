@@ -109,7 +109,7 @@ function updateProviderUi() {
     button.disabled=connecting || switchingProvider || switchingPersona;
   }
   if(providerNote)providerNote.textContent=selectedProvider==='voice'
-    ? 'OpenAI Realtime • AI-generated voice'
+    ? 'AI-generated voice · OpenAI'
     : 'Anam avatar & voice';
   if(personaVoiceNotice)personaVoiceNotice.textContent=selectedProvider==='voice'
     ? personaName()+' uses an AI-generated OpenAI voice.'
@@ -1409,6 +1409,7 @@ function beginHistorySession() {
   history.push({
     id: currentHistorySessionId,
     topic: selectedTopic,
+    provider: selectedProvider,
     persona: selectedPersona,
     startedAt: new Date().toISOString(),
     endedAt: null,
@@ -1430,6 +1431,7 @@ function saveCurrentHistory() {
   session.difficulty = difficulty;
   session.persona = selectedPersona;
   session.topic = selectedTopic;
+  session.provider = selectedProvider;
   session.messages = currentMessages
     .filter(message => message?.content?.trim())
     .slice(-200)
@@ -1606,7 +1608,7 @@ function renderHistoryDialog() {
       const meta = document.createElement('div');
       meta.className = 'history-session-meta';
       const end = session.endedAt ? `–${formatTime(session.endedAt)}` : '';
-      meta.textContent = `${formatTime(session.startedAt)}${end} · ${personaName(session.persona || 'emma')} · ${ECL_TOPICS[normalizeTopic(session.topic)].label} · Level ${session.difficulty || 2}`;
+      meta.textContent = `${formatTime(session.startedAt)}${end} · ${personaName(session.persona || 'emma')} · ${session.provider==='voice'?'Voice':'Video'} · ${ECL_TOPICS[normalizeTopic(session.topic)].label} · Level ${session.difficulty || 2}`;
       card.appendChild(meta);
 
       for (const message of session.messages) {
