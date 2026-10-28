@@ -284,7 +284,7 @@ function updateLanguageUi(resetSubtitle = false) {
     const opening = topicOpening(selectedTopic,targetLanguage);
     lastSubtitlePair = { nl: opening, en: selectedTopic==='open' ? cfg.greetingEn :
       (targetLanguage==='en'?'':topicOpening(selectedTopic,'en')) };
-    setSubtitle(cfg.greeting, cfg.greetingEn);
+    setSubtitle(lastSubtitlePair.nl, lastSubtitlePair.en);
     if (lastUserPinEn) lastUserPinEn.textContent = '';
   }
 }
@@ -917,7 +917,8 @@ function updateTypeKeyboardOffset() {
   const vv=window.visualViewport;
   const visible=vv?.height || window.innerHeight;
   const header=document.querySelector('.topbar')?.getBoundingClientRect().height || 100;
-  document.documentElement.style.setProperty('--ecl-visible-workspace-height',Math.max(155,Math.round(visible-header))+'px');
+  const themeBar=document.querySelector('.topic-strip')?.getBoundingClientRect().height || 42;
+  document.documentElement.style.setProperty('--ecl-visible-workspace-height',Math.max(155,Math.round(visible-header-themeBar))+'px');
   const covered=window.innerHeight-visible-(vv?.offsetTop||0);
   document.body.classList.toggle('ecl-keyboard-visible',interactionMode==='type'&&covered>100);
 }
@@ -1186,7 +1187,7 @@ async function requestQuickChoices(camilleText) {
       (clean === lastChoiceSource && quickReplyBar && !quickReplyBar.hidden)) return;
   // Asynchronous AI generation must never remove all visible options.
   if(quickReplyBar && (quickReplyBar.hidden || quickReplyBar.children.length!==3)) {
-    renderQuickChoices(defaultButtonChoices(clean===languageConfig().greeting?'opening':'generic'));
+    renderQuickChoices(defaultButtonChoices(clean===topicOpening(selectedTopic,targetLanguage)?'opening':'generic'));
   }
   lastChoiceSource=clean;
   pendingChoiceSource=clean;
