@@ -957,7 +957,8 @@ function updateTypeKeyboardOffset() {
   const header=document.querySelector('.topbar')?.getBoundingClientRect().height || 100;
   const themeBar=document.querySelector('.topic-strip')?.getBoundingClientRect().height || 42;
   const providerBar=document.querySelector('.conversation-provider-strip')?.getBoundingClientRect().height || 42;
-  document.documentElement.style.setProperty('--ecl-visible-workspace-height',Math.max(155,Math.round(visible-header-themeBar-providerBar))+'px');
+  const talkToolsBar=document.getElementById('talkToolsStrip')?.getBoundingClientRect().height || 37;
+  document.documentElement.style.setProperty('--ecl-visible-workspace-height',Math.max(155,Math.round(visible-header-themeBar-providerBar-talkToolsBar))+'px');
   const covered=window.innerHeight-visible-(vv?.offsetTop||0);
   document.body.classList.toggle('ecl-keyboard-visible',interactionMode==='type'&&covered>100);
 }
@@ -2772,21 +2773,16 @@ sessionHistoryDialog?.addEventListener('click', event => {
   if (event.target === sessionHistoryDialog) sessionHistoryDialog.close();
 });
 
+// These controls belong ONLY to Talk. Slide and News each have their own
+// dedicated History / Words controls and never reuse Talk archives.
 historyButton.addEventListener('click', () => {
-  if(studyPages?.getPage()==='news') {
-    studyPages.openNewsArchive();
-    return;
-  }
+  if(studyPages?.getPage()!=='talk')return;
   renderHistoryDialog();
   historyDialog.showModal();
 });
 
 wordsButton.addEventListener('click', () => {
-  const page=studyPages?.getPage();
-  if(page==='slide'||page==='news'){
-    studyPages.openWordLibrary(page);
-    return;
-  }
+  if(studyPages?.getPage()!=='talk')return;
   renderWordsDialog();
   wordsDialog.showModal();
 });
