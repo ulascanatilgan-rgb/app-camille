@@ -206,13 +206,13 @@ export function registerStudyRoutes(app) {
       const feedUrls={
         fr:[
           'https://www.france24.com/fr/rss',
-          'https://www.rfi.fr/fr/rss',
+          'https://www.francetvinfo.fr/titres.rss',
           'https://www.lemonde.fr/rss/une.xml',
           'https://news.google.com/rss?hl=fr-FR&gl=FR&ceid=FR:fr'
         ],
         nl:[
+          'https://www.vrt.be/vrtnieuws/nl.rss.articles.xml',
           'https://www.vrt.be/vrtnws/nl.rss.xml',
-          'https://www.hln.be/rss.xml',
           'https://feeds.nos.nl/nosnieuwsalgemeen',
           'https://news.google.com/rss?hl=nl-BE&gl=BE&ceid=BE:nl'
         ],
