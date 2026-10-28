@@ -10,6 +10,8 @@ export async function createVoiceOnlySession({
   let remoteAudio = null;
   let closed = false;
   let sessionReady = false;
+  let replayActive = false;
+  let replayCompletion = null;
   const responseTexts = new Map();
   const sentAt = Date.now();
   const notify = (fn,...args) => { if (!closed) fn?.(...args); };
@@ -26,6 +28,30 @@ export async function createVoiceOnlySession({
       item: { type:'message', role:'user', content:[{type:'input_text', text:clean}] }
     });
     return created && send({type:'response.create'});
+  }
+  async function speakTextExactly(text) {
+    const clean=String(text||'').trim().slice(0,360);
+    if(!clean || !sessionReady || replayActive)return false;
+    replayActive=true;
+    const completion=new Promise(resolve=>{
+      const timeout=setTimeout(()=>{replayActive=false;replayCompletion=null;resolve(false)},12000);
+      replayCompletion=()=>{
+        clearTimeout(timeout);
+        replayActive=false;
+        replayCompletion=null;
+        resolve(true);
+      };
+    });
+    const accepted=send({
+      type:'response.create',
+      response:{
+        conversation:'none',
+        output_modalities:['audio'],
+        instructions:'Say precisely the following text aloud once, without adding any other words or comments. Preserve the language, wording and pronunciation: '+JSON.stringify(clean)
+      }
+    });
+    if(!accepted){replayCompletion?.();return false;}
+    return completion;
   }
   function setMuted(muted) {
     micStream?.getAudioTracks().forEach(track => { track.enabled = !muted; });
@@ -52,6 +78,7 @@ export async function createVoiceOnlySession({
         if(transcript) notify(onUserText,transcript,event.item_id);
       }
     }
+    if (replayActive && (type === 'response.output_audio_transcript.delta' || type === 'response.audio_transcript.delta' || type === 'response.output_audio_transcript.done' || type === 'response.audio_transcript.done')) return;
     if (type === 'response.output_audio_transcript.delta' ||
         type === 'response.audio_transcript.delta') {
       const id=event.item_id || event.response_id || 'latest';
@@ -66,11 +93,15 @@ export async function createVoiceOnlySession({
       responseTexts.delete(id);
       if(finalText)notify(onAssistantDone,finalText,id);
     }
-    if(type==='response.done')notify(onSpeech,false);
+    if(type==='response.done'){
+      if(replayActive)replayCompletion?.();
+      else notify(onSpeech,false);
+    }
   }
   async function close() {
     if (closed) return;
     closed = true;
+    replayCompletion?.();
     try {if(channel?.readyState==='open')channel.send(JSON.stringify({type:'session.close'}));}catch{}
     try{channel?.close();}catch{}
     try{peer?.close();}catch{}
@@ -142,7 +173,7 @@ export async function createVoiceOnlySession({
       channel.addEventListener('open',()=>{clearTimeout(timeout);resolve();},{once:true});
       channel.addEventListener('error',()=>{clearTimeout(timeout);reject(new Error('OpenAI voice channel failed'));},{once:true});
     });
-    return {sendText,setMuted,close,isReady:()=>sessionReady,startedAt:sentAt};
+    return {sendText,speakTextExactly,setMuted,close,isReady:()=>sessionReady,startedAt:sentAt};
   } catch(error){
     await close();
     throw error;
