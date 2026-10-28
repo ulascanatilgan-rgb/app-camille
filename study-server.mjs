@@ -42,7 +42,7 @@ async function sourceContext(article){
   try{
     const address=new URL(article.link);
     if(!['https:','http:'].includes(address.protocol) ||
-      /(^|\\.)news\\.google\\.com$/i.test(address.hostname))return '';
+      /(^|\.)news\.google\.com$/i.test(address.hostname))return '';
     const response=await fetch(address.toString(),{
       headers:{'User-Agent':'Mozilla/5.0 (compatible; ECL-learning-reader/1.0)',
         'Accept':'text/html,application/xhtml+xml'},
@@ -51,19 +51,19 @@ async function sourceContext(article){
     if(!response.ok||!(response.headers.get('content-type')||'').includes('text/html'))return '';
     const html=(await response.text()).slice(0,450000);
     const clean=value=>safeText(decodeXml(String(value).replace(/<[^>]*>/g,' ')),4700);
-    const ld=html.match(/"articleBody"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"/i);
+    const ld=html.match(/"articleBody"\s*:\s*"((?:\\.|[^"\\])*)"/i);
     if(ld){
       try{
         const value=JSON.parse('"'+ld[1]+'"');
         return clean(value).slice(0,4500);
       }catch{}
     }
-    const main=html.match(/<article\\b[^>]*>([\\s\\S]*?)<\\/article>/i)||
-      html.match(/<main\\b[^>]*>([\\s\\S]*?)<\\/main>/i);
+    const main=html.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i)||
+      html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i);
     if(!main)return '';
-    const body=main[1].replace(/<script\\b[^>]*>[\\s\\S]*?<\\/script>/gi,'')
-      .replace(/<style\\b[^>]*>[\\s\\S]*?<\\/style>/gi,'');
-    const paragraphs=[...body.matchAll(/<p\\b[^>]*>([\\s\\S]*?)<\\/p>/gi)]
+    const body=main[1].replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'')
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,'');
+    const paragraphs=[...body.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)]
       .map(item=>clean(item[1])).filter(item=>item.length>60).slice(0,14);
     return paragraphs.join(' ').slice(0,4500);
   }catch{return ''}
