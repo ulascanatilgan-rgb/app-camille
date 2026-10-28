@@ -4689,3 +4689,90 @@ body.type-input-mode #typeSend {
   body.type-input-mode #typeInput,
   body.type-input-mode #typeSend {min-height:36px !important;}
 }
+
+
+/* ECL Theme selector — under Emma / Charlotte / Louis, clear on iPhone */
+.topic-strip {
+  height:42px !important;
+  min-height:42px !important;
+  box-sizing:border-box !important;
+  display:flex !important;
+  justify-content:center !important;
+  align-items:center !important;
+  gap:12px !important;
+  padding:5px 15px !important;
+  background:rgba(252,251,247,.98) !important;
+  border-bottom:1px solid #e0d9cf !important;
+  color:#34312c !important;
+}
+.topic-strip-label {
+  font-size:10px !important;
+  letter-spacing:.1em !important;
+  font-weight:750 !important;
+  color:#655b4f !important;
+  flex:0 0 auto;
+}
+.topic-select {
+  width:175px !important;
+  max-width:45vw !important;
+  height:31px !important;
+  min-height:31px !important;
+  box-sizing:border-box !important;
+  padding:3px 10px !important;
+  border-radius:9px !important;
+  border:1px solid #cfc5b6 !important;
+  color:#262b29 !important;
+  background:#f9f5ef !important;
+  box-shadow:none !important;
+  font-size:12px !important;
+  font-family:inherit !important;
+  font-weight:650 !important;
+  line-height:normal !important;
+  cursor:pointer;
+}
+.topic-select:focus-visible {
+  outline:2px solid #ad975a !important;
+  outline-offset:2px;
+}
+.topic-select:disabled {opacity:.65; cursor:wait;}
+.topic-strip-caption {
+  font-size:10.5px !important;
+  color:#796e60 !important;
+  min-width:0;
+  max-width:210px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+@media(min-width:761px) {
+  .workspace {height:calc(100dvh - 114px) !important;}
+  body.type-input-mode .workspace {height:calc(100dvh - 114px) !important;}
+}
+@media(max-width:760px) {
+  .topic-strip {
+    height:42px !important;
+    padding:4px 9px !important;
+    justify-content:center !important;
+    gap:9px !important;
+  }
+  .topic-select {
+    height:32px !important;
+    min-height:32px !important;
+    max-width:185px !important;
+    width:min(46vw,185px) !important;
+    font-size:12px !important;
+  }
+  .workspace {
+    height:calc(100dvh - 142px) !important;
+    min-height:0 !important;
+  }
+  body.type-input-mode .workspace {
+    height:var(--ecl-visible-workspace-height,calc(100dvh - 142px)) !important;
+    min-height:0 !important;
+    max-height:var(--ecl-visible-workspace-height,calc(100dvh - 142px)) !important;
+  }
+}
+@media(max-width:390px) {
+  .topic-strip-caption {display:none !important;}
+  .topic-select {width:min(60vw,190px) !important;max-width:60vw !important;}
+}
