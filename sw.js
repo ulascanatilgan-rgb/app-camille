@@ -1,4 +1,4 @@
-const CACHE = 'ecl-voice-only-v45';
+const CACHE = 'ecl-talk-slide-news-v46';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
