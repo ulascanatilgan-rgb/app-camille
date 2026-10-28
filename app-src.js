@@ -1,5 +1,6 @@
 import { createClient, AnamEvent } from '@anam-ai/js-sdk';
 import { createVoiceOnlySession } from './voice-only.mjs';
+import { initStudyPages } from './study-pages.mjs';
 import { ECL_TOPICS, normalizeTopic, topicOpening, topicStarterChoices, topicInstruction } from './ecl-topics.mjs';
 
 const micButton = document.getElementById('micButton');
@@ -163,6 +164,7 @@ const savedLanguage = localStorage.getItem(LANGUAGE_KEY);
 let targetLanguage = ['nl', 'fr', 'en'].includes(savedLanguage) ? savedLanguage : 'nl';
 let selectedTopic = normalizeTopic(localStorage.getItem(TOPIC_KEY));
 let switchingTopic = false;
+let studyPages = null;
 let learnedWords = [];
 
 let lastSubtitlePair = {
@@ -2740,6 +2742,7 @@ languageToggle?.addEventListener('click', async () => {
     updateLanguageUi(true);
     renderWordsDialog();
     renderHistoryDialog();
+    studyPages?.refreshLanguage();
     primeButtonChoices();
     setStatus(languageConfig().ready);
     avatarPlaceholderText.textContent = `Ready for ${languageConfig().name}. Press Start conversation.`;
@@ -2805,6 +2808,13 @@ window.addEventListener('unhandledrejection', event => {
   console.error('Unhandled error:', event.reason);
 });
 
+studyPages = initStudyPages({
+  getLanguage:()=>targetLanguage,
+  getTalkWords:()=>loadJson(wordsKey(),[]),
+  stopTalk:async()=>{
+    if(connected||connecting||anamClient||voiceSession)await disconnect();
+  }
+});
 migrateLanguageStores();
 updateProviderUi();
 learnedWords = loadJson(wordsKey(), []);
