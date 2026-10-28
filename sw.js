@@ -1,4 +1,4 @@
-const CACHE = 'ecl-talk-slide-news-v46';
+const CACHE = 'ecl-swipe-news-history-v47';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
