@@ -10,6 +10,9 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   let archiveStory=null,completeNews=false,wordLookupSeq=0,newsGeneration=0;
   let speechIndex=0,speechSeq=0,wordHighlight=-1,speechOffset=0;
   let newsHighlightTimer=null;
+  let newsAudioGeneration=0,newsAudioActive=false;
+  const newsAudioCache=new Map();
+  const newsAudio=$('newsAudioPlayer');
   let lastUpdateCacheKey='';
   const info=(id,msg)=>{const e=$(id);if(e)e.textContent=msg};
   const store=(key,obj)=>{try{localStorage.setItem(key,JSON.stringify(obj))}catch{}};
@@ -39,6 +42,8 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   };
   function stopNews() {
     newsPlaying=false;newsPaused=false;speechSeq++;
+    newsAudioGeneration++;
+    if(newsAudio){newsAudio.pause();}
     if(newsHighlightTimer){clearInterval(newsHighlightTimer);newsHighlightTimer=null;}
     window.speechSynthesis?.cancel?.();
     const btn=$('newsRunButton');if(btn)btn.textContent='▶ Continue';
@@ -104,8 +109,33 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       label.append(meta,strong);
     }
     const c=$('slideCard');
+    // Keep visible success/failure feedback until the next attempt.
     c.classList.remove('swipe-left','swipe-right','fly-left','fly-right','dragging','snap-back');
     c.style.transform='';slideLocked=false;
+  }
+  let slideAudioCtx=null;
+  function playSlideResultSound(correct){
+    // Original synthetic two-tone arcade feedback, not sampled copyrighted SFX.
+    try {
+      const Context=window.AudioContext||window.webkitAudioContext;
+      if(!Context)return;
+      slideAudioCtx ||= new Context();
+      if(slideAudioCtx.state==='suspended')void slideAudioCtx.resume();
+      const now=slideAudioCtx.currentTime;
+      const notes=correct?[[660,.00,.10,'sine'],[880,.10,.12,'sine'],[1320,.23,.17,'sine']]:
+        [[220,.00,.20,'sawtooth'],[157,.14,.27,'sawtooth']];
+      for(const [hz,delay,length,type] of notes){
+        const osc=slideAudioCtx.createOscillator();
+        const gain=slideAudioCtx.createGain();
+        osc.type=type;osc.frequency.setValueAtTime(hz,now+delay);
+        if(!correct)osc.frequency.exponentialRampToValueAtTime(hz*.72,now+delay+length);
+        gain.gain.setValueAtTime(.0001,now+delay);
+        gain.gain.exponentialRampToValueAtTime(correct?.085:.048,now+delay+.017);
+        gain.gain.exponentialRampToValueAtTime(.0001,now+delay+length);
+        osc.connect(gain);gain.connect(slideAudioCtx.destination);
+        osc.start(now+delay);osc.stop(now+delay+length+.012);
+      }
+    }catch(error){console.warn('Slide feedback sound unavailable',error)}
   }
   function answerSlide(side) {
     const item=cards[cardIndex%cards.length];
@@ -116,7 +146,15 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       id:item.id,word:item.word,meaning:item.meaning,correct,chosen:side,
       at:new Date().toISOString()
     });store(key('slide.results'),results.slice(-1000));
-    info('slideFeedback',(correct?'Correct! ':'Wrong — ')+item.word+' · '+item.meaning);
+    const feedback=$('slideFeedback');
+    feedback.className='slide-feedback '+(correct?'slide-feedback-correct':'slide-feedback-wrong');
+    feedback.replaceChildren();
+    const resultLabel=document.createElement('strong');
+    resultLabel.textContent=correct?'✓ CORRECT':'× WRONG';
+    const resultWord=document.createElement('span');
+    resultWord.textContent=item.word+' — '+item.meaning;
+    feedback.append(resultLabel,resultWord);
+    playSlideResultSound(correct);
     const card=$('slideCard');
     card.classList.remove('dragging','snap-back');
     card.style.transform='';
@@ -128,7 +166,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       cardIndex++;
       if(currentPage==='slide'&&deckLang===langAtSwipe)renderSlide();
       else slideLocked=false;
-    },310);
+    },620);
     updateCounts();
   }
   $('slideLeftButton').addEventListener('click',()=>answerSlide('left'));
@@ -193,7 +231,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     const words=validWords();
     if(!words.length){cards=[];setSlideEmpty('No Talk words yet. Practice a conversation to collect new vocabulary.');return}
     const signature=words.map(w=>w.id||w.nl).join('|');
-    const cached=read(key('slide.deck',lang),{});
+    const cached=read(key('slide.deck.v2',lang),{});
     if(!force&&cached.signature===signature&&Array.isArray(cached.cards)&&cached.cards.length){
       cards=makeDeck(cached.cards,lang);cardIndex=0;renderSlide();return;
     }
@@ -209,7 +247,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       if(getLanguage()!==lang)return;
       const accepted=Array.isArray(result.cards)?result.cards.filter(c=>c?.word&&c?.sentence?.includes('____')&&c?.wrong&&c?.definition):[];
       if(!accepted.length)throw new Error('No valid cards returned. Please try again.');
-      store(key('slide.deck',lang),{signature,cards:accepted});
+      store(key('slide.deck.v2',lang),{signature,cards:accepted});
       cards=makeDeck(accepted,lang);cardIndex=0;
       info('slideFeedback','');renderSlide();
     }catch(error){if(getLanguage()===lang)setSlideEmpty(String(error.message||'Card generator unavailable'))}
@@ -220,8 +258,8 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   // Word libraries are independent: Slide uses Talk words, News has its own.
   async function slideWordDetails(item) {
     const lang=getLanguage(),id=String(item.id||item.nl);
-    const all=read(key('slide.deck',lang),{}).cards||[];
-    const extra=read(key('slide.details',lang),{});
+    const all=read(key('slide.deck.v2',lang),{}).cards||[];
+    const extra=read(key('slide.details.v2',lang),{});
     const existing=all.find(w=>String(w.id)===id) || extra[id];
     if(existing)return existing;
     const response=await fetch('/study-slide-deck',{
@@ -231,7 +269,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     const data=await response.json();
     if(!response.ok||!data.cards?.[0])throw new Error(data.error||'Explanation unavailable');
     if(lang===getLanguage()){
-      extra[id]=data.cards[0];store(key('slide.details',lang),extra);
+      extra[id]=data.cards[0];store(key('slide.details.v2',lang),extra);
     }
     return data.cards[0];
   }
