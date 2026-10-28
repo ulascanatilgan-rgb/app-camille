@@ -1,4 +1,4 @@
-const CACHE = 'ecl-triple-persona-v41';
+const CACHE = 'ecl-button-first-type-dock-v42';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
