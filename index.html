@@ -64,6 +64,15 @@
       </select>
       <span class="topic-strip-caption" id="topicCaption">Free conversation</span>
     </div>
+    <div class="conversation-provider-strip" id="conversationProvider" role="group" aria-label="Choose conversation connection">
+      <button id="providerVideoButton" class="provider-choice active" type="button" data-provider="video" aria-pressed="true">
+        <span class="provider-emoji" aria-hidden="true">◉</span> Video + Voice
+      </button>
+      <button id="providerVoiceButton" class="provider-choice" type="button" data-provider="voice" aria-pressed="false">
+        <span class="provider-emoji" aria-hidden="true">♫</span> Voice Only
+      </button>
+      <span class="provider-note" id="providerNote">Anam avatar &amp; voice</span>
+    </div>
 
     <section class="workspace">
       <section id="avatarColumn" class="avatar-column" aria-label="Selected Anam live avatar">
@@ -261,7 +270,7 @@
   <dialog id="installDialog">
     <div class="settings-card install-card">
       <div class="eyebrow">INSTALL</div>
-      <h2>Camille on your phone</h2>
+      <h2>ECL on your phone</h2>
       <div id="iosInstallHelp" class="install-help">
         <p><strong>iPhone / iPad:</strong></p>
         <p>In Safari: Share → <strong>Add to Home Screen</strong> → Add.</p>
