@@ -163,9 +163,9 @@ export function registerStudyRoutes(app) {
     res.setHeader('Cache-Control','private, max-age=3600');
     if(!process.env.OPENAI_API_KEY)return res.status(503).json({error:'Voice API not configured.'});
     const language=LANGUAGE[req.body?.language]?req.body.language:'nl';
-    const text=safeText(req.body?.text,4300).slice(0,4000);
+    const text=safeText(req.body?.text,6500).slice(0,6200);
     const storyId=safeText(req.body?.storyId,140);
-    if(text.length<60||!storyId || text.length>4000)return res.status(400).json({error:'Invalid narration request.'});
+    if(text.length<60||!storyId || text.length>6200)return res.status(400).json({error:'Invalid narration request.'});
     const voiceKey=language+':'+storyId+':'+text.length+':'+text.slice(0,38);
     const saved=newsAudioCache.get(voiceKey);
     if(saved){res.type('audio/mpeg');return res.send(saved);}
@@ -184,7 +184,7 @@ export function registerStudyRoutes(app) {
         signal:AbortSignal.timeout(70000),
         body:JSON.stringify({
           model:'gpt-4o-mini-tts',
-          voice:'marin',response_format:'mp3',speed:1.06,
+          voice:'marin',response_format:'mp3',speed:1.02,
           instructions:'Read this '+LANGUAGE[language].name+' news story with a natural confident, relaxed, modern radio-presenter voice. Smooth connected flow, clear pronunciation, lightly expressive, understated and cool, never robotic or theatrical. Do not add or remove any words.',
           input:text
         })
@@ -270,7 +270,7 @@ export function registerStudyRoutes(app) {
         'Never invent facts, names, amounts, quotations, prices, dates or developments absent from the supplied facts.',
         'If the headline gives few facts, explain its general context neutrally and explicitly mark uncertainty.',
         'Never reproduce any publisher article or substantial excerpts. Create distinct original educational reporting based on short RSS facts and general context; give the publisher source link.',
-        'Create exactly 3 original reports in the supplied order, each 18 to 25 natural sentences totaling about 290–420 words in the target language. Write one coherent article with short paragraphs, not isolated vocabulary drills or bullets.',
+        'Create exactly 3 original reports in the supplied order, each 23 to 30 natural sentences totaling about 350–480 words in the target language. Write one coherent article with short paragraphs, not isolated vocabulary drills or bullets.',
         'Each story: its own original target-language title; sentences array of {"target":"...","english":"..."} pairs. Each sentence should flow into the next as a continuous essay.',
         'The english text must be a natural, faithful English translation of the corresponding target sentence.',
         'Each story: exactly 10 useful vocabulary entries, {"word":"...","english":"...","definition":"...","example":"..."}.',
@@ -285,13 +285,13 @@ export function registerStudyRoutes(app) {
       }),13000);
       const stories=(Array.isArray(generated.stories)?generated.stories:[]).slice(0,3).map((o,i)=>{
         const source=titles[i];if(!source)return null;
-        const sentences=(Array.isArray(o.sentences)?o.sentences:[]).slice(0,29)
+        const sentences=(Array.isArray(o.sentences)?o.sentences:[]).slice(0,34)
           .map(x=>({target:safeText(x?.target,360),english:safeText(x?.english,360)}))
           .filter(x=>x.target&&x.english);
         const words=(Array.isArray(o.words)?o.words:[]).slice(0,10)
           .map(x=>({word:safeText(x?.word,65),english:safeText(x?.english,110),definition:safeText(x?.definition,240),example:safeText(x?.example,240)}))
           .filter(w=>isValidWord(w.word)&&w.english&&w.definition&&w.example);
-        if(sentences.length<14||words.length<5)return null;
+        if(sentences.length<18||words.length<5)return null;
         return {id:language+'-'+getDay()+'-'+i,title:safeText(o.title,190)||source.headline,
           sourceHeadline:source.headline,source:source.source||'Google News',url:source.link,
           publishedAt:source.publishedAt,sentences,words};
