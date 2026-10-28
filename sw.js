@@ -1,4 +1,4 @@
-const CACHE = 'ecl-language-lock-v43';
+const CACHE = 'ecl-themes-v44';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
