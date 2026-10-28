@@ -389,7 +389,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       empty.textContent='No practice history yet. Swipe a Slide card to begin.';
       list.append(empty);
     }
-    for(const item of results.slice(0,200)){
+    for(const item of results.slice(0,1000)){
       const row=document.createElement('div');row.className='slide-history-row';
       const mark=document.createElement('span');
       mark.className=item.correct?'slide-result-correct':'slide-result-wrong';
@@ -450,7 +450,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     const lang=getLanguage(),today=safeDate();
     if(newsLang!==lang){
       stopNews();newsLang=lang;newsReaderIndex=-1;archiveStory=null;
-      const saved=read(key('news.daily.long.v2',lang),null);
+      const saved=read(key('news.daily.long.v3',lang),null);
       if(saved?.stories?.length)saveNewsArchive(saved.stories);
       newsData=saved?.updatedAt?.slice(0,10)===today?saved:null;
     }
@@ -470,7 +470,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       const meta=document.createElement('span');meta.className='news-card-meta';
       meta.textContent=(index+1)+' / 3 · '+story.source+(story.publishedAt?' · '+new Date(story.publishedAt).toLocaleDateString():'');
       const h=document.createElement('strong');h.textContent=story.title;
-      const count=(story.sentences||[]).reduce((sum,s)=>sum+String(s.target||'').trim().split(/\\s+/).length,0);
+      const count=(story.sentences||[]).reduce((sum,s)=>sum+String(s.target||'').trim().split(/\s+/).length,0);
       const sub=document.createElement('span');sub.textContent='Read & listen · About '+count+' words';
       btn.append(meta,h,sub);
       btn.addEventListener('click',()=>{newsReaderIndex=index;renderNewsReader();});
@@ -479,7 +479,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   }
   async function updateNews() {
     const lang=getLanguage(),today=safeDate();
-    const cached=read(key('news.daily.long.v2',lang),null);
+    const cached=read(key('news.daily.long.v3',lang),null);
     // One dated update per language per day. Reopening uses saved content.
     if(cached?.updatedAt?.startsWith(today)){
       saveNewsArchive(cached.stories||[]);
@@ -491,7 +491,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       const data=await resp.json();
       if(!resp.ok)throw new Error(data?.error||'News unavailable');
       if(!Array.isArray(data.stories)||data.stories.length!==3)throw new Error('Incomplete news update');
-      store(key('news.daily.long.v2',lang),data);
+      store(key('news.daily.long.v3',lang),data);
       if(lang===getLanguage()){
         saveNewsArchive(data.stories);
         newsData=data;newsLang=lang;newsReaderIndex=-1;archiveStory=null;renderNews();
