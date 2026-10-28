@@ -443,28 +443,105 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     $('newsCompleteButton').setAttribute('aria-pressed',String(completeNews));
     $('newsCompleteButton').textContent=completeNews?'Focused text':'Complete text';
   }
+  const stripToken=text=>String(text||'')
+    .replace(/^[^\\p{L}\\p{N}]+|[^\\p{L}\\p{N}]+$/gu,'').toLocaleLowerCase(locale[getLanguage()]||'en');
+  let focusedWord=null,focusedSentence=0,focusedChar=0;
+  async function showNewsWordDetails(token,sentenceIndex,charStart){
+    const article=currentArticle();if(!article)return;
+    stopNews();
+    focusedSentence=sentenceIndex;focusedChar=charStart;
+    const word=String(token||'').replace(/^[^\\p{L}\\p{N}]+|[^\\p{L}\\p{N}]+$/gu,'');
+    if(!word)return;
+    const panel=$('newsWordDetail');panel.hidden=false;
+    focusedWord=word;
+    info('newsWordTitle',word);
+    info('newsWordMeaning','Loading English meaning…');
+    info('newsWordDefinition','');
+    info('newsWordExample','');
+    const seq=++wordLookupSeq;
+    const fromArticle=article.words?.find(x=>stripToken(x.word)===stripToken(word));
+    let data=fromArticle;
+    if(!data){
+      const cache=read(key('news.lookup'),{});
+      const cacheKey=(article.id||'article')+'|'+sentenceIndex+'|'+stripToken(word);
+      data=cache[cacheKey];
+      if(!data){
+        try {
+          const response=await fetch('/study-news-word',{
+            method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({language:getLanguage(),word,
+              sentence:article.sentences[sentenceIndex]?.target||''})
+          });
+          const result=await response.json();
+          if(!response.ok)throw new Error(result.error||'Unable to explain this word.');
+          data=result;
+          cache[cacheKey]=data;store(key('news.lookup'),cache);
+        }catch(error){
+          if(seq===wordLookupSeq){
+            info('newsWordMeaning',String(error?.message||'Explanation unavailable.'));
+            info('newsWordDefinition','Try selecting another word or retry.');
+          }
+          return;
+        }
+      }
+    }
+    if(seq!==wordLookupSeq||focusedWord!==word||currentPage!=='news')return;
+    info('newsWordMeaning','English: '+data.english);
+    info('newsWordDefinition',data.definition);
+    info('newsWordExample',data.example);
+    $('newsWordPlay').onclick=()=>say(word);
+    $('newsExamplePlay').onclick=()=>say(data.example);
+    $('newsWordFromHere').onclick=()=>seekNews(sentenceIndex,charStart,true);
+    panel.scrollIntoView({block:'nearest',behavior:'smooth'});
+  }
+  $('newsWordClose').addEventListener('click',()=>{$('newsWordDetail').hidden=true;wordLookupSeq++;});
   function renderArticleText(article) {
     const target=$('newsReadTarget');target.replaceChildren();
-    article.sentences.forEach((s,i)=>{
+    article.sentences.forEach((sentence,i)=>{
       const line=document.createElement('p');line.className='news-sentence';
       line.dataset.sentence=String(i);
       if(i===speechIndex)line.classList.add('active-sentence');
-      // Tokenization by whitespace preserves punctuation and word offsets.
-      const tokens=s.target.split(/(\s+)/);
-      let pos=0;
+      const replay=document.createElement('button');replay.type='button';
+      replay.className='news-sentence-play';replay.textContent='▶';
+      replay.setAttribute('aria-label','Read sentence '+(i+1));
+      replay.addEventListener('click',ev=>{ev.stopPropagation();seekNews(i,0,true)});
+      line.append(replay);
+      line.addEventListener('click',()=>seekNews(i,0,true));
+      // One selectable span per word, with accurate character positions.
+      const tokens=sentence.target.split(/(\\s+)/);let pos=0;
       for(const token of tokens){
         if(!token)continue;
-        if(/^\s+$/.test(token)){line.append(document.createTextNode(token));pos+=token.length;continue;}
+        if(/^\\s+$/.test(token)){line.append(document.createTextNode(token));pos+=token.length;continue;}
         const span=document.createElement('span');span.className='news-token';
         span.textContent=token;span.dataset.charStart=String(pos);
-        if(i===speechIndex && pos<=wordHighlight &&
-           wordHighlight<pos+token.length)span.classList.add('speaking');
+        span.tabIndex=0;span.setAttribute('role','button');
+        span.setAttribute('aria-label','Explain word '+token);
+        if(i===speechIndex&&pos<=wordHighlight&&wordHighlight<pos+token.length)
+          span.classList.add('speaking');
+        const at=pos;
+        span.addEventListener('click',ev=>{ev.stopPropagation();void showNewsWordDetails(token,i,at)});
+        span.addEventListener('keydown',ev=>{
+          if(ev.key==='Enter'||ev.key===' '){
+            ev.preventDefault();ev.stopPropagation();void showNewsWordDetails(token,i,at);
+          }
+        });
         line.append(span);pos+=token.length;
       }
       target.append(line);
+      if(completeNews){
+        const english=document.createElement('p');english.className='news-complete-english';
+        english.textContent=sentence.english;
+        target.append(english);
+      }
     });
     target.querySelector('.active-sentence')?.scrollIntoView({block:'nearest',behavior:'smooth'});
   }
+  $('newsCompleteButton').addEventListener('click',()=>{
+    completeNews=!completeNews;
+    $('newsCompleteButton').setAttribute('aria-pressed',String(completeNews));
+    $('newsCompleteButton').textContent=completeNews?'Focused text':'Complete text';
+    const article=currentArticle();if(article)renderArticleText(article);
+  });
   function setSpeechIndex(i,word=-1) {
     const story=currentArticle();if(!story)return;
     speechIndex=i;wordHighlight=word;
