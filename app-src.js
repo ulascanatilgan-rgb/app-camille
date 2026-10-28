@@ -2258,7 +2258,7 @@ async function connectVoiceOnly() {
   setStatus('Connecting OpenAI voice…');
   setAvatarLive(false);
   avatarBadge.textContent='OPENAI VOICE';
-  avatarPlaceholderText.textContent=personaName()+' · OpenAI Voice Only';
+  avatarPlaceholderText.textContent=personaName()+' · AI-generated voice';
   const languageAtStart=targetLanguage;
   const personaAtStart=selectedPersona;
   const themeAtStart=selectedTopic;
@@ -2328,7 +2328,7 @@ async function connectVoiceOnly() {
     micLabel.textContent='Live';
     endButton.disabled=false;
     avatarBadge.textContent='OPENAI VOICE';
-    avatarPlaceholderText.textContent=personaName()+' · Live audio conversation';
+    avatarPlaceholderText.textContent=personaName()+' · AI voice active';
     beginHistorySession();
     saveCurrentHistory();
     applyInteractionAudioState();
