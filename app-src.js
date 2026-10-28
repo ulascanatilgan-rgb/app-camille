@@ -1101,7 +1101,7 @@ async function showTip() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
-      body: JSON.stringify({ text: source, targetLanguage, persona:selectedPersona, recentMessages })
+      body: JSON.stringify({ text: source, targetLanguage, persona:selectedPersona, topic:selectedTopic, recentMessages })
     });
     if (!response.ok) throw new Error('Tip unavailable');
     const data = await response.json();
@@ -1207,6 +1207,7 @@ async function requestQuickChoices(camilleText) {
         text: clean,
         targetLanguage,
         persona:selectedPersona,
+        topic:selectedTopic,
         recentMessages
       })
     });
@@ -1366,6 +1367,7 @@ function beginHistorySession() {
   const history = loadJson(historyKey(), []);
   history.push({
     id: currentHistorySessionId,
+    topic: selectedTopic,
     persona: selectedPersona,
     startedAt: new Date().toISOString(),
     endedAt: null,
@@ -1386,6 +1388,7 @@ function saveCurrentHistory() {
 
   session.difficulty = difficulty;
   session.persona = selectedPersona;
+  session.topic = selectedTopic;
   session.messages = currentMessages
     .filter(message => message?.content?.trim())
     .slice(-200)
@@ -1562,7 +1565,7 @@ function renderHistoryDialog() {
       const meta = document.createElement('div');
       meta.className = 'history-session-meta';
       const end = session.endedAt ? `–${formatTime(session.endedAt)}` : '';
-      meta.textContent = `${formatTime(session.startedAt)}${end} · ${personaName(session.persona || 'emma')} · Level ${session.difficulty || 2}`;
+      meta.textContent = `${formatTime(session.startedAt)}${end} · ${personaName(session.persona || 'emma')} · ${ECL_TOPICS[normalizeTopic(session.topic)].label} · Level ${session.difficulty || 2}`;
       card.appendChild(meta);
 
       for (const message of session.messages) {
@@ -1788,6 +1791,7 @@ async function sendTypedTurn(text, inputKind = 'type') {
         correctionLevel: correctionLevel.value || 'medium',
         targetLanguage,
         persona:selectedPersona,
+        topic:selectedTopic,
         choiceModeEnabled,
         interactionMode,
         inputKind
@@ -1862,6 +1866,7 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
         correctionLevel: correctionLevel.value || 'medium',
         targetLanguage,
         persona:selectedPersona,
+        topic:selectedTopic,
         choiceModeEnabled,
         interactionMode,
         inputKind: 'speak'
@@ -2441,6 +2446,52 @@ document.addEventListener('click', event => {
   difficultyToggle?.setAttribute('aria-expanded', 'false');
 });
 
+topicSelect?.addEventListener('change', async () => {
+  const next=normalizeTopic(topicSelect.value);
+  if(next===selectedTopic || switchingTopic || connecting || switchingPersona) {
+    updateTopicUi();
+    return;
+  }
+  switchingTopic=true;
+  updateTopicUi();
+  const wasLive=connected || Boolean(anamClient);
+  try {
+    // Stop previous-topic audio and store that conversation before starting
+    // a new session with the new theme in the original system prompt.
+    if(wasLive)await disconnect();
+    selectedTopic=next;
+    localStorage.setItem(TOPIC_KEY,next);
+    clearQuickChoices();
+    hideTip();
+    cachedTip=null;
+    currentMessages=[];
+    translationByMessageId.clear();
+    streamBuffers.clear();
+    vocabProcessedIds.clear();
+    vocabSentenceCounts.clear();
+    lastProcessedUserMessageId=null;
+    pinnedUserMessageId=null;
+    activeSubtitleMessageId=null;
+    lastUserPin.hidden=true;
+    lastUserPinText.textContent='';
+    if(lastUserPinEn)lastUserPinEn.textContent='';
+    messagesEl.innerHTML='';
+    updateLanguageUi(true);
+    updateTopicUi();
+    renderHistoryDialog();
+    renderSessionHistoryDialog();
+    primeButtonChoices();
+    setStatus(next==='open' ? languageConfig().ready : ECL_TOPICS[next].label+' theme ready');
+    if(wasLive)await connect();
+  } catch(error) {
+    console.error('ECL theme switch failed:',error);
+    setStatus('Theme unavailable — try Start');
+  } finally {
+    switchingTopic=false;
+    updateTopicUi();
+  }
+});
+
 languageToggle?.addEventListener('click', async () => {
   if (languageToggle.disabled || connecting) return;
   // A language change must never leave old-language audio playing.
@@ -2544,6 +2595,7 @@ migrateLanguageStores();
 learnedWords = loadJson(wordsKey(), []);
 updateDifficultyUi();
 updateLanguageUi(true);
+updateTopicUi();
 updateInteractionModeUi();
 setAvatarLive(false);
 updatePersonaUi();
