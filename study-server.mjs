@@ -85,9 +85,9 @@ export function registerStudyRoutes(app) {
         if(!definition||!sentence.includes('____')||sentence.split('____').length!==2||
           !isValidWord(wrong)||wrong.toLowerCase()===w.word.toLowerCase() ||
           !/\p{Script=Latin}/u.test(definition))return null;
-        if(new RegExp('\\b'+w.word.replace(/[.*+?^$()|[\]{}\\]/g,'\\$&')+'\\b','iu').test(definition))return null;
+        if(definition.toLocaleLowerCase().includes(w.word.toLocaleLowerCase()))return null;
         const count=sentence.trim().split(/\s+/).length;
-        if(count<5||count>13)return null;
+        if(count<6||count>11)return null;
         return {id:w.id,word:w.word,meaning:w.meaning,definition,sentence,wrong};
       }).filter(Boolean);
       res.json({cards});
