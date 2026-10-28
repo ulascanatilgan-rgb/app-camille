@@ -448,7 +448,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     stopNews();speechIndex=0;speechOffset=0;wordHighlight=-1;
     $('newsWordDetail').hidden=true;
     renderArticleText(article);
-    info('newsReadEnglish',article.sentences[0]?.english||'');
+    info('newsReadEnglish',getLanguage()==='en'?'':(article.sentences[0]?.english||''));
     $('newsRunButton').textContent='▶ Run';
     $('newsPauseButton').textContent='Stop';
     $('newsCompleteButton').setAttribute('aria-pressed',String(completeNews));
@@ -539,7 +539,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
         line.append(span);pos+=token.length;
       }
       target.append(line);
-      if(completeNews){
+      if(completeNews && getLanguage()!=='en'){
         const english=document.createElement('p');english.className='news-complete-english';
         english.textContent=sentence.english;
         target.append(english);
@@ -564,7 +564,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
         token.classList.toggle('speaking',n===i&&word>=pos&&word<pos+token.textContent.length);
       }
     });
-    info('newsReadEnglish',story.sentences[i]?.english||'');
+    info('newsReadEnglish',getLanguage()==='en'?'':(story.sentences[i]?.english||''));
     lines[i]?.scrollIntoView({block:'nearest',behavior:'smooth'});
   }
   function seekNews(index,offset=0,autoplay=true){
