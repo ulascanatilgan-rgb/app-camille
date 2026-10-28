@@ -204,48 +204,100 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   $('slideReloadButton').addEventListener('click',()=>void loadSlide(true));
 
   // Word libraries are independent: Slide uses Talk words, News has its own.
+  async function slideWordDetails(item) {
+    const lang=getLanguage(),id=String(item.id||item.nl);
+    const all=read(key('slide.deck',lang),{}).cards||[];
+    const extra=read(key('slide.details',lang),{});
+    const existing=all.find(w=>String(w.id)===id) || extra[id];
+    if(existing)return existing;
+    const response=await fetch('/study-slide-deck',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({language:lang,words:[{id,word:item.nl,meaning:item.en}]})
+    });
+    const data=await response.json();
+    if(!response.ok||!data.cards?.[0])throw new Error(data.error||'Explanation unavailable');
+    if(lang===getLanguage()){
+      extra[id]=data.cards[0];store(key('slide.details',lang),extra);
+    }
+    return data.cards[0];
+  }
+  function createPlay(label,text) {
+    const play=document.createElement('button');play.type='button';play.className='study-word-audio';
+    play.textContent='🎧';play.title=label;play.setAttribute('aria-label',label);
+    play.addEventListener('click',ev=>{ev.stopPropagation();say(text)});
+    return play;
+  }
   function openWordLibrary(which) {
     stopNews();
-    const dialog=$('studyWordsDialog');
-    const lang=getLanguage();
-    const isSlide=which==='slide';
+    const dialog=$('studyWordsDialog'),lang=getLanguage(),isSlide=which==='slide';
     info('studyWordsTitle',isSlide?'Slide Words':'News Words');
     info('studyWordsEyebrow',(isSlide?'TALK WORDS':'NEWS VOCABULARY')+' · '+lang.toUpperCase());
     const filters=$('studyWordsFilters');filters.replaceChildren();
     const options=isSlide?['All Words','Wrong Words','Correct Words']:['All Words'];
-    const records=isSlide?validWords():newsWords();
-    const results=score();
-    const list=$('studyWordsList');
+    const records=isSlide?validWords():newsWords(),results=score(),list=$('studyWordsList');
+    let filterRun=0;
     function renderFilter(filter) {
+      filterRun++;
+      const run=filterRun;
       [...filters.children].forEach(e=>e.classList.toggle('active',e.textContent===filter));
       list.replaceChildren();
       let selected=records;
-      if(isSlide&&filter!=='All Words'){
+      if(isSlide && filter!=='All Words'){
         const good=filter==='Correct Words';
         const ids=new Set(results.filter(r=>r.correct===good).map(r=>r.id));
         selected=records.filter(w=>ids.has(w.id||w.nl));
       }
-      if(!selected.length){const p=document.createElement('p');p.className='study-empty';p.textContent='No words in this category yet.';list.append(p);return}
-      for(const item of [...selected].reverse()){
+      if(!selected.length){
+        const p=document.createElement('p');p.className='study-empty';
+        p.textContent='No words in this category yet.';list.append(p);return;
+      }
+      for(const item of [...selected].reverse()) {
+        const word=isSlide?item.nl:item.word;
         const row=document.createElement('div');row.className='study-word-row';
         const main=document.createElement('div');main.className='study-word-row-main';
-        const word=document.createElement('strong');word.textContent=isSlide?item.nl:item.word;
-        const trans=document.createElement('p');trans.textContent=isSlide?item.en:item.english;
-        main.append(word,trans);
-        if(!isSlide){
-          const def=document.createElement('p');def.textContent=item.definition;def.className='study-word-detail';
-          const example=document.createElement('p');example.textContent=item.example;example.className='study-word-example';
-          main.append(def,example);
-        }
-        const play=document.createElement('button');play.type='button';play.className='study-word-audio';
-        play.textContent='♫';play.setAttribute('aria-label','Play '+(isSlide?item.nl:item.word));
-        play.addEventListener('click',()=>say(isSlide?item.nl:item.word));
+        const heading=document.createElement('div');heading.className='study-word-row-heading';
+        const expand=document.createElement('button');expand.type='button';
+        expand.className='study-word-expand';expand.textContent=word+' · '+(isSlide?item.en:item.english);
+        expand.setAttribute('aria-expanded','false');
+        heading.append(expand);
+        main.append(heading);
+        const detail=document.createElement('div');detail.className='study-word-expanded';detail.hidden=true;
+        main.append(detail);
+        let loaded=false;
+        const setDetail=(def,example)=>{
+          detail.replaceChildren();
+          const explanation=document.createElement('p');explanation.className='study-word-detail';
+          explanation.textContent=def;
+          const usage=document.createElement('p');usage.className='study-word-example';
+          usage.textContent=example;
+          const actions=document.createElement('div');actions.className='study-word-actions';
+          actions.append(createPlay('Hear '+word,word),createPlay('Hear example sentence',example));
+          detail.append(explanation,usage,actions);
+        };
+        expand.addEventListener('click',async()=>{
+          const open=detail.hidden;
+          detail.hidden=!open;expand.setAttribute('aria-expanded',String(open));
+          if(!open||loaded)return;
+          if(!isSlide){
+            setDetail(item.definition,item.example);loaded=true;return;
+          }
+          detail.textContent='Preparing explanation and example…';
+          try {
+            const found=await slideWordDetails(item);
+            if(run!==filterRun||lang!==getLanguage())return;
+            const complete=found.sentence.replace('____',found.word);
+            setDetail(found.definition,complete);loaded=true;
+          }catch(err){
+            detail.textContent='Could not prepare this example. Tap the word to retry.';
+          }
+        });
+        const play=createPlay('Hear '+word,word);
         row.append(main,play);list.append(row);
       }
     }
-    for(const option of options){
-      const btn=document.createElement('button');btn.type='button';btn.textContent=option;
-      btn.addEventListener('click',()=>renderFilter(option));filters.append(btn);
+    for(const option of options) {
+      const button=document.createElement('button');button.type='button';button.textContent=option;
+      button.addEventListener('click',()=>renderFilter(option));filters.append(button);
     }
     renderFilter('All Words');dialog.showModal();
   }
