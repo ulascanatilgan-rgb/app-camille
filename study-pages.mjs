@@ -59,6 +59,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     for(const [name,node] of Object.entries(pages))node.hidden=name!==next;
     document.querySelector('.topic-strip').hidden=next!=='talk';
     document.querySelector('.conversation-provider-strip').hidden=next!=='talk';
+    document.getElementById('talkToolsStrip').hidden=next!=='talk';
     for(const btn of tabs){
       const selected=btn.dataset.page===next;
       btn.classList.toggle('selected',selected);
@@ -314,6 +315,38 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     }
     renderFilter('All Words');dialog.showModal();
   }
+  function openSlideHistory() {
+    const dialog=$('slideHistoryDialog'),list=$('slideHistoryList');
+    list.replaceChildren();
+    const results=score().slice().reverse();
+    const heading=document.createElement('p');heading.className='slide-history-summary';
+    const correct=results.filter(x=>x.correct).length;
+    heading.textContent=results.length+' answers · '+correct+' correct · '+(results.length-correct)+' wrong';
+    list.append(heading);
+    if(!results.length){
+      const empty=document.createElement('p');empty.className='study-empty';
+      empty.textContent='No practice history yet. Swipe a Slide card to begin.';
+      list.append(empty);
+    }
+    for(const item of results.slice(0,200)){
+      const row=document.createElement('div');row.className='slide-history-row';
+      const mark=document.createElement('span');
+      mark.className=item.correct?'slide-result-correct':'slide-result-wrong';
+      mark.textContent=item.correct?'✓ Correct':'× Wrong';
+      const word=document.createElement('strong');word.textContent=item.word||'';
+      const meaning=document.createElement('span');meaning.textContent=item.meaning||'';
+      const timestamp=document.createElement('small');
+      timestamp.textContent=item.at?new Date(item.at).toLocaleString():'';
+      row.append(mark,word,meaning,timestamp);
+      list.append(row);
+    }
+    dialog.showModal();
+  }
+  $('slideHistoryButton').addEventListener('click',openSlideHistory);
+  $('slideHistoryClose').addEventListener('click',()=>$('slideHistoryDialog').close());
+  $('slideHistoryDialog').addEventListener('click',ev=>{
+    if(ev.target===$('slideHistoryDialog'))ev.target.close();
+  });
   $('slideWordsButton').addEventListener('click',()=>openWordLibrary('slide'));
   $('newsWordsButton').addEventListener('click',()=>openWordLibrary('news'));
   $('studyWordsClose').addEventListener('click',()=>$('studyWordsDialog').close());
@@ -660,5 +693,5 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     if(currentPage==='news'){newsLang='';newsReaderIndex=-1;archiveStory=null;renderNews();}
   }
   return {refreshLanguage,stopNews,getPage:()=>currentPage,openNewsArchive,
-    openWordLibrary};
+    openSlideHistory,openWordLibrary};
 }
