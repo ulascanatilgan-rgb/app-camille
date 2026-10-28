@@ -119,8 +119,6 @@ let pendingChoiceSource = '';
 let tipRequestSeq = 0;
 let tipAbortController = null;
 let cachedTip = null;
-let stableViewportHeight = window.innerHeight;
-let stableWorkspaceHeight = workspaceEl?.getBoundingClientRect().height || 0;
 let replaySequence = 0;
 let replayingAudio = false;
 let replayHighlightTimer = null;
@@ -894,38 +892,24 @@ async function finalizeSubtitle(nlText, messageId) {
   renderMessages(currentMessages);
 }
 
-function captureStableTypeViewport() {
-  stableViewportHeight = window.innerHeight || stableViewportHeight;
-  stableWorkspaceHeight = workspaceEl?.getBoundingClientRect().height || stableWorkspaceHeight;
-  document.documentElement.style.setProperty('--stable-workspace-height', `${Math.round(stableWorkspaceHeight)}px`);
-  updateTypeKeyboardOffset();
-}
-
+// iPhone keyboard can shrink visualViewport without changing 100dvh.
+// Keep Type in the regular footer while resizing its available workspace.
 function updateTypeKeyboardOffset() {
-  if (interactionMode !== 'type') {
-    document.documentElement.style.setProperty('--keyboard-offset', '0px');
-    return;
-  }
-
-  const viewport = window.visualViewport;
-  if (!viewport) {
-    document.documentElement.style.setProperty('--keyboard-offset', '0px');
-    return;
-  }
-
-  const keyboardOffset = Math.max(0, stableViewportHeight - viewport.height - viewport.offsetTop);
-  document.documentElement.style.setProperty('--keyboard-offset', `${Math.round(keyboardOffset)}px`);
+  const vv=window.visualViewport;
+  const visible=vv?.height || window.innerHeight;
+  const header=document.querySelector('.topbar')?.getBoundingClientRect().height || 100;
+  document.documentElement.style.setProperty('--ecl-visible-workspace-height',Math.max(155,Math.round(visible-header))+'px');
+  const covered=window.innerHeight-visible-(vv?.offsetTop||0);
+  document.body.classList.toggle('ecl-keyboard-visible',interactionMode==='type'&&covered>100);
 }
-
+function captureStableTypeViewport() { updateTypeKeyboardOffset(); }
 function updateTypeModeLayout() {
-  const typing = interactionMode === 'type';
-  document.body.classList.toggle('type-input-mode', typing);
-
-  if (typing) {
-    captureStableTypeViewport();
-    setTimeout(updateTypeKeyboardOffset, 60);
-  } else {
-    document.documentElement.style.setProperty('--keyboard-offset', '0px');
+  const active=interactionMode==='type';
+  document.body.classList.toggle('type-input-mode',active);
+  if(active)updateTypeKeyboardOffset();
+  else {
+    document.body.classList.remove('ecl-keyboard-visible');
+    document.documentElement.style.removeProperty('--ecl-visible-workspace-height');
   }
 }
 function updateInteractionModeUi() {
@@ -950,10 +934,8 @@ function updateInteractionModeUi() {
   if (interactionMode !== 'button') clearQuickChoices();
   if (tipButton) tipButton.hidden = interactionMode === 'button';
   hideTip();
-  if (interactionMode === 'type' && connected) {
-    captureStableTypeViewport();
-    setTimeout(() => typeInput?.focus({ preventScroll: true }), 80);
-  }
+  // Populate immediately, including a saved Button selection before Start.
+  if (interactionMode === 'button') primeButtonChoices();
 }
 
 function applyInteractionAudioState() {
@@ -1022,7 +1004,7 @@ function setInteractionMode(mode) {
     } catch {}
     pushLearningContext();
 
-    if (mode === 'button' && !isResponding) primeButtonChoices();
+    if (mode === 'button') primeButtonChoices();
   }
 }
 
@@ -2446,13 +2428,16 @@ wordsDialog.addEventListener('click', event => {
 
 window.visualViewport?.addEventListener('resize', updateTypeKeyboardOffset);
 window.visualViewport?.addEventListener('scroll', updateTypeKeyboardOffset);
-
-window.addEventListener('resize', () => {
-  if (interactionMode !== 'type') {
-    stableViewportHeight = window.innerHeight;
-    stableWorkspaceHeight = workspaceEl?.getBoundingClientRect().height || stableWorkspaceHeight;
-  }
+typeInput?.addEventListener('focus', () => {
+  updateTypeKeyboardOffset();
+  window.setTimeout(() => {
+    updateTypeKeyboardOffset();
+    if (conversationPane) conversationPane.scrollTop = conversationPane.scrollHeight;
+  }, 170);
 });
+typeInput?.addEventListener('blur', updateTypeKeyboardOffset);
+
+window.addEventListener('resize', updateTypeKeyboardOffset);
 
 window.addEventListener('beforeunload', () => {
   if (currentHistorySessionId) saveCurrentHistory();
