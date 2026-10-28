@@ -89,39 +89,81 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       const strong=document.createElement('strong');strong.textContent=answer;
       label.append(meta,strong);
     }
-    const c=$('slideCard');c.classList.remove('swipe-left','swipe-right');
+    const c=$('slideCard');
+    c.classList.remove('swipe-left','swipe-right','fly-left','fly-right','dragging','snap-back');
+    c.style.transform='';slideLocked=false;
   }
   function answerSlide(side) {
     const item=cards[cardIndex%cards.length];
-    if(!item||pendingDeck)return;
+    if(!item||pendingDeck||slideLocked)return;
+    slideLocked=true;
     const correct=side===item.correctSide;
     const results=score();results.push({
       id:item.id,word:item.word,meaning:item.meaning,correct,chosen:side,
       at:new Date().toISOString()
     });store(key('slide.results'),results.slice(-1000));
     info('slideFeedback',(correct?'Correct! ':'Wrong — ')+item.word+' · '+item.meaning);
-    const card=$('slideCard');card.classList.add(side==='left'?'swipe-left':'swipe-right');
-    cardIndex++;
+    const card=$('slideCard');
+    card.classList.remove('dragging','snap-back');
+    card.style.transform='';
+    card.classList.add(side==='left'?'fly-left':'fly-right');
+    const langAtSwipe=getLanguage();
+    const previousDeck=cards;
     window.setTimeout(()=>{
-      if(currentPage==='slide'&&deckLang===getLanguage())renderSlide();
-    },200);
+      if(cards!==previousDeck)return;
+      cardIndex++;
+      if(currentPage==='slide'&&deckLang===langAtSwipe)renderSlide();
+      else slideLocked=false;
+    },310);
     updateCounts();
   }
   $('slideLeftButton').addEventListener('click',()=>answerSlide('left'));
   $('slideRightButton').addEventListener('click',()=>answerSlide('right'));
-  let startX=null,startY=null;
+  // Genuine Tinder-style gesture: the card follows the pointer while held.
+  // Keep vertical scrolling available until horizontal movement is intentional.
+  let gesture=null,slideLocked=false;
   const slide=$('slideCard');
+  function resetSwipe(){
+    gesture=null;
+    slide.classList.remove('dragging');
+    slide.classList.add('snap-back');
+    slide.style.transform='';
+    slide.querySelectorAll('.slide-choice').forEach(e=>e.classList.remove('direction-active'));
+    window.setTimeout(()=>slide.classList.remove('snap-back'),220);
+  }
   slide.addEventListener('pointerdown',ev=>{
-    if(ev.target.closest('button'))return;
-    startX=ev.clientX;startY=ev.clientY;
+    if(slideLocked || pendingDeck || ev.button>0 || !cards.length)return;
+    gesture={id:ev.pointerId,x:ev.clientX,y:ev.clientY,dx:0,dy:0,tracking:false};
+  });
+  slide.addEventListener('pointermove',ev=>{
+    if(!gesture || ev.pointerId!==gesture.id || slideLocked)return;
+    const dx=ev.clientX-gesture.x,dy=ev.clientY-gesture.y;
+    gesture.dx=dx;gesture.dy=dy;
+    if(!gesture.tracking){
+      if(Math.abs(dy)>Math.abs(dx) && Math.abs(dy)>12){gesture=null;return;}
+      if(Math.abs(dx)<9 || Math.abs(dx)<=Math.abs(dy)*1.1)return;
+      gesture.tracking=true;
+      try{slide.setPointerCapture(ev.pointerId)}catch{}
+      slide.classList.remove('snap-back');slide.classList.add('dragging');
+    }
+    slide.style.transform='translateX('+dx+'px) rotate('+(dx/20)+'deg)';
+    const active=dx<-35?'left':dx>35?'right':'';
+    $('slideLeftWord').classList.toggle('direction-active',active==='left');
+    $('slideRightWord').classList.toggle('direction-active',active==='right');
+    if(ev.cancelable)ev.preventDefault();
   });
   slide.addEventListener('pointerup',ev=>{
-    if(startX===null)return;
-    const dx=ev.clientX-startX,dy=ev.clientY-startY;
-    startX=null;startY=null;
-    if(Math.abs(dx)>65&&Math.abs(dx)>Math.abs(dy)*1.25)answerSlide(dx<0?'left':'right');
+    if(!gesture || ev.pointerId!==gesture.id)return;
+    const {dx,dy,tracking}=gesture;
+    gesture=null;
+    if(tracking && Math.abs(dx)>=Math.max(70,slide.clientWidth*.19) &&
+      Math.abs(dx)>Math.abs(dy)*1.2)answerSlide(dx<0?'left':'right');
+    else resetSwipe();
   });
-  slide.addEventListener('pointercancel',()=>{startX=null;});
+  slide.addEventListener('pointercancel',resetSwipe);
+  slide.addEventListener('lostpointercapture',()=>{
+    if(gesture && gesture.tracking)resetSwipe();
+  });
   slide.addEventListener('keydown',ev=>{
     if(ev.key==='ArrowLeft'||ev.key==='ArrowRight'){
       ev.preventDefault();answerSlide(ev.key==='ArrowLeft'?'left':'right');
