@@ -4776,3 +4776,104 @@ body.type-input-mode #typeSend {
   .topic-strip-caption {display:none !important;}
   .topic-select {width:min(60vw,190px) !important;max-width:60vw !important;}
 }
+
+
+/* ECL: three warm character colors, a clear selected outline */
+#personaPicker .persona-select {
+  border:2px solid transparent !important;
+  color:#181c1e !important;
+  font-weight:700 !important;
+  opacity:.92 !important;
+  box-shadow:none !important;
+}
+#personaPicker .persona-select[data-persona="emma"] {
+  background:#a87957 !important;
+  color:#fff9f3 !important;
+}
+#personaPicker .persona-select[data-persona="charlotte"] {
+  background:#cfac43 !important;
+  color:#272316 !important;
+}
+#personaPicker .persona-select[data-persona="louis"] {
+  background:#6693c7 !important;
+  color:#101c2b !important;
+}
+#personaPicker .persona-select[aria-pressed="true"],
+#personaPicker .persona-select.active {
+  border:2px solid #191b1e !important;
+  outline:1px solid #191b1e !important;
+  outline-offset:0 !important;
+  opacity:1 !important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.75),0 2px 6px rgba(0,0,0,.16) !important;
+}
+#personaPicker .persona-select:hover:not(:disabled) {
+  opacity:1 !important;
+  filter:brightness(1.08) !important;
+}
+.conversation-provider-strip {
+  height:44px !important; min-height:44px !important;
+  display:flex !important;
+  align-items:center;justify-content:center;
+  gap:8px;
+  padding:5px 14px;
+  border-bottom:1px solid #e2dacf;
+  background:#fcfbf7;
+  box-sizing:border-box;
+}
+.provider-choice {
+  min-height:32px !important;
+  display:inline-flex !important;
+  align-items:center;justify-content:center;
+  gap:5px;
+  padding:5px 14px !important;
+  border-radius:10px !important;
+  background:#f3efe8 !important;
+  color:#554f47 !important;
+  border:1px solid #d4ccbf !important;
+  font-size:11px !important;
+  font-weight:650 !important;
+  white-space:nowrap;
+  cursor:pointer;
+}
+.provider-choice[aria-pressed="true"] {
+  color:#fffaf2 !important;
+  background:#343c39 !important;
+  border-color:#222925 !important;
+  box-shadow:0 1px 5px rgba(0,0,0,.11);
+}
+.provider-choice:disabled {opacity:.65;cursor:wait;}
+.provider-emoji {font-size:13px;font-weight:700;}
+.provider-note {font-size:10px;color:#787064;}
+@media(min-width:761px) {
+  .workspace {height:calc(100dvh - 158px) !important;}
+  body.type-input-mode .workspace {height:calc(100dvh - 158px) !important;}
+}
+@media(max-width:760px) {
+  .conversation-provider-strip {
+    height:42px !important;min-height:42px !important;
+    padding:4px 8px !important;gap:7px !important;
+  }
+  .provider-choice {
+    padding:5px 10px !important;
+    flex:1 1 0;max-width:170px;
+    font-size:11px !important;
+  }
+  .provider-note {display:none !important;}
+  .workspace {height:calc(100dvh - 184px) !important;min-height:0 !important;}
+  body.type-input-mode .workspace {
+    height:var(--ecl-visible-workspace-height,calc(100dvh - 184px)) !important;
+    max-height:var(--ecl-visible-workspace-height,calc(100dvh - 184px)) !important;
+  }
+}
+/* In Voice Only the actual selected photo remains static; the WebRTC audio
+   is played by its own hidden audio element, never by an Anam video. */
+body.ecl-voice-only .avatar-placeholder {
+  display:block !important;
+  opacity:1 !important;
+  visibility:visible !important;
+}
+body.ecl-voice-only .anam-video {display:none !important;}
+body.ecl-voice-only .portrait-wrap {background:#252423 !important;}
+body.ecl-voice-only .avatar-placeholder .placeholder-text {
+  background:rgba(31,30,29,.68) !important;
+}
