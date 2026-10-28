@@ -523,7 +523,18 @@ async function replayText(text, element = null, { useAvatarVoice = false } = {})
       try { anamClient.muteInputAudio(); } catch {}
     }
 
-    if (useAvatarVoice && connected && anamClient) {
+    if (selectedProvider==='voice') {
+      if (!connected || !voiceSession) {
+        setStatus('Start Voice Only to replay sentences');
+        return;
+      }
+      const duration=estimateReplayDuration(clean);
+      const highlight=animateReplayHighlight(element,clean,duration,runId);
+      voiceSession.setMuted(true);
+      const spoken=await voiceSession.speakTextExactly(clean);
+      if(!spoken)throw new Error('OpenAI Realtime could not replay the sentence');
+      await highlight;
+    } else if (useAvatarVoice && connected && anamClient) {
       const duration = estimateReplayDuration(clean);
       const highlight = animateReplayHighlight(element, clean, duration, runId);
       await anamClient.talk(clean);
@@ -532,8 +543,9 @@ async function replayText(text, element = null, { useAvatarVoice = false } = {})
       await browserReplay(clean, element, runId);
     }
   } catch (error) {
-    console.warn('Replay failed, using local speech fallback:', error);
-    if (runId === replaySequence) await browserReplay(clean, element, runId);
+    console.warn('ECL replay failed:', error);
+    if(selectedProvider==='voice')setStatus('OpenAI replay unavailable');
+    else if (runId === replaySequence) await browserReplay(clean, element, runId);
   } finally {
     if (runId === replaySequence) {
       if (replayHighlightTimer) window.clearTimeout(replayHighlightTimer);
@@ -2407,6 +2419,12 @@ async function connect() {
 
     beginHistorySession();
     saveCurrentHistory();
+    // A mode switch preserves only a brief context summary, never an old
+    // Anam audio stream or a mixed voice provider session.
+    if(handoffContext) {
+      try { anamClient?.addContext('Earlier conversation context to continue naturally: '+handoffContext); } catch {}
+      handoffContext='';
+    }
     window.setTimeout(primeButtonChoices, 350);
     try { anamClient?.addContext(liveLanguageLockInstruction()); } catch {}
     pushLearningContext();
