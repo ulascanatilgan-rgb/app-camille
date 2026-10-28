@@ -1783,6 +1783,26 @@ function renderWordsDialog() {
 
 async function sendTypedTurn(text, inputKind = 'type') {
   const clean = String(text || '').trim();
+  if(selectedProvider==='voice') {
+    if(!clean || !voiceSession || !connected || isResponding)return;
+    // Text and Button input are sent to the SAME OpenAI Realtime session,
+    // not to Anam and not through the separate /chat response engine.
+    if(!voiceSession.sendText(clean)){
+      setStatus('OpenAI voice is not ready');
+      return;
+    }
+    clearQuickChoices();
+    hideTip();
+    const itemId='voice-typed-'+Date.now();
+    setLastUserPin(clean,itemId);
+    finalizeUserTranslation(clean,itemId);
+    upsertConversationTurn({id:itemId,role:'user',content:clean});
+    isResponding=true;
+    setStatus(personaName()+' is replying…');
+    saveCurrentHistory();
+    renderMessages(currentMessages);
+    return;
+  }
   if (!clean || !anamClient || !connected || isResponding) return;
 
   clearQuickChoices();
@@ -2469,7 +2489,11 @@ async function disconnect() {
   endHistorySession();
 
   try { activeChatAbort?.abort(); } catch {}
-
+  if(voiceSession) {
+    const active=voiceSession;
+    voiceSession=null;
+    try { await active.close(); } catch(error) { console.warn('OpenAI voice stop error:',error); }
+  }
   try {
     await anamClient?.stopStreaming();
   } catch (error) {
@@ -2490,7 +2514,7 @@ async function choosePersona(key) {
   switchingPersona = true;
   // update button states without replacing any current video stream
   for(const b of personaButtons)b.disabled=true;
-  const live=connected || Boolean(anamClient);
+  const live=connected || Boolean(anamClient) || Boolean(voiceSession);
   try {
     if(live) await disconnect();
     selectedPersona=key;
@@ -2503,6 +2527,36 @@ async function choosePersona(key) {
     updatePersonaUi();
   }
 }
+document.getElementById('conversationProvider')?.addEventListener('click', async event=>{
+  const button=event.target.closest('button[data-provider]');
+  if(!button)return;
+  const next=button.dataset.provider;
+  if(!['video','voice'].includes(next) || next===selectedProvider ||
+      switchingProvider || connecting || switchingPersona)return;
+  switchingProvider=true;
+  updateProviderUi();
+  const wasLive=connected||Boolean(anamClient)||Boolean(voiceSession);
+  const continuity=currentMessages.filter(x=>x?.content?.trim()).slice(-8)
+    .map(x=>(normalizedRole(x.role)==='user'?'Learner':personaName())+': '+x.content.trim()).join('\\n');
+  try {
+    if(wasLive)await disconnect();
+    selectedProvider=next;
+    localStorage.setItem(PROVIDER_KEY,next);
+    handoffContext=continuity.slice(-1800);
+    setAvatarLive(false);
+    updateProviderUi();
+    updatePersonaUi();
+    primeButtonChoices();
+    if(wasLive)await connect();
+  } catch(error) {
+    console.warn('Could not switch ECL voice mode',error);
+    setStatus('Could not change mode');
+  } finally {
+    switchingProvider=false;
+    updateProviderUi();
+  }
+});
+
 personaPicker?.addEventListener('click',event=>{
   const button=event.target.closest('button[data-persona]');
   if(button && personaPicker.contains(button)) choosePersona(button.dataset.persona);
@@ -2727,6 +2781,7 @@ window.addEventListener('unhandledrejection', event => {
 });
 
 migrateLanguageStores();
+updateProviderUi();
 learnedWords = loadJson(wordsKey(), []);
 updateDifficultyUi();
 updateLanguageUi(true);
