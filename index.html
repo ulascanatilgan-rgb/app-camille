@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=ecl-20261027" />
   <link rel="icon" type="image/png" href="/favicon-64.png?v=ecl-20261027" />
   <title>ECL — Emma, Charlotte &amp; Louis</title>
-  <link rel="stylesheet" href="/styles.css?v=ecl-news-editorial-20261028" />
+  <link rel="stylesheet" href="/styles.css?v=ecl-reader-swipes-20261029" />
 </head>
 <body>
   <main class="app-shell">
@@ -244,13 +244,9 @@
             <p id="slideSentence" class="slide-sentence"></p>
             <div class="slide-card-separator"></div>
             <div class="slide-choices">
-              <div id="slideLeftWord" class="slide-choice"><span>← LEFT</span><strong></strong></div>
-              <div id="slideRightWord" class="slide-choice"><span>RIGHT →</span><strong></strong></div>
+              <button id="slideLeftWord" class="slide-choice" type="button" aria-label="Choose the left word"><span>← LEFT</span><strong></strong></button>
+              <button id="slideRightWord" class="slide-choice" type="button" aria-label="Choose the right word"><span>RIGHT →</span><strong></strong></button>
             </div>
-          </div>
-          <div class="slide-actions">
-            <button id="slideLeftButton" type="button" class="slide-action-btn">← Left</button>
-            <button id="slideRightButton" type="button" class="slide-action-btn">Right →</button>
           </div>
           <div id="slideFeedback" class="slide-feedback" aria-live="assertive" role="status"></div>
           <button id="slideReloadButton" class="study-inline-button" type="button">New cards</button>
@@ -274,19 +270,20 @@
           <button id="newsBackButton" class="study-inline-button" type="button">← All stories</button>
           <div class="news-player-controls">
             <button id="newsRunButton" class="study-primary-button" type="button">▶ Run</button>
-            <button id="newsPrevButton" class="study-secondary-button" type="button" aria-label="Previous sentence">←</button>
+            <button id="newsPrevButton" class="study-secondary-button" type="button" aria-label="Previous sentence" title="Previous sentence">←</button>
           <button id="newsPauseButton" class="study-secondary-button" type="button">Stop</button>
-          <button id="newsNextButton" class="study-secondary-button" type="button" aria-label="Next sentence">→</button>
+          <button id="newsNextButton" class="study-secondary-button" type="button" aria-label="Next sentence" title="Next sentence">→</button>
           <button id="newsCompleteButton" class="study-secondary-button" type="button" aria-pressed="false">Complete text</button>
           </div>
         </div>
         <h2 id="newsReaderTitle"></h2>
         <div id="newsReaderSource" class="news-source-line"></div>
         <div id="newsNarrationDisclosure" class="news-voice-disclosure">AI-generated natural newsreader voice · Tap a word for its meaning</div>
+        <div class="news-seek-controls"><label for="newsSeekRange">Article position</label><input id="newsSeekRange" type="range" min="0" max="1000" step="1" value="0" aria-label="Move backward or forward through the article" /><span id="newsSeekLabel">0%</span></div>
         <div id="newsReadTarget" class="news-read-target" aria-live="off"></div>
         <div id="newsReadEnglish" class="news-read-english"></div>
         <div id="newsAudioControls" class="news-audio-controls" hidden>
-          <audio id="newsAudioPlayer" controls preload="metadata" playsinline aria-label="Natural AI news narration"></audio>
+          <audio id="newsAudioPlayer" preload="metadata" playsinline aria-label="Natural AI news narration"></audio>
         </div>
         <div id="newsWordDetail" class="news-word-detail" hidden aria-live="polite">
           <div class="news-detail-heading"><strong id="newsWordTitle"></strong><button id="newsWordClose" type="button" aria-label="Close word details">×</button></div>
@@ -408,6 +405,6 @@
     </form>
   </dialog>
 
-  <script src="/app.bundle.js?v=ecl-news-editorial-20261028" type="module"></script>
+  <script src="/app.bundle.js?v=ecl-reader-swipes-20261029" type="module"></script>
 </body>
 </html>
