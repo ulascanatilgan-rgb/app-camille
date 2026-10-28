@@ -1,4 +1,5 @@
 import { createClient, AnamEvent } from '@anam-ai/js-sdk';
+import { ECL_TOPICS, normalizeTopic, topicOpening, topicStarterChoices, topicInstruction } from './ecl-topics.mjs';
 
 const micButton = document.getElementById('micButton');
 const micLabel = document.getElementById('micLabel');
@@ -68,6 +69,8 @@ const buttonModeButton = document.getElementById('buttonModeButton');
 const quickReplyBar = document.getElementById('quickReplyBar');
 const languageToggle = document.getElementById('languageToggle');
 const languageToggleLabel = document.getElementById('languageToggleLabel');
+const topicSelect = document.getElementById('topicSelect');
+const topicCaption = document.getElementById('topicCaption');
 const practiceEyebrow = document.getElementById('practiceEyebrow');
 const practiceTitle = document.getElementById('practiceTitle');
 const practiceDescription = document.getElementById('practiceDescription');
@@ -81,6 +84,7 @@ const HISTORY_BASE_KEY = 'camille.history.v3';
 const WORDS_BASE_KEY = 'camille.words.v3';
 const LEVEL_KEY = 'camille.difficulty.v1';
 const LANGUAGE_KEY = 'camille.targetLanguage.v1';
+const TOPIC_KEY = 'ecl.selectedTopic.v1';
 const CHOICE_MODE_KEY = 'camille.choiceMode.v1';
 const INPUT_MODE_KEY = 'camille.inputMode.v1';
 const PERSONA_KEY = 'ecl.selectedPersona.v1';
@@ -134,6 +138,8 @@ let vocabQueue = Promise.resolve();
 let difficulty = clampLevel(Number(localStorage.getItem(LEVEL_KEY) || 2));
 const savedLanguage = localStorage.getItem(LANGUAGE_KEY);
 let targetLanguage = ['nl', 'fr', 'en'].includes(savedLanguage) ? savedLanguage : 'nl';
+let selectedTopic = normalizeTopic(localStorage.getItem(TOPIC_KEY));
+let switchingTopic = false;
 let learnedWords = [];
 
 let lastSubtitlePair = {
@@ -241,6 +247,16 @@ function updatePersonaUi() {
   if(personaVoiceNotice)personaVoiceNotice.textContent='Voice provided by '+name+'\'s own Anam persona.';
   if(!connected && !connecting && avatarPlaceholderText)avatarPlaceholderText.textContent=name+' is ready to talk.';
 }
+function updateTopicUi() {
+  if(topicSelect) {
+    topicSelect.value=selectedTopic;
+    topicSelect.disabled=switchingTopic || connecting || switchingPersona;
+  }
+  if(topicCaption)topicCaption.textContent=selectedTopic==='open'
+    ? 'Free conversation'
+    : 'Focused: '+ECL_TOPICS[selectedTopic].label;
+  document.body.dataset.practiceTopic=selectedTopic;
+}
 function updateLanguageUi(resetSubtitle = false) {
   const cfg = languageConfig();
   document.documentElement.lang = targetLanguage;
@@ -265,7 +281,9 @@ function updateLanguageUi(resetSubtitle = false) {
   historyButton.setAttribute('aria-label', `${cfg.name} history`);
   wordsButton.setAttribute('aria-label', `${cfg.name} saved words`);
   if (resetSubtitle) {
-    lastSubtitlePair = { nl: cfg.greeting, en: cfg.greetingEn };
+    const opening = topicOpening(selectedTopic,targetLanguage);
+    lastSubtitlePair = { nl: opening, en: selectedTopic==='open' ? cfg.greetingEn :
+      (targetLanguage==='en'?'':topicOpening(selectedTopic,'en')) };
     setSubtitle(cfg.greeting, cfg.greetingEn);
     if (lastUserPinEn) lastUserPinEn.textContent = '';
   }
@@ -1028,6 +1046,7 @@ function defaultButtonChoices(context='opening') {
     fr:[{text:'Oui',english:'Yes'},{text:'Non',english:'No'},{text:'Je ne sais pas',english:'I don’t know'}],
     en:[{text:'Yes',english:''},{text:'No',english:''},{text:'Not sure yet',english:''}]
   };
+  if(context==='opening' && selectedTopic!=='open')return topicStarterChoices(selectedTopic,targetLanguage);
   return (context==='opening'?greeting:general)[targetLanguage] || greeting.nl;
 }
 function primeButtonChoices() {
@@ -1308,7 +1327,11 @@ function buildRuntimeContext() {
     'If he is stuck, give him the beginning of the sentence so he can finish it.',
     'Every few turns, proactively introduce one stronger or more natural alternative and one reusable phrase. Then ask exactly one simple question.',
     `On every user turn, first restate the ENTIRE intended sentence in natural spoken ${target}, not just one word. Then answer immediately.`,
-    'Use his real life naturally when useful: ING/IT, Hondinn, job interviews, project work, investing, business, cars and renovation.'
+    selectedTopic==='open'
+      ? 'When free conversation mode is selected, follow the learner freely and never force Office or any other preset.'
+      : 'Do NOT introduce random daily-life or office topics when a specific theme is selected. Practice ONLY the selected theme.',
+    topicInstruction(selectedTopic),
+    'Use his real life naturally when useful: ING/IT, Hondinn, job interviews, project work, investing, business, cars and renovation, ONLY if relevant to the chosen theme.'
   ].join(' ').replaceAll('Emma',personaName());
 }
 
@@ -2133,7 +2156,7 @@ async function speakLocalizedOpening(client = anamClient) {
   const languageAtStart = targetLanguage;
   const personaAtStart = selectedPersona;
   const greeting = languageConfig();
-  const phrase = greeting.greeting;
+  const phrase = topicOpening(selectedTopic,targetLanguage);
   if (!phrase) return;
   try {
     const stream = client.createTalkMessageStream();
@@ -2144,7 +2167,7 @@ async function speakLocalizedOpening(client = anamClient) {
     // The first visible / recorded message also obeys the selected language.
     const id = `ecl-greeting-${Date.now()}-${sequence}`;
     upsertConversationTurn({ id, role: 'persona', content: phrase });
-    setSubtitle(phrase, greeting.greetingEn || '');
+    setSubtitle(phrase, selectedTopic==='open' ? greeting.greetingEn || '' : (targetLanguage==='en'?'':topicOpening(selectedTopic,'en')));
     saveCurrentHistory();
     renderMessages(currentMessages);
     if (interactionMode === 'button') requestQuickChoices(phrase);
@@ -2162,6 +2185,8 @@ async function connect() {
   languageToggle.disabled = true;
   const requestedLanguage = targetLanguage;
   const requestedPersona = selectedPersona;
+  const requestedTopic = selectedTopic;
+  updateTopicUi();
   runtimeContextApplied = false;
   micButton.disabled = true;
   endButton.disabled = true;
@@ -2174,15 +2199,16 @@ async function connect() {
     const response = await fetch('/anam-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({persona:requestedPersona, targetLanguage:requestedLanguage}),
+      body: JSON.stringify({persona:requestedPersona, targetLanguage:requestedLanguage, topic:requestedTopic}),
       cache: 'no-store'
     });
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.sessionToken ||
         data.persona?.toLowerCase() !== requestedPersona ||
-        data.language !== requestedLanguage ||
-        requestedLanguage !== targetLanguage || requestedPersona !== selectedPersona) {
+        data.language !== requestedLanguage || data.topic !== requestedTopic ||
+        requestedLanguage !== targetLanguage || requestedPersona !== selectedPersona ||
+        requestedTopic !== selectedTopic) {
       const detail = data.anamMessage
         ? `${data.error || 'Anam error'} — ${data.anamMessage}`
         : (data.error || 'Could not create Anam session.');
@@ -2201,6 +2227,7 @@ async function connect() {
     attachAnamListeners(anamClient);
     await anamClient.streamToVideoElement('avatarVideo');
     languageToggle.disabled = false;
+    updateTopicUi();
 
     if (!connected) {
       connected = true;
@@ -2239,6 +2266,7 @@ async function connect() {
     console.error('Anam connection failed:', error);
     languageToggle.disabled = false;
     connecting = false;
+    updateTopicUi();
     connected = false;
     customLlmMode = false;
     updatePersonaUi();
@@ -2255,6 +2283,7 @@ async function connect() {
 function resetUiAfterDisconnect() {
   sessionOpeningSeq += 1;
   languageToggle.disabled = false;
+  updateTopicUi();
   replaySequence += 1;
   window.speechSynthesis?.cancel?.();
   replayingAudio = false;
