@@ -2012,6 +2012,7 @@ function liveLanguageLockInstruction() {
 
 function attachAnamListeners(client) {
   client.addListener(AnamEvent.CONNECTION_ESTABLISHED, () => {
+    if (client !== anamClient) return;
     connected = true;
     connecting = false;
     try {
@@ -2034,6 +2035,7 @@ function attachAnamListeners(client) {
   });
 
   client.addListener(AnamEvent.VIDEO_PLAY_STARTED, () => {
+    if (client !== anamClient) return;
     setAvatarLive(true);
     applyInteractionAudioState();
     try { anamClient?.addContext(liveLanguageLockInstruction()); } catch {}
@@ -2045,11 +2047,19 @@ function attachAnamListeners(client) {
     window.setTimeout(primeButtonChoices, 500);
   });
 
-  client.addListener(AnamEvent.MESSAGE_STREAM_EVENT_RECEIVED, handleStreamEvent);
-  client.addListener(AnamEvent.MESSAGE_HISTORY_UPDATED, handleMessagesUpdated);
+  // A late event from a previous Anam session must never inject French into
+  // Dutch, or English into French, after switching the active language.
+  client.addListener(AnamEvent.MESSAGE_STREAM_EVENT_RECEIVED, event => {
+    if (client !== anamClient) return;
+    handleStreamEvent(event);
+  });
+  client.addListener(AnamEvent.MESSAGE_HISTORY_UPDATED, messages => {
+    if (client !== anamClient) return;
+    void handleMessagesUpdated(messages);
+  });
 
   client.addListener(AnamEvent.USER_SPEECH_STARTED, () => {
-    if (interactionMode !== 'speak') return;
+    if (client !== anamClient || interactionMode !== 'speak') return;
     replaySequence += 1;
     window.speechSynthesis?.cancel?.();
     replayingAudio = false;
@@ -2076,7 +2086,7 @@ function attachAnamListeners(client) {
   });
 
   client.addListener(AnamEvent.USER_SPEECH_ENDED, () => {
-    if (interactionMode !== 'speak') return;
+    if (client !== anamClient || interactionMode !== 'speak') return;
     setStatus('Thinking…');
     voiceRing.classList.remove('active');
     successBalloon?.classList.remove('listening');
@@ -2098,6 +2108,7 @@ function attachAnamListeners(client) {
   });
 
   client.addListener(AnamEvent.TALK_STREAM_INTERRUPTED, () => {
+    if (client !== anamClient) return;
     try { activeChatAbort?.abort(); } catch {}
     isResponding = false;
   });
@@ -2109,6 +2120,7 @@ function attachAnamListeners(client) {
   });
 
   client.addListener(AnamEvent.MIC_PERMISSION_DENIED, () => {
+    if (client !== anamClient) return;
     setStatus('Microphone permission needed');
   });
 }
