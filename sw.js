@@ -1,4 +1,4 @@
-const CACHE = 'ecl-header-three-rows-v48';
+const CACHE = 'ecl-news-editorial-v49';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
