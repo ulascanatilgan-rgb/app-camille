@@ -1,4 +1,4 @@
-const CACHE = 'ecl-swipe-news-history-v47';
+const CACHE = 'ecl-header-three-rows-v48';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
