@@ -480,12 +480,16 @@ app.post('/chat', async (req, res) => {
   }
 
   const systemPrompt = [
+    ECL_LANGUAGE_RULES[targetLanguage].prompt,
     tutorInstructions.replaceAll('Emma',activePersonaName),
     targetLanguageInstruction(targetLanguage),
     difficultyInstruction(difficulty, targetLanguage),
     inputKind === 'button' ? '' : correctionInstruction(correctionLevel, targetLanguage),
     choiceModeInstruction(choiceModeEnabled),
-    inputModeInstruction(interactionMode, inputKind, targetLanguage)
+    inputModeInstruction(interactionMode, inputKind, targetLanguage),
+    // End on the output language lock; even when the user writes an English
+    // question, spoken chat text must remain entirely in the lesson language.
+    ECL_LANGUAGE_RULES[targetLanguage].prompt
   ].filter(Boolean).join(' ');
 
   const maxTokensByDifficulty = targetLanguage === 'en'
