@@ -2211,7 +2211,113 @@ async function speakLocalizedOpening(client = anamClient) {
   }
 }
 
+// Voice Only uses exclusively OpenAI Realtime; no Anam session is requested.
+async function connectVoiceOnly() {
+  if(connected || connecting)return;
+  connecting=true;
+  updatePersonaUi();
+  updateTopicUi();
+  languageToggle.disabled=true;
+  micButton.disabled=true;
+  endButton.disabled=true;
+  micLabel.textContent='Connecting…';
+  setStatus('Connecting OpenAI voice…');
+  setAvatarLive(false);
+  avatarBadge.textContent='OPENAI VOICE';
+  avatarPlaceholderText.textContent=personaName()+' · OpenAI Voice Only';
+  const languageAtStart=targetLanguage;
+  const personaAtStart=selectedPersona;
+  const themeAtStart=selectedTopic;
+  const context=handoffContext;
+  try {
+    const session=await createVoiceOnlySession({
+      persona:selectedPersona,
+      targetLanguage, topic:selectedTopic, difficulty,
+      inputMode:interactionMode, context,
+      onStatus:message=>{
+        if(selectedProvider==='voice')setStatus(message);
+      },
+      onSpeech:listening=>{
+        if(selectedProvider!=='voice')return;
+        voiceRing.classList.toggle('active',listening);
+        if(interactionMode==='speak')setStatus(listening?'Listening…':'Thinking…');
+      },
+      onUserText:(text,id)=>{
+        if(selectedProvider!=='voice'||targetLanguage!==languageAtStart)return;
+        const itemId=id||'voice-user-'+Date.now();
+        upsertConversationTurn({id:itemId,role:'user',content:text});
+        setLastUserPin(text,itemId);
+        finalizeUserTranslation(text,itemId);
+        saveCurrentHistory();
+        renderMessages(currentMessages);
+      },
+      onAssistantDelta:(text,id)=>{
+        if(selectedProvider!=='voice'||targetLanguage!==languageAtStart)return;
+        activeSubtitleMessageId=id;
+        renderLiveDutch(limitCamilleReply(text).text);
+      },
+      onAssistantDone:(text,id)=>{
+        if(selectedProvider!=='voice'||targetLanguage!==languageAtStart)return;
+        const clean=limitCamilleReply(text).text;
+        const itemId=id||'voice-persona-'+Date.now();
+        isResponding=false;
+        upsertConversationTurn({id:itemId,role:'persona',content:clean});
+        saveCurrentHistory();
+        renderMessages(currentMessages);
+        setStatus(languageConfig().ready);
+        void finalizeSubtitle(clean,itemId);
+        processVocabularyProgress(itemId,clean,true);
+        if(interactionMode==='button')requestQuickChoices(clean);
+      },
+      onError:message=>{
+        if(selectedProvider!=='voice')return;
+        isResponding=false;
+        console.warn('OpenAI voice error:',message);
+        setStatus('Voice error: '+String(message).slice(0,75));
+      }
+    });
+    if(selectedProvider!=='voice'||personaAtStart!==selectedPersona||
+      languageAtStart!==targetLanguage||themeAtStart!==selectedTopic){
+      await session.close();
+      return;
+    }
+    voiceSession=session;
+    connected=true;
+    connecting=false;
+    handoffContext='';
+    languageToggle.disabled=false;
+    updatePersonaUi();
+    updateTopicUi();
+    document.body.classList.add('conversation-live');
+    micButton.disabled=false;
+    micButton.classList.add('live');
+    micLabel.textContent='Live';
+    endButton.disabled=false;
+    avatarBadge.textContent='OPENAI VOICE';
+    avatarPlaceholderText.textContent=personaName()+' · Live audio conversation';
+    beginHistorySession();
+    saveCurrentHistory();
+    applyInteractionAudioState();
+    primeButtonChoices();
+    setStatus(languageConfig().ready);
+  } catch(error) {
+    console.warn('Could not connect ECL OpenAI voice:',error);
+    connected=false;
+    connecting=false;
+    languageToggle.disabled=false;
+    micButton.disabled=false;
+    endButton.disabled=true;
+    micLabel.textContent='Try again';
+    avatarBadge.textContent='VOICE OFFLINE';
+    setStatus('Voice unavailable');
+    avatarPlaceholderText.textContent=String(error?.message||'OpenAI Realtime could not connect.').slice(0,165);
+    updatePersonaUi();
+    updateTopicUi();
+  }
+}
+
 async function connect() {
+  if (selectedProvider==='voice') return connectVoiceOnly();
   if (connected || connecting) return;
 
   connecting = true;
