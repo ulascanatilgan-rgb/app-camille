@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ECL_TOPICS, normalizeTopic, topicInstruction } from './ecl-topics.mjs';
 import { refreshAnamEclArtwork } from './ecl-artwork.mjs';
 
 const app = express();
@@ -259,9 +260,11 @@ const ECL_LANGUAGE_RULES = Object.freeze({
   }
 });
 
-async function buildAnamSession(apiKey, personaId, language, name) {
+async function buildAnamSession(apiKey, personaId, language, name, selectedTopic = 'open') {
   const code = normalizeTargetLanguage(language);
   const rule = ECL_LANGUAGE_RULES[code];
+  const theme = normalizeTopic(selectedTopic);
+  const themeRule = topicInstruction(theme);
   const response = await fetch(`${ANAM_API_BASE}/personas/${encodeURIComponent(personaId)}`, {
     headers: { Authorization: `Bearer ${apiKey}` },
     cache: 'no-store',
@@ -291,11 +294,13 @@ async function buildAnamSession(apiKey, personaId, language, name) {
   const strictPrompt = [
     `HIGHEST PRIORITY — ECL LOCKED OUTPUT LANGUAGE: ${rule.label}. This is determined by the app before the session starts, never by the avatar or browser.`,
     rule.prompt,
+    themeRule,
     `You are ${name}, an AI language-conversation coach in the ECL app.`,
     'Comprehend the user speaking English even in the French or Flemish lesson, but your EVERY audible and written word must be in the selected output language. Do not switch because the user requests, speaks or quotes another language.',
     'Correct the learner briefly using ONLY the selected language, then answer naturally and ask one simple follow-up question. Keep replies short, conversational and calm.',
     'Do not include parenthetical English translations in speech; the ECL interface handles translations separately.',
     originalStyle ? `PERSONA STYLE (follow only when consistent with the mandatory language): ${originalStyle}` : '',
+    themeRule,
     'FINAL AND OVERRIDING REQUIREMENT: ALWAYS answer exclusively in the selected target language. An English input DOES NOT permit an English response when French or Flemish is selected.'
   ].filter(Boolean).join('\\n');
 
@@ -314,7 +319,7 @@ async function buildAnamSession(apiKey, personaId, language, name) {
     config.voiceSpeed = persona.voiceSpeed;
   }
   const sessionToken = await requestAnamSessionToken(apiKey, config);
-  return { sessionToken, mode: 'locked-language-persona', source: 'anam-persona-avatar-voice', language: code };
+  return { sessionToken, mode: 'locked-language-persona', source: 'anam-persona-avatar-voice', language: code, topic: theme };
 }
 
 function safeAnamError(error) {
@@ -351,6 +356,7 @@ app.post('/anam-session', async (req, res) => {
   const persona = selectedPersona(req.body?.persona);
   const personaId = persona.personaId;
   const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
+  const selectedTopic = normalizeTopic(req.body?.topic);
 
   if (!apiKey || !personaId) {
     return res.status(500).json({
@@ -359,7 +365,7 @@ app.post('/anam-session', async (req, res) => {
   }
 
   try {
-    const session = await buildAnamSession(apiKey, personaId, targetLanguage, persona.name);
+    const session = await buildAnamSession(apiKey, personaId, targetLanguage, persona.name, selectedTopic);
     return res.json({ ...session, persona: persona.name });
   } catch (error) {
     const safe = safeAnamError(error);
@@ -448,6 +454,7 @@ app.post('/chat', async (req, res) => {
   const difficulty = Math.max(1, Math.min(5, Number(req.body?.difficulty) || 2));
   const kickoff = Boolean(req.body?.kickoff);
   const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
+  const selectedTopic = normalizeTopic(req.body?.topic);
   const activePersonaName = selectedPersona(req.body?.persona).name;
   const choiceModeEnabled = Boolean(req.body?.choiceModeEnabled);
   const interactionMode = ['speak', 'type', 'button'].includes(req.body?.interactionMode)
@@ -471,7 +478,8 @@ app.post('/chat', async (req, res) => {
   if (kickoff) {
     history.push({
       role: 'user',
-      content: targetLanguage === 'fr'
+      content: selectedTopic !== 'open' ? `[Conversation start: Topic ${ECL_TOPICS[selectedTopic].label}. Ask ONE very short useful question in the selected language about this exact topic. No unrelated themes.]`
+        : targetLanguage === 'fr'
         ? '[Conversation start] Start now with one very short practical French sentence and one easy question. Do not explain grammar.'
         : targetLanguage === 'en'
           ? '[Conversation start] Start with one polished professional-English prompt about work, projects or stakeholder communication. Keep it conversational.'
@@ -481,6 +489,7 @@ app.post('/chat', async (req, res) => {
 
   const systemPrompt = [
     ECL_LANGUAGE_RULES[targetLanguage].prompt,
+    topicInstruction(selectedTopic),
     tutorInstructions.replaceAll('Emma',activePersonaName),
     targetLanguageInstruction(targetLanguage),
     difficultyInstruction(difficulty, targetLanguage),
@@ -489,7 +498,8 @@ app.post('/chat', async (req, res) => {
     inputModeInstruction(interactionMode, inputKind, targetLanguage),
     // End on the output language lock; even when the user writes an English
     // question, spoken chat text must remain entirely in the lesson language.
-    ECL_LANGUAGE_RULES[targetLanguage].prompt
+    ECL_LANGUAGE_RULES[targetLanguage].prompt,
+    topicInstruction(selectedTopic)
   ].filter(Boolean).join(' ');
 
   const maxTokensByDifficulty = targetLanguage === 'en'
@@ -636,6 +646,7 @@ app.post('/choices', async (req, res) => {
   const activePersonaName = selectedPersona(req.body?.persona).name;
   const question = String(req.body?.text || '').trim().slice(0, 900);
   const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
+  const selectedTopic = normalizeTopic(req.body?.topic);
   if (!question) return res.json({ choices: [] });
 
   const language = practiceLanguageName(targetLanguage);
@@ -643,6 +654,8 @@ app.post('/choices', async (req, res) => {
     `RECENT DIALOGUE (context only):\n${recentLearningConversation(req.body?.recentMessages) || '(new conversation)'}` +
     `\n\n${activePersonaName.toUpperCase()}'S CURRENT QUESTION: ${question}`;
   const systemText = [
+    `CURRENT LESSON TOPIC: ${ECL_TOPICS[selectedTopic].label}. The three replies MUST respond naturally to the avatar's question about this field, and keep the learning topic focused.`,
+    topicInstruction(selectedTopic),
     'You generate UI reply buttons for a language-learning conversation with Emma.',
     `Each option.text MUST be written exclusively in ${language}, in the Latin alphabet.`,
     'Each option.english MUST be its exact natural English translation (unless the target is English).',
@@ -687,6 +700,7 @@ app.post('/tip', async (req, res) => {
   const activePersonaName = selectedPersona(req.body?.persona).name;
   const question = String(req.body?.text || '').trim().slice(0, 900);
   const targetLanguage = normalizeTargetLanguage(req.body?.targetLanguage);
+  const selectedTopic = normalizeTopic(req.body?.topic);
   if (!question) return res.json({ tip: null });
 
   const language = practiceLanguageName(targetLanguage);
@@ -694,6 +708,8 @@ app.post('/tip', async (req, res) => {
     `RECENT DIALOGUE (context only):\n${recentLearningConversation(req.body?.recentMessages) || '(new conversation)'}` +
     `\n\n${activePersonaName.toUpperCase()}'S LATEST MESSAGE: ${question}`;
   const systemText = [
+    `CURRENT LESSON TOPIC: ${ECL_TOPICS[selectedTopic].label}. Suggest one short, immediately usable learner sentence about this specific field; never switch topics.`,
+    topicInstruction(selectedTopic),
     'You are the small optional TIP feature in the Emma language-learning application.',
     `Suggest exactly ONE SHORT answer the learner could personally SPEAK or TYPE in ${language}.`,
     'The field tip.text MUST be exclusively in the target language using its normal Latin alphabet.',
