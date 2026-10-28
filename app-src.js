@@ -2526,6 +2526,11 @@ async function disconnect() {
 
 micButton.addEventListener('click', () => {
   primePopAudio();
+  if(selectedProvider==='voice' && connected){
+    // Safari sometimes requires a second user tap to resume remote audio.
+    void voiceSession?.resumeAudio();
+    return;
+  }
   if (!connected && !connecting) connect();
 });
 
