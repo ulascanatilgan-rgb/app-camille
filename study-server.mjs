@@ -233,7 +233,7 @@ export function registerStudyRoutes(app) {
       const seen=new Set();
       // Prefer distinct publishers and topical diversity over just the first feed.
       const unique=articles.filter(item=>{
-        const k=item.headline.toLowerCase().replace(/[^\\p{L}\\p{N}]+/gu,' ').slice(0,65);
+        const k=item.headline.toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').slice(0,65);
         if(seen.has(k))return false;
         seen.add(k);return true;
       });
