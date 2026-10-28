@@ -1,4 +1,5 @@
 import { createClient, AnamEvent } from '@anam-ai/js-sdk';
+import { createVoiceOnlySession } from './voice-only.mjs';
 import { ECL_TOPICS, normalizeTopic, topicOpening, topicStarterChoices, topicInstruction } from './ecl-topics.mjs';
 
 const micButton = document.getElementById('micButton');
@@ -29,6 +30,8 @@ const personaPreview = document.getElementById('personaPreview');
 const personaPicker = document.getElementById('personaPicker');
 const personaButtons = [...document.querySelectorAll('.persona-select')];
 const personaVoiceNotice = document.getElementById('personaVoiceNotice');
+const providerButtons = [...document.querySelectorAll('.provider-choice')];
+const providerNote = document.getElementById('providerNote');
 
 const difficultySlider = document.getElementById('difficultySlider');
 const difficultyValue = document.getElementById('difficultyValue');
@@ -92,6 +95,26 @@ const PERSONA_NAMES = Object.freeze({emma:'Emma',charlotte:'Charlotte',louis:'Lo
 const storedPersona = localStorage.getItem(PERSONA_KEY);
 let selectedPersona = Object.hasOwn(PERSONA_NAMES,storedPersona) ? storedPersona : 'emma';
 let switchingPersona = false;
+const PROVIDER_KEY = 'ecl.connectionMode.v1';
+let selectedProvider = localStorage.getItem(PROVIDER_KEY)==='voice' ? 'voice' : 'video';
+let switchingProvider = false;
+let voiceSession = null;
+let handoffContext = '';
+function updateProviderUi() {
+  document.body.classList.toggle('ecl-voice-only',selectedProvider==='voice');
+  for(const button of providerButtons) {
+    const active=button.dataset.provider===selectedProvider;
+    button.classList.toggle('active',active);
+    button.setAttribute('aria-pressed',String(active));
+    button.disabled=connecting || switchingProvider || switchingPersona;
+  }
+  if(providerNote)providerNote.textContent=selectedProvider==='voice'
+    ? 'OpenAI Realtime • AI-generated voice'
+    : 'Anam avatar & voice';
+  if(personaVoiceNotice)personaVoiceNotice.textContent=selectedProvider==='voice'
+    ? personaName()+' uses an AI-generated OpenAI voice.'
+    : 'Voice provided by '+personaName()+'\'s Anam persona.';
+}
 function personaName(key=selectedPersona){return PERSONA_NAMES[key] || 'Emma';}
 
 let anamClient = null;
@@ -244,7 +267,7 @@ function updatePersonaUi() {
   }
   const label=document.querySelector('.live-camille .live-speaker-label');
   if(label)label.textContent=name.toUpperCase();
-  if(personaVoiceNotice)personaVoiceNotice.textContent='Voice provided by '+name+'\'s own Anam persona.';
+  updateProviderUi();
   if(!connected && !connecting && avatarPlaceholderText)avatarPlaceholderText.textContent=name+' is ready to talk.';
 }
 function updateTopicUi() {
@@ -918,7 +941,8 @@ function updateTypeKeyboardOffset() {
   const visible=vv?.height || window.innerHeight;
   const header=document.querySelector('.topbar')?.getBoundingClientRect().height || 100;
   const themeBar=document.querySelector('.topic-strip')?.getBoundingClientRect().height || 42;
-  document.documentElement.style.setProperty('--ecl-visible-workspace-height',Math.max(155,Math.round(visible-header-themeBar))+'px');
+  const providerBar=document.querySelector('.conversation-provider-strip')?.getBoundingClientRect().height || 42;
+  document.documentElement.style.setProperty('--ecl-visible-workspace-height',Math.max(155,Math.round(visible-header-themeBar-providerBar))+'px');
   const covered=window.innerHeight-visible-(vv?.offsetTop||0);
   document.body.classList.toggle('ecl-keyboard-visible',interactionMode==='type'&&covered>100);
 }
@@ -959,6 +983,10 @@ function updateInteractionModeUi() {
 }
 
 function applyInteractionAudioState() {
+  if (selectedProvider==='voice') {
+    voiceSession?.setMuted(interactionMode !== 'speak');
+    return;
+  }
   if (!anamClient || !connected) return;
 
   try {
