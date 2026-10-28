@@ -93,6 +93,34 @@ export function registerStudyRoutes(app) {
       res.json({cards});
     }catch(error){console.error('Slide deck failed:',error);res.status(502).json({error:'Could not generate study cards.'});}
   });
+  // A reader can tap ANY article word, not only the ten extracted words.
+  // Cache is maintained by the browser; source sentences are bounded.
+  app.post('/study-news-word',async(req,res)=>{
+    res.setHeader('Cache-Control','no-store');
+    if(!process.env.OPENAI_API_KEY)return res.status(503).json({error:'OpenAI API key not configured.'});
+    const language=LANGUAGE[req.body?.language]?req.body.language:'nl';
+    const word=safeText(req.body?.word,65),sentence=safeText(req.body?.sentence,340);
+    if(!isValidWord(word)||!sentence || word.length>65)
+      return res.status(400).json({error:'Invalid study word.'});
+    try {
+      const system=[
+        'You teach vocabulary in '+LANGUAGE[language].name+'.',
+        'Given a word and its short sentence, identify the sense in that sentence.',
+        'Return one correct concise English translation, a short, easy explanation IN THE TARGET LANGUAGE,',
+        'and one new natural practical example sentence IN THE TARGET LANGUAGE, 6-12 words.',
+        'Do not invent factual news claims. Explain the word as used, not the whole article.',
+        'JSON ONLY: {"word":"...","english":"...","definition":"...","example":"..."}'
+      ].join(' ');
+      const data=await jsonFromOpenAI(process.env.OPENAI_API_KEY,system,JSON.stringify({word,sentence,language}),330);
+      const result={word,english:safeText(data.english,110),definition:safeText(data.definition,240),
+        example:safeText(data.example,240)};
+      if(!result.english||!result.definition||!result.example)throw new Error('Incomplete word details');
+      return res.json(result);
+    }catch(error){
+      console.error('News word lookup unavailable:',error);
+      return res.status(502).json({error:'Word explanation unavailable. Please retry.'});
+    }
+  });
   app.get('/study-news',async(req,res)=>{
     res.setHeader('Cache-Control','no-store');
     const language=LANGUAGE[req.query?.language]?req.query.language:'nl';
