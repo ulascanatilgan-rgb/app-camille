@@ -2773,11 +2773,20 @@ sessionHistoryDialog?.addEventListener('click', event => {
 });
 
 historyButton.addEventListener('click', () => {
+  if(studyPages?.getPage()==='news') {
+    studyPages.openNewsArchive();
+    return;
+  }
   renderHistoryDialog();
   historyDialog.showModal();
 });
 
 wordsButton.addEventListener('click', () => {
+  const page=studyPages?.getPage();
+  if(page==='slide'||page==='news'){
+    studyPages.openWordLibrary(page);
+    return;
+  }
   renderWordsDialog();
   wordsDialog.showModal();
 });
