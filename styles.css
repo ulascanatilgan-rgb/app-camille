@@ -5695,6 +5695,8 @@ body.type-input-mode .workspace {
 .news-seek-controls input{width:100%;accent-color:#456b51;cursor:pointer;}
 .news-seek-controls span{min-width:54px;text-align:right;font-variant-numeric:tabular-nums;}
 .news-audio-controls{display:none !important;}
+.news-audio-controls.manual-playback:not([hidden]){display:block !important;}
+.news-audio-controls.manual-playback audio{display:block !important;width:100%;max-width:600px;}
 .news-voice-disclosure{font-size:11px !important;letter-spacing:0 !important;}
 @media(max-width:760px){
   .slide-card .slide-choice{min-height:67px;}
