@@ -100,15 +100,6 @@
 
                     
 
-          <div id="successBalloon" class="success-balloon avatar-balloon" aria-hidden="true">
-            <span class="balloon-body"></span>
-            <span class="balloon-knot"></span>
-            <span class="balloon-string"></span>
-            <span class="balloon-spark balloon-spark-a"></span>
-            <span class="balloon-spark balloon-spark-b"></span>
-            <span class="balloon-spark balloon-spark-c"></span>
-          </div>
-
           <div id="wordCard" class="word-card" hidden>
             <div class="word-card-label">NEW WORD</div>
             <div class="word-card-pair">
@@ -261,7 +252,7 @@
             <button id="slideLeftButton" type="button" class="slide-action-btn">← Left</button>
             <button id="slideRightButton" type="button" class="slide-action-btn">Right →</button>
           </div>
-          <div id="slideFeedback" class="slide-feedback" aria-live="polite"></div>
+          <div id="slideFeedback" class="slide-feedback" aria-live="assertive" role="status"></div>
           <button id="slideReloadButton" class="study-inline-button" type="button">New cards</button>
         </div>
       </div>
@@ -269,7 +260,7 @@
     <section id="newsPage" class="study-page news-page" hidden aria-label="News reading practice">
       <header class="study-page-header">
         <div><div class="eyebrow">NEWS · LISTEN & LEARN</div><h1>Daily reading</h1>
-          <p>Three current headlines rewritten as accessible learning summaries.</p></div>
+          <p>Three longer, original news articles from publicly accessible sources.</p></div>
         <div class="study-header-actions">
           <button id="newsUpdateButton" class="study-primary-button" type="button">Update</button>
           <button id="newsWordsButton" class="study-secondary-button" type="button">News Words</button>
@@ -291,8 +282,12 @@
         </div>
         <h2 id="newsReaderTitle"></h2>
         <div id="newsReaderSource" class="news-source-line"></div>
+        <div id="newsNarrationDisclosure" class="news-voice-disclosure">AI-generated natural newsreader voice · Tap a word for its meaning</div>
         <div id="newsReadTarget" class="news-read-target" aria-live="off"></div>
         <div id="newsReadEnglish" class="news-read-english"></div>
+        <div id="newsAudioControls" class="news-audio-controls" hidden>
+          <audio id="newsAudioPlayer" controls preload="metadata" playsinline aria-label="Natural AI news narration"></audio>
+        </div>
         <div id="newsWordDetail" class="news-word-detail" hidden aria-live="polite">
           <div class="news-detail-heading"><strong id="newsWordTitle"></strong><button id="newsWordClose" type="button" aria-label="Close word details">×</button></div>
           <p id="newsWordMeaning"></p><p id="newsWordDefinition"></p><p id="newsWordExample"></p>
