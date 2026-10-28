@@ -346,6 +346,89 @@ function safeAnamError(error) {
   };
 }
 
+// OpenAI Voice Only WebRTC. The OPENAI_API_KEY never leaves the Railway server.
+// Unlike /anam-session this route does NOT request or create an Anam session.
+const ECL_REALTIME_MODEL = process.env.ECL_REALTIME_MODEL || 'gpt-realtime-2.1-mini';
+const ECL_OPENAI_VOICES = Object.freeze({ emma:'marin', charlotte:'shimmer', louis:'cedar' });
+const voiceStartAttempts = new Map();
+app.post('/ecl-realtime-call', async (req, res) => {
+  res.setHeader('Cache-Control','no-store');
+  const origin=req.get('origin');
+  if(origin) {
+    try {
+      if(new URL(origin).host !== req.get('host'))
+        return res.status(403).json({error:'Voice calls must originate from ECL.'});
+    } catch { return res.status(403).json({error:'Invalid origin.'}); }
+  }
+  if(!process.env.OPENAI_API_KEY)
+    return res.status(503).json({error:'OPENAI_API_KEY is missing on Railway.'});
+  const sdp=req.body?.sdp;
+  if(typeof sdp!=='string' || sdp.length>65000 || !sdp.startsWith('v=0'))
+    return res.status(400).json({error:'Invalid WebRTC offer.'});
+  const ip=req.ip || 'unknown';
+  const now=Date.now();
+  const recent=(voiceStartAttempts.get(ip)||[]).filter(time=>now-time<5*60*1000);
+  if(recent.length>=18)
+    return res.status(429).json({error:'Too many new voice sessions. Try again later.'});
+  recent.push(now);
+  voiceStartAttempts.set(ip,recent);
+  if(voiceStartAttempts.size>500)voiceStartAttempts.clear();
+
+  const key=typeof req.body?.persona==='string' && Object.hasOwn(ECL_PERSONAS,req.body.persona)
+    ? req.body.persona : 'emma';
+  const persona=ECL_PERSONAS[key];
+  const language=normalizeTargetLanguage(req.body?.targetLanguage);
+  const topic=normalizeTopic(req.body?.topic);
+  const level=Math.max(1,Math.min(5,Number(req.body?.difficulty)||2));
+  const mode=['speak','type','button'].includes(req.body?.inputMode)?req.body.inputMode:'speak';
+  const context=typeof req.body?.context==='string'?req.body.context.slice(-1800):'';
+  const instructions=[
+    ECL_LANGUAGE_RULES[language].prompt,
+    `You are ${persona.name}, the user's personal speaking partner and language teacher. Your own voice is selected by ECL. Speak naturally, calmly and confidently.`,
+    `Learning level: ${level} out of 5. ${level<=2?'Use very common simple phrases (A1-A2).':level<=3?'Use short practical intermediate expressions (B1).':'Use natural fluent expressions (B2-C1).'}`,
+    topicInstruction(topic),
+    'Keep every reply concise: one or two short sentences, and one direct practical follow-up question. Give useful expressions and correct mistakes gently. Never lecture.',
+    'The learner can speak in English in all lessons; answer ONLY in the chosen learning language. Never switch into English unless English is selected.',
+    mode==='button'?'BUTTON MODE: the user selects one short response. React to its meaning; do not needlessly correct it.':'SPEAK/TYPE MODE: listen to or read the learner and keep conversation flowing.',
+    context?`CONTEXT FROM EARLIER ECL VIDEO/VOICE SESSION (for continuity only, do not repeat word-for-word): ${context}`:'',
+    topicInstruction(topic),
+    ECL_LANGUAGE_RULES[language].prompt
+  ].filter(Boolean).join('\\n');
+  const session={
+    type:'realtime',
+    model:ECL_REALTIME_MODEL,
+    instructions,
+    output_modalities:['audio'],
+    audio:{
+      input:{
+        transcription:{model:'gpt-transcribe'},
+        turn_detection:{type:'semantic_vad'}
+      },
+      output:{voice:ECL_OPENAI_VOICES[key]}
+    }
+  };
+  try {
+    const form=new FormData();
+    form.set('sdp',sdp);
+    form.set('session',JSON.stringify(session));
+    const upstream=await fetch('https://api.openai.com/v1/realtime/calls',{
+      method:'POST',
+      headers:{Authorization:`Bearer ${process.env.OPENAI_API_KEY}`},
+      body:form,
+      signal:AbortSignal.timeout(25000)
+    });
+    const answer=await upstream.text();
+    if(!upstream.ok){
+      console.error('OpenAI Realtime setup failed',upstream.status,answer.slice(0,450));
+      return res.status(502).json({error:`OpenAI voice setup failed (HTTP ${upstream.status}). Check OpenAI API access and billing.`});
+    }
+    res.type('application/sdp').status(201).send(answer);
+  } catch(error) {
+    console.error('OpenAI Realtime call error:',error?.message||error);
+    res.status(502).json({error:'Could not start OpenAI Voice Only. Verify API billing and network.'});
+  }
+});
+
 app.post('/anam-session', async (req, res) => {
   // Each Start creates a new Anam session token from the current published
   // Emma persona. Never reuse an earlier session after its Lab settings change.
