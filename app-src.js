@@ -1016,39 +1016,30 @@ function readablePracticeText(value) {
     /^[\p{Script=Latin}\p{Mark}0-9 .,!?;:'’"()\-–—]+$/u.test(clean));
 }
 
+function defaultButtonChoices(context='opening') {
+  const greeting={
+    nl:[{text:'Goed, dank je',english:'Good, thank you'},{text:'Gaat wel',english:'So-so'},{text:'Niet zo goed',english:'Not so good'}],
+    fr:[{text:'Très bien',english:'Very well'},{text:'Ça va',english:'I’m okay'},{text:'Pas très bien',english:'Not very well'}],
+    en:[{text:'Project updates',english:''},{text:'Planning',english:''},{text:'Meetings',english:''}]
+  };
+  const general={
+    nl:[{text:'Ja',english:'Yes'},{text:'Nee',english:'No'},{text:'Weet ik niet',english:'I don’t know'}],
+    fr:[{text:'Oui',english:'Yes'},{text:'Non',english:'No'},{text:'Je ne sais pas',english:'I don’t know'}],
+    en:[{text:'Yes',english:''},{text:'No',english:''},{text:'Not sure yet',english:''}]
+  };
+  return (context==='opening'?greeting:general)[targetLanguage] || greeting.nl;
+}
 function primeButtonChoices() {
-  if (!connected || interactionMode !== 'button' || isResponding) return;
-  const last = currentMessages[currentMessages.length - 1];
-  if (last?.role === 'user') return; // A new answer is still being processed.
-  if (last?.role === 'persona') {
+  if(interactionMode!=='button' || !quickReplyBar || isResponding) return;
+  const last=currentMessages[currentMessages.length-1];
+  if(last?.role==='user')return;
+  if(last?.role==='persona' && connected) {
     requestQuickChoices(last.content);
     return;
   }
-  // Display three usable replies immediately on the first connection, even
-  // before the Anam provider delivers its first transcript or OpenAI replies.
-  // The real first spoken question replaces these starter choices automatically.
-  if (!activeSubtitleMessageId) {
-    const greeting = languageConfig().greeting;
-    if (lastChoiceSource === greeting && quickReplyBar && !quickReplyBar.hidden) return;
-    const initial = {
-      fr: [
-        { text: 'Très bien', english: 'Very well' },
-        { text: 'Ça va', english: 'I’m okay' },
-        { text: 'Pas très bien', english: 'Not very well' }
-      ],
-      nl: [
-        { text: 'Goed, dank je', english: 'Good, thank you' },
-        { text: 'Gaat wel', english: 'So-so' },
-        { text: 'Niet zo goed', english: 'Not so good' }
-      ],
-      en: [
-        { text: 'Project updates', english: '' },
-        { text: 'Planning', english: '' },
-        { text: 'Meetings', english: '' }
-      ]
-    };
-    lastChoiceSource = greeting;
-    renderQuickChoices(initial[targetLanguage] || initial.nl);
+  // Show options even before Anam starts or provides the first transcript.
+  if(quickReplyBar.hidden || quickReplyBar.children.length!==3) {
+    renderQuickChoices(defaultButtonChoices('opening'));
   }
 }
 
@@ -1147,10 +1138,16 @@ function renderQuickChoices(choices) {
       button.appendChild(translation);
     }
     button.setAttribute('aria-label', targetLanguage !== 'en' && english ? `${text} — ${english}` : text);
-    button.addEventListener('click', () => {
-      if (!connected || isResponding) return;
+    button.addEventListener('click', async () => {
+      if(isResponding || connecting) return;
+      // Button itself may launch the first Anam conversation.
+      if(!connected) {
+        await connect();
+        if(!connected || interactionMode!=='button') return;
+      }
+      if(!anamClient || isResponding)return;
       clearQuickChoices();
-      sendTypedTurn(text, 'button');
+      sendTypedTurn(text,'button');
     });
     quickReplyBar.appendChild(button);
   }
