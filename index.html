@@ -17,12 +17,6 @@
 <body>
   <main class="app-shell">
     <header class="topbar">
-      <nav id="studyNav" class="study-nav" aria-label="ECL learning sections">
-        <button id="talkTab" class="study-nav-button selected" type="button" data-page="talk" aria-current="page"><span aria-hidden="true">🎙</span> Talk</button>
-        <button id="slideTab" class="study-nav-button" type="button" data-page="slide"><span aria-hidden="true">⇆</span> Slide</button>
-        <button id="newsTab" class="study-nav-button" type="button" data-page="news"><span aria-hidden="true">▤</span> News</button>
-      </nav>
-
       <div class="header-left">
         <div class="uca-lab-logo header-uca" aria-label="UCA Lab">
           <img src="/uca-lab-logo.png" alt="UCA Lab" />
@@ -31,6 +25,17 @@
           <span id="languageToggleLabel">NL</span>
         </button>
       </div>
+
+      <div class="header-status">
+        <span id="status" class="status">Ready</span>
+        <button id="installButton" class="text-button" type="button" hidden>Install</button>
+        <button id="settingsButton" class="icon-button" aria-label="Settings">•••</button>
+      </div>
+      <nav id="studyNav" class="study-nav" aria-label="ECL learning sections">
+        <button id="talkTab" class="study-nav-button selected" type="button" data-page="talk" aria-current="page"><span aria-hidden="true">🎙</span> Talk</button>
+        <button id="slideTab" class="study-nav-button" type="button" data-page="slide"><span aria-hidden="true">⇆</span> Slide</button>
+        <button id="newsTab" class="study-nav-button" type="button" data-page="news"><span aria-hidden="true">▤</span> News</button>
+      </nav>
 
       <div class="center-brand ecl-brand" aria-label="ECL language companions">
         <span class="ecl-wordmark">ECL</span>
@@ -41,13 +46,6 @@
         </div>
       </div>
 
-      <div class="header-status">
-        <button id="historyButton" class="nav-button" type="button">History</button>
-        <button id="wordsButton" class="nav-button" type="button">Words</button>
-        <span id="status" class="status">Ready</span>
-        <button id="installButton" class="text-button" type="button" hidden>Install</button>
-        <button id="settingsButton" class="icon-button" aria-label="Settings">•••</button>
-      </div>
     </header>
 
     <div class="topic-strip" aria-label="Conversation theme">
@@ -78,6 +76,14 @@
         <span class="provider-emoji" aria-hidden="true">♫</span> Voice Only
       </button>
       <span class="provider-note" id="providerNote">Anam avatar &amp; voice</span>
+    </div>
+
+    <div id="talkToolsStrip" class="talk-tools-strip" aria-label="Talk history and vocabulary">
+      <span class="talk-tools-title">TALK</span>
+      <div class="talk-tools-actions">
+        <button id="historyButton" class="nav-button talk-tool-button" type="button">History</button>
+        <button id="wordsButton" class="nav-button talk-tool-button" type="button">Words</button>
+      </div>
     </div>
 
     <section id="talkPage" class="workspace">
@@ -229,7 +235,10 @@
       <header class="study-page-header">
         <div><div class="eyebrow">SLIDE · VOCABULARY</div><h1>Find the word</h1>
           <p>Swipe toward the matching word. Practice vocabulary saved in Talk.</p></div>
-        <button id="slideWordsButton" class="study-secondary-button" type="button">Words ▦</button>
+        <div class="slide-header-actions">
+          <button id="slideHistoryButton" class="study-secondary-button" type="button">History</button>
+          <button id="slideWordsButton" class="study-secondary-button" type="button">Words ▦</button>
+        </div>
       </header>
       <div class="slide-layout">
         <aside class="slide-stats"><div><span>Total</span><strong id="slideTotal">0</strong></div>
@@ -293,6 +302,16 @@
       </section>
     </section>
   </main>
+
+  <dialog id="slideHistoryDialog" class="study-words-dialog">
+    <div class="study-words-shell">
+      <header class="study-words-heading">
+        <div><div class="eyebrow">SLIDE HISTORY</div><h2>Practice results</h2></div>
+        <button id="slideHistoryClose" class="study-secondary-button" type="button">Close</button>
+      </header>
+      <div id="slideHistoryList" class="study-words-list"></div>
+    </div>
+  </dialog>
 
   <dialog id="newsHistoryDialog" class="study-words-dialog">
     <div class="study-words-shell">
