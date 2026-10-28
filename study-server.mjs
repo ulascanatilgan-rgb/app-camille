@@ -68,12 +68,12 @@ export function registerStudyRoutes(app) {
       const system=[
         'Create swipe-learning cloze cards in '+LANGUAGE[language].name+'.',
         'Each card must test exactly the given word (not a synonym).',
-        'Definition: a helpful, simple, one-sentence explanation IN THE TARGET LANGUAGE, WITHOUT writing the answer word, 7-16 words.',
+        'Definition: a helpful SIMPLE ENGLISH explanation for a learner, WITHOUT writing the answer word, 7-16 words. ALWAYS use ENGLISH even when the tested word is French or Dutch.',
         'Sentence: a NATURAL sentence in the target language, 7-10 words total, with the EXACT answer replaced by literal ____ (one blank).',
         'The missing word must fit grammatically as-is, including when the word is a multiword expression.',
         'wrong: ONE unrelated but plausible different word IN THE TARGET LANGUAGE, never the correct word.',
         'Return one card for each input word; preserve exact input id, word.',
-        'No English in definitions or sample sentences unless the target language is English.',
+        'The definition MUST be in English. The sample sentence and wrong option MUST be in the target language only.',
         'JSON ONLY {"cards":[{"id":"...","definition":"...","sentence":"... ____ ...","wrong":"..."}]}'
       ].join(' ');
       const result=await jsonFromOpenAI(process.env.OPENAI_API_KEY,system,JSON.stringify({language,words}),3600);
@@ -121,6 +121,45 @@ export function registerStudyRoutes(app) {
       return res.status(502).json({error:'Word explanation unavailable. Please retry.'});
     }
   });
+
+  // Natural narrated News, cached once per article per server lifetime.
+  // All speech is generated with an AI voice, not a human newsreader.
+  const newsAudioCache=new Map();
+  app.post('/study-news-audio',async(req,res)=>{
+    res.setHeader('Cache-Control','private, max-age=3600');
+    if(!process.env.OPENAI_API_KEY)return res.status(503).json({error:'Voice API not configured.'});
+    const language=LANGUAGE[req.body?.language]?req.body.language:'nl';
+    const text=safeText(req.body?.text,4300).slice(0,4000);
+    const storyId=safeText(req.body?.storyId,140);
+    if(text.length<60||!storyId || text.length>4000)return res.status(400).json({error:'Invalid narration request.'});
+    const voiceKey=language+':'+storyId+':'+text.length+':'+text.slice(0,38);
+    const saved=newsAudioCache.get(voiceKey);
+    if(saved){res.type('audio/mpeg');return res.send(saved);}
+    try{
+      // Speech endpoint is available currently; migration to Realtime audio
+      // is needed before its announced 2027-01-06 retirement.
+      const response=await fetch('https://api.openai.com/v1/audio/speech',{
+        method:'POST',
+        headers:{Authorization:'Bearer '+process.env.OPENAI_API_KEY,'Content-Type':'application/json'},
+        signal:AbortSignal.timeout(70000),
+        body:JSON.stringify({
+          model:'gpt-4o-mini-tts',
+          voice:'marin',response_format:'mp3',speed:1.06,
+          instructions:'Read this '+LANGUAGE[language].name+' news story with a natural confident, relaxed, modern radio-presenter voice. Smooth connected flow, clear pronunciation, lightly expressive, understated and cool, never robotic or theatrical. Do not add or remove any words.',
+          input:text
+        })
+      });
+      if(!response.ok)throw new Error('OpenAI audio response '+response.status);
+      const bytes=Buffer.from(await response.arrayBuffer());
+      if(bytes.length<1200||bytes.length>12_000_000)throw new Error('Invalid audio size');
+      if(newsAudioCache.size>24)newsAudioCache.clear();
+      newsAudioCache.set(voiceKey,bytes);
+      res.type('audio/mpeg').send(bytes);
+    }catch(error){
+      console.error('News narration failed:',error?.message||error);
+      res.status(502).json({error:'Natural narration unavailable. You can use device speech as a fallback.'});
+    }
+  });
   app.get('/study-news',async(req,res)=>{
     res.setHeader('Cache-Control','no-store');
     const language=LANGUAGE[req.query?.language]?req.query.language:'nl';
@@ -129,44 +168,86 @@ export function registerStudyRoutes(app) {
     if(!process.env.OPENAI_API_KEY)return res.status(503).json({error:'OpenAI API key not configured.'});
     const cfg=LANGUAGE[language];
     try{
-      const newsFeed='https://news.google.com/rss?hl='+encodeURIComponent(cfg.locale)+'&gl='+cfg.region+'&ceid='+encodeURIComponent(cfg.edition);
-      const rss=await fetch(newsFeed,{headers:{'User-Agent':'ECL-Language-Learning/1.0'},signal:AbortSignal.timeout(16000)});
-      if(!rss.ok)throw new Error('News feed HTTP '+rss.status);
-      const articles=findFeeds(await rss.text());
+      // Use several public, freely accessible RSS sources with links back to the
+      // original publisher. Never copy or republish copyrighted full articles.
+      const feedUrls={
+        fr:[
+          'https://www.france24.com/fr/rss',
+          'https://www.rfi.fr/fr/rss',
+          'https://www.lemonde.fr/rss/une.xml',
+          'https://news.google.com/rss?hl=fr-FR&gl=FR&ceid=FR:fr'
+        ],
+        nl:[
+          'https://www.vrt.be/vrtnws/nl.rss.xml',
+          'https://www.hln.be/rss.xml',
+          'https://feeds.nos.nl/nosnieuwsalgemeen',
+          'https://news.google.com/rss?hl=nl-BE&gl=BE&ceid=BE:nl'
+        ],
+        en:[
+          'https://feeds.bbci.co.uk/news/world/rss.xml',
+          'https://www.theguardian.com/world/rss',
+          'https://feeds.npr.org/1001/rss.xml',
+          'https://news.google.com/rss?hl=en-GB&gl=GB&ceid=GB:en'
+        ]
+      };
+      const feedResults=await Promise.allSettled(feedUrls[language].map(async (url)=>{
+        const response=await fetch(url,{headers:{'User-Agent':'ECL-Learning/1.0 (educational RSS reader)','Accept':'application/rss+xml, application/xml, text/xml, */*'},signal:AbortSignal.timeout(11000)});
+        if(!response.ok)throw new Error('RSS '+response.status);
+        const items=findFeeds(await response.text());
+        return items.map(item=>({...item,feed:new URL(url).hostname}));
+      }));
+      const articles=feedResults.filter(item=>item.status==='fulfilled').flatMap(item=>item.value);
       const seen=new Set();
-      const titles=articles.filter(a=>{
-        const k=a.headline.toLowerCase().slice(0,70);
-        if(seen.has(k))return false;seen.add(k);return true;
-      }).slice(0,3);
-      if(titles.length<3)throw new Error('Not enough fresh headlines available');
+      // Prefer distinct publishers and topical diversity over just the first feed.
+      const unique=articles.filter(item=>{
+        const k=item.headline.toLowerCase().replace(/[^\\p{L}\\p{N}]+/gu,' ').slice(0,65);
+        if(seen.has(k))return false;
+        seen.add(k);return true;
+      });
+      const sourceGroups=new Map();
+      for(const item of unique){
+        const name=(item.source||item.feed||'news').toLowerCase();
+        if(!sourceGroups.has(name))sourceGroups.set(name,[]);
+        sourceGroups.get(name).push(item);
+      }
+      const titles=[];
+      for(const group of sourceGroups.values()){
+        if(titles.length>=3)break;
+        if(group[0])titles.push(group[0]);
+      }
+      for(const item of unique){
+        if(titles.length>=3)break;
+        if(!titles.includes(item))titles.push(item);
+      }
+      if(titles.length<3)throw new Error('Not enough public headlines available');
       const system=[
-        'You are producing ORIGINAL, concise language-learning news summaries in '+cfg.name+'.',
-        'The ONLY factual source for each item is the supplied headline, publisher, description and date.',
+        'You are an engaging international newsroom writer creating ORIGINAL, longer magazine-style educational news articles in '+cfg.name+'.',
+        'Use ONLY verifiable facts in the supplied feed headline, publisher, description and date; add clearly signposted general background and explanation, not fabricated event details.',
         'Never invent facts, names, amounts, quotations, prices, dates or developments absent from the supplied facts.',
         'If the headline gives few facts, explain its general context neutrally and explicitly mark uncertainty.',
-        'Never copy or paraphrase the whole source article. Write independent, educational summaries, NOT a reproduction.',
-        'Create exactly 3 stories in the input order, each with 8 to 11 SHORT sentences (approximately 110–170 words target language total).',
-        'Each story: original title in target language, "sentences" an array of {"target":"...","english":"..."} per sentence.',
+        'Never reproduce any publisher article or substantial excerpts. Create distinct original educational reporting based on short RSS facts and general context; give the publisher source link.',
+        'Create exactly 3 original reports in the supplied order, each 18 to 25 natural sentences totaling about 290–420 words in the target language. Write one coherent article with short paragraphs, not isolated vocabulary drills or bullets.',
+        'Each story: its own original target-language title; sentences array of {"target":"...","english":"..."} pairs. Each sentence should flow into the next as a continuous essay.',
         'The english text must be a natural, faithful English translation of the corresponding target sentence.',
         'Each story: exactly 10 useful vocabulary entries, {"word":"...","english":"...","definition":"...","example":"..."}.',
         'definition and example must be in the target language. Example: one practical sentence, no more than 12 words.',
         'Choose genuinely useful terms that actually appear in the target sentences. Avoid names.',
-        'Use simple practical language, CEFR A2/B1, direct style. Teach through accessible prose.',
+        'Use natural, engaging and readable B1-level reporting, gently introducing new vocabulary; not childish, not clipped. Keep each sentence moderate in length and paragraphs logical.',
         'Do not claim there is up-to-the-minute reporting beyond the supplied feed.',
         'Return JSON {"stories":[{"title":"...","sentences":[{"target":"...","english":"..."}],"words":[{"word":"...","english":"...","definition":"...","example":"..."}]}]}.'
       ].join(' ');
       const generated=await jsonFromOpenAI(process.env.OPENAI_API_KEY,system,JSON.stringify({
         language,day:getDay(),headlines:titles
-      }),6700);
+      }),13000);
       const stories=(Array.isArray(generated.stories)?generated.stories:[]).slice(0,3).map((o,i)=>{
         const source=titles[i];if(!source)return null;
-        const sentences=(Array.isArray(o.sentences)?o.sentences:[]).slice(0,14)
+        const sentences=(Array.isArray(o.sentences)?o.sentences:[]).slice(0,29)
           .map(x=>({target:safeText(x?.target,360),english:safeText(x?.english,360)}))
           .filter(x=>x.target&&x.english);
         const words=(Array.isArray(o.words)?o.words:[]).slice(0,10)
           .map(x=>({word:safeText(x?.word,65),english:safeText(x?.english,110),definition:safeText(x?.definition,240),example:safeText(x?.example,240)}))
           .filter(w=>isValidWord(w.word)&&w.english&&w.definition&&w.example);
-        if(sentences.length<5||words.length<5)return null;
+        if(sentences.length<14||words.length<5)return null;
         return {id:language+'-'+getDay()+'-'+i,title:safeText(o.title,190)||source.headline,
           sourceHeadline:source.headline,source:source.source||'Google News',url:source.link,
           publishedAt:source.publishedAt,sentences,words};
