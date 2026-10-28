@@ -276,7 +276,9 @@ async function buildAnamSession(apiKey, personaId, language, name) {
   const persona = result?.persona || result?.data || result;
   const avatarId = persona?.avatar?.id || persona?.avatarId;
   const voiceId = persona?.voice?.id || persona?.voiceId;
-  const llmId = persona?.llmId || persona?.llm?.id;
+  // Use Anam's documented default model when a published persona omits llmId.
+  // This keeps the user's original avatar and voice even with older presets.
+  const llmId = persona?.llmId || persona?.llm?.id || '0934d97d-0c3a-4f33-91b0-5e136a0ef466';
   // Fail closed rather than silently playing a saved persona's English greeting
   // in French or Dutch mode. Never replace the user's selected Anam voice.
   if (!avatarId || !voiceId || !llmId) {
