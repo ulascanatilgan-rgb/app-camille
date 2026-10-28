@@ -173,7 +173,9 @@ export async function createVoiceOnlySession({
       channel.addEventListener('open',()=>{clearTimeout(timeout);resolve();},{once:true});
       channel.addEventListener('error',()=>{clearTimeout(timeout);reject(new Error('OpenAI voice channel failed'));},{once:true});
     });
-    return {sendText,speakTextExactly,setMuted,close,isReady:()=>sessionReady,startedAt:sentAt};
+    return {sendText,speakTextExactly,setMuted,close,
+      resumeAudio:()=>remoteAudio?.play().catch(()=>notify(onStatus,'Audio playback needs a user tap')),
+      isReady:()=>sessionReady,startedAt:sentAt};
   } catch(error){
     await close();
     throw error;
