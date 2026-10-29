@@ -294,6 +294,45 @@ export function registerStudyRoutes(app) {
           sentences:detail,words:[]
         };
       });
+      // A half-page front-page briefing combines five SHORT source excerpts,
+      // while two individual linked stories remain available as separate cards.
+      // Each entry is explicitly attributed; this is a roundup, not a
+      // reproduction of the publishers' original articles.
+      const digestItems=[...choices];
+      for(const item of sorted){
+        if(digestItems.length>=5)break;
+        if(!digestItems.includes(item))digestItems.push(item);
+      }
+      if(digestItems.length>=4){
+        const titles={
+          fr:"L'essentiel de l'actualité",
+          nl:"Het belangrijkste nieuws van vandaag",
+          en:"Today's news in brief"
+        };
+        const intro={
+          fr:"Voici les principales informations des médias publics et des fils RSS.",
+          nl:"Dit zijn recente berichten uit openbare nieuwsbronnen.",
+          en:"These are recent reports from freely accessible news sources."
+        };
+        const excerpts=digestItems.slice(0,5).map(item=>{
+          const publisher=item.source||item.feed||'RSS';
+          const shortSummary=String(item.description||'').trim().split(/\s+/).slice(0,25).join(' ');
+          const headline=item.headline.replace(/[.!?]+$/u,'');
+          return {target:publisher+': '+headline+'.'+(shortSummary?' '+shortSummary.replace(/[.!?]+$/u,'')+'.':''),english:''};
+        });
+        const linked=digestItems.slice(0,5).map(item=>({
+          name:item.source||item.feed||'RSS',url:item.link
+        }));
+        stories.unshift({
+          id:language+'-rss-briefing-'+getDay(),kind:'rss',
+          language,title:titles[language],source:'Public RSS briefing',
+          url:linked[0].url,sources:linked,
+          publishedAt:digestItems[0].publishedAt||new Date().toISOString(),
+          sentences:[{target:intro[language],english:''},...excerpts],
+          words:[]
+        });
+        stories.length=3;
+      }
       const data={language,updatedAt:new Date().toISOString(),stories,
         format:'public-rss-short',partial:stories.length<3};
       inMemoryNews.set(language,{fetchedAt:now,data});
