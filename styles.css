@@ -5868,3 +5868,111 @@ html,body,.app-shell{background:var(--ecl-canvas) !important;color:var(--ecl-ink
 
 /* Keep nonactive media sections and panels truly hidden in all responsive layouts. */
 #songPage[hidden],#clipsPage[hidden],#clipLivePanel[hidden],#clipPlayback[hidden],#songDraft[hidden]{display:none !important;}
+
+
+/* ECL Clips v57 — calm semi-transparent grey preparation trays. */
+#clipWordsPanel[hidden],#clipPreparedPanel[hidden]{display:none!important}
+#clipsPage .clip-workflow-card{
+  margin:15px 0 13px;
+  background:rgba(214,222,232,.35);
+  border:1px solid rgba(152,167,188,.35);
+  border-radius:17px;
+  padding:12px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+}
+#clipsPage .clip-workflow-heading{
+  width:100%;display:flex;align-items:center;justify-content:space-between;
+  gap:10px;border:1px solid rgba(155,169,186,.38);
+  background:rgba(236,240,245,.82);
+  color:#293749;border-radius:11px;padding:12px 13px;
+  font:750 12px/1.4 Comfortaa,Arial,sans-serif;text-align:left;cursor:pointer;
+}
+#clipsPage .clip-count{font-size:10px;color:#69788a;font-weight:600;white-space:nowrap}
+#clipsPage .clip-words-panel{
+  margin:11px 0;padding:11px;border:1px solid rgba(166,177,190,.45);
+  border-radius:12px;background:rgba(255,255,255,.62);
+}
+#clipsPage .clip-search-label{
+  display:block;margin-bottom:7px;font:700 10px/1.5 Comfortaa,Arial,sans-serif;color:#657386
+}
+#clipsPage #clipWordsSearch{
+  box-sizing:border-box;width:100%;padding:10px 12px;margin-bottom:9px;
+  border:1px solid #cbd5e0;border-radius:10px;background:#fff;color:#263648;
+  font:500 12px Comfortaa,Arial,sans-serif;
+}
+#clipsPage .clip-all-words{
+  max-height:238px;overflow:auto;overscroll-behavior:contain;
+  display:flex;flex-direction:column;gap:5px;padding-right:3px
+}
+#clipsPage .clip-universe-row{
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr) auto;
+  gap:7px;align-items:center;
+  padding:9px 10px;border:1px solid #e6ebf1;border-radius:9px;
+  background:rgba(255,255,255,.86);color:#304052;
+}
+#clipsPage .clip-universe-row strong{font-size:12px;overflow-wrap:anywhere}
+#clipsPage .clip-universe-row span{font-size:11px;color:#657285;overflow-wrap:anywhere}
+#clipsPage .clip-universe-row small{
+  font-size:9px;color:#758399;background:#eef1f6;border-radius:6px;padding:4px 5px;
+}
+#clipsPage .clip-workflow-actions{
+  display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:11px
+}
+#clipsPage .clip-workflow-button{
+  min-height:45px;border:1px solid rgba(155,170,188,.5);border-radius:11px;
+  background:rgba(234,238,244,.86);color:#2e3c4d;
+  padding:10px 9px;cursor:pointer;
+  font:750 11px/1.4 Comfortaa,Arial,sans-serif;
+  transition:border-color .15s ease,background .15s ease;
+}
+#clipsPage .clip-workflow-button:not(:disabled):hover,
+#clipsPage .clip-workflow-heading:hover{
+  background:rgba(245,247,250,.96);border-color:#aebdce
+}
+#clipsPage .clip-workflow-button:disabled{
+  cursor:not-allowed;opacity:.55
+}
+#clipsPage #clipSelectionInfo{
+  margin:12px 2px 9px;font-size:10px;line-height:1.6;color:#667586
+}
+#clipsPage .clip-selected-words{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:6px;max-height:260px;overflow-y:auto
+}
+#clipsPage .clip-selected-chip{
+  display:flex;align-items:center;gap:8px;min-width:0;
+  background:rgba(255,255,255,.75);
+  border:1px solid #d9e1ea;border-radius:9px;
+  padding:8px 9px;color:#304254;
+}
+#clipsPage .clip-selected-chip small{
+  font:750 9px Comfortaa,Arial,sans-serif;color:#8995a3;min-width:14px;
+}
+#clipsPage .clip-selected-chip strong{
+  min-width:0;overflow-wrap:anywhere;font:650 11px/1.35 Comfortaa,Arial,sans-serif
+}
+#clipsPage .clip-prepared-panel{
+  margin:13px 0;padding:17px;
+  border:1px solid rgba(158,173,190,.5);border-radius:15px;
+  background:rgba(222,229,237,.44);
+  box-shadow:0 3px 13px rgba(25,40,55,.035)
+}
+#clipsPage .clip-prepared-panel h3{
+  margin:3px 0 12px;color:#263748;font-size:14px;line-height:1.45
+}
+#clipsPage .clip-prepared-script{
+  max-height:300px;overflow:auto;white-space:pre-wrap;
+  background:rgba(255,255,255,.86);
+  border:1px solid #dce4ed;border-radius:11px;
+  padding:14px 15px;margin:0;
+  color:#283748;font:500 14px/1.85 Georgia,'Times New Roman',serif;
+}
+#clipsPage #clipRunButton:disabled{opacity:.5;cursor:not-allowed}
+#clipsPage .clip-transcript{max-height:315px;white-space:normal}
+#clipsPage .clip-player{margin-bottom:6px}
+@media(max-width:420px){
+  #clipsPage .clip-workflow-card{padding:10px}
+  #clipsPage .clip-workflow-button{font-size:10px;padding:9px 6px}
+  #clipsPage .clip-universe-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px}
+  #clipsPage .clip-universe-row small{grid-column:1/-1;justify-self:start}
+}
