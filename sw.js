@@ -1,4 +1,4 @@
-const CACHE = 'ecl-reader-swipes-v50';
+const CACHE = 'ecl-news-repair-v51';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
