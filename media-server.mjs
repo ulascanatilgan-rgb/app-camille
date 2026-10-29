@@ -23,7 +23,7 @@ export function registerMediaRoutes(app){
       'Target language is '+LANG[language]+'. NEVER mix French and Dutch.',
       'The user supplies vocabulary with English translations.',
       kind==='clip'?
-        'Create a NATURAL one-person spoken monologue for an avatar, about 100-120 words and around 60 seconds when read slowly. Use 8-12 input vocabulary items naturally. Use short complete sentences, cohesive narrative, no dialogue labels or stage directions. Avoid markdown.':
+        'Create ONE fresh, ORIGINAL one-person spoken monologue for an avatar, about 110-130 words lasting around 60 seconds at a calm speaking pace. Incorporate ALL the supplied selected vocabulary (up to 20), naturally and grammatically, with one cohesive story rather than a word list. Prefer everyday B1 language, fluid short sentences and a fresh angle each time even for identical inputs. No dialogue labels, stage directions or markdown.':
         'Write an ORIGINAL, short, singable, easy-to-understand song lyric, including a recurring chorus, in the requested genre '+genre+'. Use 15-20 input vocabulary items when available; for fewer words, use all naturally. Repetition helps memorization. 3 verses/chorus sections maximum. Do not imitate specific artists or copyrighted songs.',
       'Return ONLY JSON {"title":"...","text":"...","usedWords":["..."]}.',
       'The text and title must be solely in the target language. Use newline breaks for song verses.',
@@ -34,7 +34,7 @@ export function registerMediaRoutes(app){
         method:'POST',headers:{'Authorization':'Bearer '+process.env.OPENAI_API_KEY,'Content-Type':'application/json'},
         signal:AbortSignal.timeout(55000),
         body:JSON.stringify({
-          model:'gpt-4o-mini',temperature:.55,response_format:{type:'json_object'},max_tokens:1250,
+          model:'gpt-4o-mini',temperature:kind==='clip'?.85:.55,response_format:{type:'json_object'},max_tokens:1450,
           messages:[{role:'system',content:system},{role:'user',content:JSON.stringify({theme,genre,words})}]
         })
       });
