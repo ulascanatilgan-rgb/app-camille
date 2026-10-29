@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=ecl-20261027" />
   <link rel="icon" type="image/png" href="/favicon-64.png?v=ecl-20261027" />
   <title>ECL — Emma, Charlotte &amp; Louis</title>
-  <link rel="stylesheet" href="/styles.css?v=ecl-clips-audiofix-v56-20261030" />
+  <link rel="stylesheet" href="/styles.css?v=ecl-clips-workflow-v57-20261030" />
 </head>
 <body>
   <main class="app-shell">
@@ -340,7 +340,29 @@
             <label>Speaker<select id="clipPersona"></select></label>
             <label>Conversation topic<select id="clipTheme"></select></label>
           </div>
-          <button id="clipRunButton" class="study-primary-button media-run" type="button">Run · Create 1-minute video</button>
+          <div class="clip-workflow-card" aria-label="Clip vocabulary and script preparation">
+            <button id="clipWordsButton" class="clip-workflow-heading" type="button" aria-expanded="false" aria-controls="clipWordsPanel">
+              <span>Words for Clip</span><span id="clipUniverseCount" class="clip-count">0 words <span aria-hidden="true">⌄</span></span>
+            </button>
+            <div id="clipWordsPanel" class="clip-words-panel" hidden>
+              <label class="clip-search-label" for="clipWordsSearch">All learned words · Talk + News</label>
+              <input id="clipWordsSearch" type="search" placeholder="Search learned words..." autocomplete="off" />
+              <div id="clipAllWords" class="clip-all-words" aria-label="All learned words"></div>
+            </div>
+            <div class="clip-workflow-actions">
+              <button id="clipMixButton" class="clip-workflow-button" type="button">Mix · 20 random words</button>
+              <button id="clipPrepareButton" class="clip-workflow-button" type="button" disabled>Prepare · Script</button>
+            </div>
+            <p id="clipSelectionInfo" class="media-hint" aria-live="polite">Use Mix to choose 20 learned words.</p>
+            <div id="clipSelectedWords" class="clip-selected-words" aria-label="Words selected for this clip"></div>
+          </div>
+          <div id="clipPreparedPanel" class="clip-prepared-panel" hidden>
+            <div class="media-eyebrow">PREPARED · 1-MINUTE SCRIPT</div>
+            <h3 id="clipPreparedTitle"></h3>
+            <p id="clipPreparedScript" class="clip-prepared-script"></p>
+            <p class="media-hint">Not happy? Press Prepare again for another script using the same words.</p>
+          </div>
+          <button id="clipRunButton" class="study-primary-button media-run" type="button" disabled>Run · Create 1-minute video</button>
           <button id="clipCancelButton" class="study-secondary-button media-run" type="button" hidden>Stop recording</button>
           <div id="clipStatus" class="study-message" role="status">Choose an avatar to create a clip with Anam.</div>
           <div id="clipLivePanel" class="clip-live-panel" hidden>
@@ -361,7 +383,7 @@
             </div>
             <button id="clipDownloadButton" type="button" class="study-secondary-button media-download">Download video</button>
             <div id="clipWordDetail" class="media-word-detail">Tap a word for its meaning.</div>
-            <h3>Interactive transcript</h3><div id="clipTranscript" class="clip-transcript"></div>
+            <h3>Full script · interactive transcript</h3><div id="clipTranscript" class="clip-transcript"></div>
             <p class="media-hint">Word highlighting follows estimated playback timing. Video replay does not use Anam credits.</p>
           </div>
           <p class="media-placeholder">Your latest clip will appear here after recording. Browse the saved videos on the left.</p>
@@ -480,6 +502,6 @@
     </form>
   </dialog>
 
-  <script src="/app.bundle.js?v=ecl-clips-audiofix-v56-20261030" type="module"></script>
+  <script src="/app.bundle.js?v=ecl-clips-workflow-v57-20261030" type="module"></script>
 </body>
 </html>
