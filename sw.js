@@ -1,4 +1,4 @@
-const CACHE = 'ecl-public-rss-v54';
+const CACHE = 'ecl-media-v55';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -43,7 +43,7 @@ self.addEventListener('fetch', event => {
 
   if (
     url.origin === self.location.origin &&
-    ['/anam-session', '/anam-health', '/chat', '/choices', '/tip', '/translate', '/health', '/vocab', '/study-news', '/study-slide-deck'].includes(url.pathname)
+    ['/anam-session', '/anam-health', '/chat', '/choices', '/tip', '/translate', '/health', '/vocab', '/study-news', '/study-slide-deck', '/study-media-script'].includes(url.pathname)
   ) {
     return;
   }
