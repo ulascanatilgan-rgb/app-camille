@@ -314,7 +314,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
       r.stop();await stopped;
     }
     stopStream();
-    $('clipRunButton').disabled=false;$('clipCancelButton').hidden=true;
+    $('clipCancelButton').hidden=true;renderClipSelection();
     stopInProgress=false;
     if(!completed)status('clipStatus','Recording stopped. Incomplete clips are not saved.');
   }
@@ -325,21 +325,22 @@ export function initMediaPages({getLanguage,getTalkWords}){
     saving=false;await finishRecording(false);
   }
   async function runClip(){
-    if(saving)return;
-    const words=sourceWords(12),lang=getLanguage(),persona=$('clipPersona').value;
-    if(!words.length){status('clipStatus','Save vocabulary from Talk first.');return}
+    if(saving||preparingClip)return;
+    const lang=getLanguage(),persona=$('clipPersona').value;
+    const data=clipDraft;
+    if(!data?.text||!selectedClipWords.length){
+      status('clipStatus','First press Mix, then Prepare. Run only records the approved script.');return;
+    }
+    if(data.theme!==$('clipTheme').value){
+      status('clipStatus','Topic changed. Press Prepare again before Run.');return;
+    }
     if(!mime()){status('clipStatus','This browser cannot record avatar video. Try an updated Safari or Chrome.');return}
     saving=true;let seq=++liveSequence,recorded=[];
-    $('clipRunButton').disabled=true;$('clipCancelButton').hidden=false;
-    status('clipStatus','Preparing a 1-minute '+(NAMES[persona]||'Emma')+' script…');
+    renderClipSelection();
+    $('clipCancelButton').hidden=false;
+    status('clipScript',data.text);
+    status('clipStatus','Connecting '+(NAMES[persona]||'your avatar')+' to record your prepared script…');
     try{
-      const response=await fetch('/study-media-script',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({kind:'clip',language:lang,words,theme:$('clipTheme').value})});
-      const data=await response.json();
-      if(!response.ok)throw new Error(data.error||'Could not prepare clip');
-      if(seq!==liveSequence||lang!==getLanguage())return;
-      status('clipScript',data.text);
-      status('clipStatus','Connecting '+NAMES[persona]+' on Anam…');
       const tokenResp=await fetch('/anam-session',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({persona,targetLanguage:lang,topic:'open'})});
       const token=await tokenResp.json();
@@ -412,7 +413,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
       if(blob.size<10000)throw new Error('The recording was incomplete. Please retry.');
       const clip={id:'clip-'+Date.now(),createdAt:new Date().toISOString(),
         language:lang,persona,title:data.title,text:script,theme:data.theme,
-        usedWords:data.usedWords,blob,duration:(Date.now()-liveSince)/1000};
+        usedWords:data.usedWords,selectedWords:data.selectedWords,blob,duration:(Date.now()-liveSince)/1000};
       await putClip(clip);
       status('clipStatus','Saved! Replay this video any time without starting Anam again.');
       await renderClips();await selectClip(clip);
@@ -421,7 +422,8 @@ export function initMediaPages({getLanguage,getTalkWords}){
       status('clipStatus',String(e.message||'Could not save clip.'));
       if(recorder)await finishRecording(false);else stopStream();
     }finally{
-      saving=false;abortWait=null;recorded=[];$('clipRunButton').disabled=false;$('clipCancelButton').hidden=true;
+      saving=false;abortWait=null;recorded=[];$('clipCancelButton').hidden=true;
+      renderClipSelection();
     }
   }
   makeOption($('songTheme'),THEMES.map(x=>[x,x]));
@@ -429,7 +431,20 @@ export function initMediaPages({getLanguage,getTalkWords}){
   makeOption($('songGenre'),['Pop','Acoustic','Indie','Hip-hop','Jazz','Electronic','Ballad'].map(x=>[x,x]));
   makeOption($('clipPersona'),Object.entries(NAMES));
   $('clipPersona').value=localStorage.getItem('ecl.selectedPersona.v1')||'emma';
+  restoreClipWorkspace();
   $('songRunButton').addEventListener('click',makeSong);
+  $('clipWordsButton').addEventListener('click',()=>{
+    const panel=$('clipWordsPanel');panel.hidden=!panel.hidden;
+    $('clipWordsButton').setAttribute('aria-expanded',String(!panel.hidden));
+    if(!panel.hidden)renderClipWordUniverse();
+  });
+  $('clipWordsSearch').addEventListener('input',renderClipWordUniverse);
+  $('clipMixButton').addEventListener('click',mixClipWords);
+  $('clipPrepareButton').addEventListener('click',()=>void prepareClipScript());
+  $('clipTheme').addEventListener('change',()=>{
+    if(clipDraft)invalidateClipDraft();
+    status('clipStatus','Topic updated. Press Prepare to create a new script.');
+  });
   $('clipRunButton').addEventListener('click',runClip);
   $('clipCancelButton').addEventListener('click',cancelClip);
   $('clipSavedVideo').addEventListener('timeupdate',updateSubtitles);
@@ -440,12 +455,18 @@ export function initMediaPages({getLanguage,getTalkWords}){
     if(current==='clips'&&next!=='clips')void cancelClip();
     current=next;
     if(next==='song'){showInventory();renderSongs()}
-    if(next==='clips'){showInventory();void renderClips()}
+    if(next==='clips'){restoreClipWorkspace();void renderClips()}
   }
   function refreshLanguage(){
     if(current==='clips')void cancelClip();
     if(current==='song'){showInventory();renderSongs()}
-    if(current==='clips'){showInventory();activeClip=null;void renderClips()}
+    if(current==='clips'){
+      prepareSequence++;preparingClip=false;
+      $('clipWordsPanel').hidden=true;
+      $('clipWordsButton').setAttribute('aria-expanded','false');
+      $('clipWordsSearch').value='';
+      restoreClipWorkspace();activeClip=null;void renderClips();
+    }
   }
   return {onPage,refreshLanguage,stop:cancelClip};
 }
