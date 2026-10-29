@@ -550,10 +550,17 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     info('newsReaderTitle',article.title);
     const source=$('newsReaderSource');source.replaceChildren();
     const name=document.createElement('span');
-    name.textContent='Source: '+article.source+(article.publishedAt?' · '+new Date(article.publishedAt).toLocaleDateString():'')+' · ';
-    const link=document.createElement('a');
-    link.textContent='Original source';link.href=article.url;link.target='_blank';link.rel='noopener noreferrer';
-    source.append(name,link);
+    name.textContent=(article.sources?.length?'Sources: ':'Source: ')+article.source+
+      (article.publishedAt?' · '+new Date(article.publishedAt).toLocaleDateString():'')+' · ';
+    source.append(name);
+    const links=article.sources?.length?article.sources:[{name:'Original article',url:article.url}];
+    links.forEach((item,index)=>{
+      if(index)source.append(document.createTextNode(' · '));
+      const link=document.createElement('a');
+      link.textContent=item.name||'Original article';
+      link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';
+      source.append(link);
+    });
     addNewsWords(article);
     info('newsNarrationDisclosure',article.kind==='rss'
       ?'Public RSS news · Device narration · Tap a word for its English meaning'
