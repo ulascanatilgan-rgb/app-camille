@@ -68,7 +68,7 @@ async function sourceContext(article){
     return paragraphs.join(' ').slice(0,4500);
   }catch{return ''}
 }
-function getDay() {return new Date().toISOString().slice(0,10)}
+function getDay() {return new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Brussels'})}
 function isValidWord(word) {return typeof word==='string'&&word.length>=1&&word.length<=60&&/\p{Script=Latin}/u.test(word)}
 async function jsonFromOpenAI(apiKey,system,user,maxTokens=3400) {
   const response=await fetch('https://api.openai.com/v1/chat/completions',{
@@ -105,23 +105,24 @@ export function registerStudyRoutes(app) {
         'Sentence: a NATURAL sentence in the target language, 7-10 words total, with the EXACT answer replaced by literal ____ (one blank).',
         'The missing word must fit grammatically as-is, including when the word is a multiword expression.',
         'wrong: ONE unrelated but plausible different word IN THE TARGET LANGUAGE, never the correct word.',
+        'englishSentence: a FULL clear English translation of the COMPLETED target-language sentence, including the missing answer UNHIDDEN. No underscores or blanks. Never omit this field.',
         'Return one card for each input word; preserve exact input id, word.',
         'The definition MUST be in English. The sample sentence and wrong option MUST be in the target language only.',
-        'JSON ONLY {"cards":[{"id":"...","definition":"...","sentence":"... ____ ...","wrong":"..."}]}'
+        'JSON ONLY {"cards":[{"id":"...","definition":"...","sentence":"... ____ ...","englishSentence":"English complete sentence","wrong":"..."}]}'
       ].join(' ');
       const result=await jsonFromOpenAI(process.env.OPENAI_API_KEY,system,JSON.stringify({language,words}),3600);
       const expected=new Map(words.map(w=>[w.id,w]));
       const cards=(Array.isArray(result.cards)?result.cards:[]).map(c=>{
         const w=expected.get(String(c?.id));
         if(!w)return null;
-        const definition=safeText(c.definition,260),sentence=safeText(c.sentence,240),wrong=safeText(c.wrong,65);
-        if(!definition||!sentence.includes('____')||sentence.split('____').length!==2||
+        const definition=safeText(c.definition,260),sentence=safeText(c.sentence,240),wrong=safeText(c.wrong,65),englishSentence=safeText(c.englishSentence,300);
+        if(!definition||!englishSentence||englishSentence.includes('____')||!sentence.includes('____')||sentence.split('____').length!==2||
           !isValidWord(wrong)||wrong.toLowerCase()===w.word.toLowerCase() ||
           !/\p{Script=Latin}/u.test(definition))return null;
         if(definition.toLocaleLowerCase().includes(w.word.toLocaleLowerCase()))return null;
         const count=sentence.trim().split(/\s+/).length;
         if(count<6||count>11)return null;
-        return {id:w.id,word:w.word,meaning:w.meaning,definition,sentence,wrong};
+        return {id:w.id,word:w.word,meaning:w.meaning,definition,sentence,wrong,englishSentence};
       }).filter(Boolean);
       res.json({cards});
     }catch(error){console.error('Slide deck failed:',error);res.status(502).json({error:'Could not generate study cards.'});}
@@ -252,7 +253,8 @@ export function registerStudyRoutes(app) {
       // Each card is a real, independently sourced short public-news brief.
       // Prefer informative RSS summaries, variety of publishers and recent posts.
       const sorted=unique
-        .filter(item=>item.link && item.headline && item.description.length>=20)
+        .filter(item=>item.link && item.headline && item.description.length>=20 &&
+          item.publishedAt && new Date(item.publishedAt).toLocaleDateString('sv-SE',{timeZone:'Europe/Brussels'})===getDay())
         .sort((a,b)=>{
           const recentA=Number.isFinite(Date.parse(a.publishedAt))?Date.parse(a.publishedAt):0;
           const recentB=Number.isFinite(Date.parse(b.publishedAt))?Date.parse(b.publishedAt):0;
@@ -263,17 +265,18 @@ export function registerStudyRoutes(app) {
         const host=item.source||item.feed;
         if(hosts.has(host))continue;
         hosts.add(host);choices.push(item);
-        if(choices.length===3)break;
+        if(choices.length===12)break;
       }
       for(const item of sorted){
-        if(choices.length===3)break;
+        if(choices.length===12)break;
         if(!choices.includes(item))choices.push(item);
       }
       if(!choices.length){
         // Some feeds omit descriptions. Still render dated, linked headlines.
-        choices.push(...unique.filter(x=>x.link&&x.headline).slice(0,3));
+        choices.push(...unique.filter(x=>x.link&&x.headline&&x.publishedAt&&
+          new Date(x.publishedAt).toLocaleDateString('sv-SE',{timeZone:'Europe/Brussels'})===getDay()).slice(0,12));
       }
-      if(!choices.length)throw new Error('No reachable RSS articles');
+      if(!choices.length)throw new Error('No dated articles from today were available in the public RSS feeds.');
       const stories=choices.map((item,i)=>{
         const source=item.source||item.feed||'Public RSS';
         const summary=safeText(item.description,730);
@@ -331,10 +334,10 @@ export function registerStudyRoutes(app) {
           sentences:[{target:intro[language],english:''},...excerpts],
           words:[]
         });
-        stories.length=3;
+        stories.length=13;
       }
       const data={language,updatedAt:new Date().toISOString(),stories,
-        format:'public-rss-short',partial:stories.length<3};
+        format:'public-rss-today',partial:stories.length<4};
       inMemoryNews.set(language,{fetchedAt:now,data});
       res.json(data);
     }catch(error){
@@ -342,7 +345,7 @@ export function registerStudyRoutes(app) {
       if(cached?.data?.stories?.length)
         return res.json({...cached.data,stale:true,partial:true});
       res.status(503).json({
-        error:'Public news feeds are currently unreachable. Please try Update again.'
+        error:'No current-day news available from public feeds. Please try Update later today.'
       });
     }
   });
