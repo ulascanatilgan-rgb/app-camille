@@ -50,7 +50,7 @@ function renderTokens(target,text,dict,active,onClick){
 }
 export function initMediaPages({getLanguage,getTalkWords}){
   let current='talk',client=null,recorder=null,clock=null,liveSince=0,stopInProgress=false;
-  let activeClip=null,clipUrl='',liveSequence=0,saving=false;
+  let activeClip=null,clipUrl='',liveSequence=0,saving=false,abortWait=null;
   const status=(id,msg)=>{const el=$(id);if(el)el.textContent=msg};
   const langName=()=>({nl:'Dutch',fr:'French',en:'English'}[getLanguage()]||'Dutch');
   const dictionary=()=>new Map(safeWords(getTalkWords,getLanguage()).map(w=>[w.word.toLocaleLowerCase(),w.english]));
@@ -199,7 +199,9 @@ export function initMediaPages({getLanguage,getTalkWords}){
     if(!completed)status('clipStatus','Recording stopped. Incomplete clips are not saved.');
   }
   async function cancelClip(){
-    liveSequence++;if(!recorder){stopStream();return}
+    liveSequence++;
+    if(abortWait){const abort=abortWait;abortWait=null;abort();}
+    if(!recorder){stopStream();return}
     saving=false;await finishRecording(false);
   }
   async function runClip(){
@@ -244,11 +246,12 @@ export function initMediaPages({getLanguage,getTalkWords}){
       const stream=client.createTalkMessageStream();
       await stream.streamMessageChunk(script,true);
       await new Promise((resolve,reject)=>{
+        abortWait=()=>{clearInterval(clock);clock=null;reject(new Error('Clip cancelled'));};
         clock=setInterval(()=>{
-          if(seq!==liveSequence){clearInterval(clock);reject(new Error('Clip cancelled'));return}
+          if(seq!==liveSequence){const abort=abortWait;abortWait=null;if(abort)abort();return}
           const elapsed=Date.now()-liveSince;
           status('clipStatus','Recording · '+Math.min(100,Math.round(elapsed/targetMs*100))+'%');
-          if(elapsed>=targetMs){clearInterval(clock);clock=null;resolve()}
+          if(elapsed>=targetMs){clearInterval(clock);clock=null;abortWait=null;resolve()}
         },300);
       });
       if(seq!==liveSequence)return;
@@ -268,7 +271,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
       status('clipStatus',String(e.message||'Could not save clip.'));
       if(recorder)await finishRecording(false);else stopStream();
     }finally{
-      saving=false;recorded=[];$('clipRunButton').disabled=false;$('clipCancelButton').hidden=true;
+      saving=false;abortWait=null;recorded=[];$('clipRunButton').disabled=false;$('clipCancelButton').hidden=true;
     }
   }
   makeOption($('songTheme'),THEMES.map(x=>[x,x]));
