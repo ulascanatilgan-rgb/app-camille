@@ -457,7 +457,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     const lang=getLanguage(),today=safeDate();
     if(newsLang!==lang){
       stopNews();newsLang=lang;newsReaderIndex=-1;archiveStory=null;
-      const saved=read(key('news.daily.public.v5',lang),null);
+      const saved=read(key('news.daily.magazine.v6',lang),null);
       const previous=read(key('news.daily.long.v3',lang),null);
       if(previous?.stories?.length)saveNewsArchive(previous.stories);
       if(saved?.stories?.length)saveNewsArchive(saved.stories);
@@ -468,10 +468,10 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     if(archiveStory) {renderNewsReader();return;}
     if(!newsData?.stories?.length){
       $('newsReader').hidden=true;
-      info('newsStatus','Tap Update to load today\'s articles in '+({nl:'Dutch',fr:'French',en:'English'}[lang])+'.');
+      info('newsStatus','Tap Update to prepare three magazine articles in '+({nl:'Dutch',fr:'French',en:'English'}[lang])+'.');
       return;
     }
-    info('newsStatus',(new Date(newsData.updatedAt).toLocaleDateString('sv-SE',{timeZone:'Europe/Brussels'})===today&&!newsData.stale?'Public news · ':'Previously saved news · ')+newsData.stories.length+' short '+(newsData.stories.length===1?'article':'articles')+' · '+new Date(newsData.updatedAt).toLocaleDateString()+'.'+(newsData.partial?' Tap Update to check for more.':''));
+    info('newsStatus',(new Date(newsData.updatedAt).toLocaleDateString('sv-SE',{timeZone:'Europe/Brussels'})===today&&!newsData.stale?'Articles · ':'Saved articles · ')+newsData.stories.length+' '+(newsData.stories.length===1?'article':'articles')+' · '+new Date(newsData.updatedAt).toLocaleDateString()+'.'+(newsData.partial?' Tap Update to check for more.':''));
     if(newsReaderIndex>=0&&newsReaderIndex<newsData.stories.length){renderNewsReader();return;}
     $('newsReader').hidden=true;stories.hidden=false;
     newsData.stories.forEach((story,index)=>{
@@ -488,19 +488,19 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   }
   async function updateNews(force=false) {
     const lang=getLanguage(),today=safeDate();
-    const cached=read(key('news.daily.public.v5',lang),null);
+    const cached=read(key('news.daily.magazine.v6',lang),null);
     // One dated update per language per day. Reopening uses saved content.
     if(!force&&cached?.stories?.length&&new Date(cached.updatedAt).toLocaleDateString('sv-SE',{timeZone:'Europe/Brussels'})===today&&!cached.partial&&!cached.stale){
       saveNewsArchive(cached.stories||[]);
       newsData=cached;newsLang=lang;newsReaderIndex=-1;archiveStory=null;renderNews();return;
     }
-    $('newsUpdateButton').disabled=true;info('newsStatus','Loading short public-news stories…');
+    $('newsUpdateButton').disabled=true;info('newsStatus','Compiling three full-length articles from open magazine sources…');
     try{
-      const resp=await fetch('/study-news?language='+encodeURIComponent(lang)+(force?'&refresh=1':''),{cache:'no-store',signal:AbortSignal.timeout(16000)});
+      const resp=await fetch('/study-news?language='+encodeURIComponent(lang)+(force?'&refresh=1':''),{cache:'no-store',signal:AbortSignal.timeout(110000)});
       const data=await resp.json();
       if(!resp.ok)throw new Error(data?.error||'News unavailable');
       if(!Array.isArray(data.stories)||data.stories.length===0)throw new Error('No articles in news update');
-      store(key('news.daily.public.v5',lang),data);
+      store(key('news.daily.magazine.v6',lang),data);
       if(lang===getLanguage()){
         saveNewsArchive(data.stories);
         newsData=data;newsLang=lang;newsReaderIndex=-1;archiveStory=null;renderNews();
@@ -567,9 +567,9 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       source.append(link);
     });
     addNewsWords(article);
-    info('newsNarrationDisclosure',article.kind==='rss'
-      ?'Public RSS news · Device narration · Tap a word for its English meaning'
-      :'Original learning summary · Tap a word for its English meaning');
+    info('newsNarrationDisclosure',article.kind==='article'
+      ?'Original magazine-style learning article · Natural AI narration · Select any word to study'
+      : 'Saved reading · Tap a word for its meaning');
     $('newsCompleteButton').hidden=!article.sentences.some(s=>s.english);
     const vocab=$('newsReaderWords');vocab.replaceChildren();
     for(const w of article.words){
@@ -896,7 +896,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     $('newsRunButton').textContent='■ Stop';
     $('newsPauseButton').textContent='Stop';
     if(story.kind==='rss'){
-      info('newsStatus','Reading this public-news brief with your device voice.');
+      info('newsStatus','Reading with your device voice.');
       speakCurrent(seq);
       return;
     }
