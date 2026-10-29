@@ -1,4 +1,4 @@
-const CACHE = 'ecl-public-rss-v52';
+const CACHE = 'ecl-public-rss-v53';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
