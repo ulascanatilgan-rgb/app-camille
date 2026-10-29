@@ -1,9 +1,11 @@
-// ECL's three-page learning experience. No Anam/Realtime audio session is
+// ECL's five-page learning experience. No Anam/Realtime audio session is
 // required in Slide or News; browser speech reads these study materials.
+import { initMediaPages } from './media-pages.mjs';
 export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   const $=id=>document.getElementById(id);
   const tabs=[...document.querySelectorAll('.study-nav-button')];
-  const pages={talk:$('talkPage'),slide:$('slidePage'),news:$('newsPage')};
+  const pages={talk:$('talkPage'),slide:$('slidePage'),news:$('newsPage'),song:$('songPage'),clips:$('clipsPage')};
+  const media=initMediaPages({getLanguage,getTalkWords});
   const locale={fr:'fr-FR',nl:'nl-BE',en:'en-GB'};
   let currentPage='talk', cards=[], cardIndex=0, deckLang='', pendingDeck=false;
   let newsData=null,newsLang='',newsReaderIndex=-1,newsPlaying=false,newsPaused=false;
@@ -41,7 +43,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     archive.sort((a,b)=>String(b.archivedAt||b.publishedAt||'').localeCompare(String(a.archivedAt||a.publishedAt||'')));
     store(key('news.archive'),archive);
   }
-  const safeDate=()=>new Date().toISOString().slice(0,10);
+  const safeDate=()=>new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Brussels'});
   const say=(text)=>{
     if(!('speechSynthesis' in window))return;
     window.speechSynthesis.cancel();
@@ -86,6 +88,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     }
     // Leaving Talk intentionally ends paid Anam/OpenAI sessions.
     if(wasTalk && next!=='talk')Promise.resolve(stopTalk()).catch(err=>console.warn('Talk did not fully stop:',err));
+    media.onPage(next);
     if(next==='slide')void loadSlide();
     if(next==='news'){
       renderNews();
@@ -108,6 +111,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     $('slideLeftWord').disabled=false;$('slideRightWord').disabled=false;
     info('slideStatus',(cardIndex+1)+' / '+cards.length+' · Swipe the card or tap the left/right word');
     info('slideDefinition',item.definition);
+    info('slideSentenceEnglish',item.englishSentence||'');
     const sentence=$('slideSentence');sentence.replaceChildren();
     const fragments=item.sentence.split('____');
     const before=document.createTextNode(fragments[0]||'');
@@ -257,7 +261,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     const words=validWords();
     if(!words.length){cards=[];setSlideEmpty('No Talk words yet. Practice a conversation to collect new vocabulary.');return}
     const signature=words.map(w=>w.id||w.nl).join('|');
-    const cached=read(key('slide.deck.v2',lang),{});
+    const cached=read(key('slide.deck.v3',lang),{});
     if(!force&&cached.signature===signature&&Array.isArray(cached.cards)&&cached.cards.length){
       cards=makeDeck(cached.cards,lang);cardIndex=0;renderSlide();return;
     }
@@ -271,9 +275,9 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       const result=await resp.json();
       if(!resp.ok)throw new Error(result.error||'Card generation unavailable');
       if(getLanguage()!==lang)return;
-      const accepted=Array.isArray(result.cards)?result.cards.filter(c=>c?.word&&c?.sentence?.includes('____')&&c?.wrong&&c?.definition):[];
+      const accepted=Array.isArray(result.cards)?result.cards.filter(c=>c?.word&&c?.sentence?.includes('____')&&c?.wrong&&c?.definition&&c?.englishSentence):[];
       if(!accepted.length)throw new Error('No valid cards returned. Please try again.');
-      store(key('slide.deck.v2',lang),{signature,cards:accepted});
+      store(key('slide.deck.v3',lang),{signature,cards:accepted});
       cards=makeDeck(accepted,lang);cardIndex=0;
       info('slideFeedback','');renderSlide();
     }catch(error){if(getLanguage()===lang)setSlideEmpty(String(error.message||'Card generator unavailable'))}
@@ -284,7 +288,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   // Word libraries are independent: Slide uses Talk words, News has its own.
   async function slideWordDetails(item) {
     const lang=getLanguage(),id=String(item.id||item.nl);
-    const all=read(key('slide.deck.v2',lang),{}).cards||[];
+    const all=read(key('slide.deck.v3',lang),{}).cards||[];
     const extra=read(key('slide.details.v2',lang),{});
     const existing=all.find(w=>String(w.id)===id) || extra[id];
     if(existing)return existing;
@@ -507,6 +511,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     finally{$('newsUpdateButton').disabled=false;}
   }
   $('newsUpdateButton').addEventListener('click',()=>void updateNews(true));
+  $('newsArticlesButton').addEventListener('click',()=>{stopNews();archiveStory=null;newsReaderIndex=-1;renderNews();});
   $('newsBackButton').addEventListener('click',()=>{
     stopNews();newsReaderIndex=-1;archiveStory=null;renderNews();
   });
@@ -972,7 +977,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     seekNews(Math.min(story.sentences.length-1,speechIndex+1),0,newsPlaying);
   });
   function refreshLanguage(){
-    stopNews();
+    stopNews();media.refreshLanguage();
     if(currentPage==='slide'){cards=[];cardIndex=0;void loadSlide();}
     if(currentPage==='news'){
       newsLang='';newsReaderIndex=-1;archiveStory=null;renderNews();
