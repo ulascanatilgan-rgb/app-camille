@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { ECL_TOPICS, normalizeTopic, topicInstruction } from './ecl-topics.mjs';
 import { refreshAnamEclArtwork } from './ecl-artwork.mjs';
 import { registerStudyRoutes } from './study-server.mjs';
+import { registerMediaRoutes } from './media-server.mjs';
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -962,6 +963,7 @@ app.post('/vocab', async (req, res) => {
 });
 
 registerStudyRoutes(app);
+registerMediaRoutes(app);
 
 app.get('/health', (_req, res) => {
   res.json({
