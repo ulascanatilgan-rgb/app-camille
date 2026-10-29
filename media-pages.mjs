@@ -166,7 +166,11 @@ export function initMediaPages({getLanguage,getTalkWords}){
     try{
       const response=await fetch('/study-media-script',{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({kind:'clip',language:lang,theme,words})
+        body:JSON.stringify({
+          kind:'clip',language:lang,theme,words,
+          previousTitle:clipDraft?.title||'',
+          previousText:clipDraft?.text?.slice(0,650)||''
+        })
       });
       const data=await response.json();
       if(!response.ok)throw new Error(data.error||'Could not prepare the clip script');
