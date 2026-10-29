@@ -87,7 +87,10 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     // Leaving Talk intentionally ends paid Anam/OpenAI sessions.
     if(wasTalk && next!=='talk')Promise.resolve(stopTalk()).catch(err=>console.warn('Talk did not fully stop:',err));
     if(next==='slide')void loadSlide();
-    if(next==='news')renderNews();
+    if(next==='news'){
+      renderNews();
+      if(!newsData?.stories?.length||newsData.updatedAt?.slice(0,10)!==safeDate())void updateNews();
+    }
   }
   for(const tab of tabs)tab.addEventListener('click',()=>changePage(tab.dataset.page));
 
@@ -450,9 +453,11 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     const lang=getLanguage(),today=safeDate();
     if(newsLang!==lang){
       stopNews();newsLang=lang;newsReaderIndex=-1;archiveStory=null;
-      const saved=read(key('news.daily.long.v3',lang),null);
+      const saved=read(key('news.daily.public.v4',lang),null);
+      const previous=read(key('news.daily.long.v3',lang),null);
+      if(previous?.stories?.length)saveNewsArchive(previous.stories);
       if(saved?.stories?.length)saveNewsArchive(saved.stories);
-      newsData=saved?.updatedAt?.slice(0,10)===today?saved:null;
+      newsData=saved?.stories?.length?saved:null;
     }
     const stories=$('newsStoryList');
     stories.replaceChildren();
@@ -462,7 +467,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       info('newsStatus','Tap Update to load today\'s articles in '+({nl:'Dutch',fr:'French',en:'English'}[lang])+'.');
       return;
     }
-    info('newsStatus','Updated '+new Date(newsData.updatedAt).toLocaleDateString()+'. '+newsData.stories.length+' original reading '+(newsData.stories.length===1?'article':'articles')+' based on public headlines.'+(newsData.partial?' Some stories could not load; tap Update to retry.':''));
+    info('newsStatus',(newsData.updatedAt?.slice(0,10)===today&&!newsData.stale?'Public news · ':'Previously saved news · ')+newsData.stories.length+' short '+(newsData.stories.length===1?'article':'articles')+' · '+new Date(newsData.updatedAt).toLocaleDateString()+'.'+(newsData.partial?' Tap Update to check for more.':''));
     if(newsReaderIndex>=0&&newsReaderIndex<newsData.stories.length){renderNewsReader();return;}
     $('newsReader').hidden=true;stories.hidden=false;
     newsData.stories.forEach((story,index)=>{
@@ -477,29 +482,31 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       stories.append(btn);
     });
   }
-  async function updateNews() {
+  async function updateNews(force=false) {
     const lang=getLanguage(),today=safeDate();
-    const cached=read(key('news.daily.long.v3',lang),null);
+    const cached=read(key('news.daily.public.v4',lang),null);
     // One dated update per language per day. Reopening uses saved content.
-    if(cached?.updatedAt?.startsWith(today)&&!cached.partial){
+    if(!force&&cached?.stories?.length&&cached.updatedAt?.startsWith(today)&&!cached.partial&&!cached.stale){
       saveNewsArchive(cached.stories||[]);
       newsData=cached;newsLang=lang;newsReaderIndex=-1;archiveStory=null;renderNews();return;
     }
-    $('newsUpdateButton').disabled=true;info('newsStatus','Loading headlines and building accessible reading articles…');
+    $('newsUpdateButton').disabled=true;info('newsStatus','Loading short public-news stories…');
     try{
-      const resp=await fetch('/study-news?language='+encodeURIComponent(lang),{cache:'no-store'});
+      const resp=await fetch('/study-news?language='+encodeURIComponent(lang)+(force?'&refresh=1':''),{cache:'no-store',signal:AbortSignal.timeout(16000)});
       const data=await resp.json();
       if(!resp.ok)throw new Error(data?.error||'News unavailable');
       if(!Array.isArray(data.stories)||data.stories.length===0)throw new Error('No articles in news update');
-      store(key('news.daily.long.v3',lang),data);
+      store(key('news.daily.public.v4',lang),data);
       if(lang===getLanguage()){
         saveNewsArchive(data.stories);
         newsData=data;newsLang=lang;newsReaderIndex=-1;archiveStory=null;renderNews();
       }
-    }catch(error){info('newsStatus',String(error.message||'News update could not finish'))}
+    }catch(error){
+      info('newsStatus',(newsData?.stories?.length?'Could not refresh; saved stories remain available. ':'')+String(error.message||'News update could not finish'));
+    }
     finally{$('newsUpdateButton').disabled=false;}
   }
-  $('newsUpdateButton').addEventListener('click',()=>void updateNews());
+  $('newsUpdateButton').addEventListener('click',()=>void updateNews(true));
   $('newsBackButton').addEventListener('click',()=>{
     stopNews();newsReaderIndex=-1;archiveStory=null;renderNews();
   });
@@ -543,11 +550,15 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     info('newsReaderTitle',article.title);
     const source=$('newsReaderSource');source.replaceChildren();
     const name=document.createElement('span');
-    name.textContent='Based on: '+article.source+(article.publishedAt?' · '+new Date(article.publishedAt).toLocaleDateString():'')+' · ';
+    name.textContent='Source: '+article.source+(article.publishedAt?' · '+new Date(article.publishedAt).toLocaleDateString():'')+' · ';
     const link=document.createElement('a');
     link.textContent='Original source';link.href=article.url;link.target='_blank';link.rel='noopener noreferrer';
     source.append(name,link);
     addNewsWords(article);
+    info('newsNarrationDisclosure',article.kind==='rss'
+      ?'Public RSS news · Device narration · Tap a word for its English meaning'
+      :'Original learning summary · Tap a word for its English meaning');
+    $('newsCompleteButton').hidden=!article.sentences.some(s=>s.english);
     const vocab=$('newsReaderWords');vocab.replaceChildren();
     for(const w of article.words){
       const item=document.createElement('div');item.className='news-vocab-item';
@@ -872,6 +883,11 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     window.speechSynthesis?.cancel?.();
     $('newsRunButton').textContent='■ Stop';
     $('newsPauseButton').textContent='Stop';
+    if(story.kind==='rss'){
+      info('newsStatus','Reading this public-news brief with your device voice.');
+      speakCurrent(seq);
+      return;
+    }
     void playNaturalNews(seq).catch(error=>{
       if(seq!==speechSeq || !newsPlaying)return;
       newsAudioActive=false;
@@ -951,7 +967,10 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   function refreshLanguage(){
     stopNews();
     if(currentPage==='slide'){cards=[];cardIndex=0;void loadSlide();}
-    if(currentPage==='news'){newsLang='';newsReaderIndex=-1;archiveStory=null;renderNews();}
+    if(currentPage==='news'){
+      newsLang='';newsReaderIndex=-1;archiveStory=null;renderNews();
+      if(!newsData?.stories?.length||newsData.updatedAt?.slice(0,10)!==safeDate())void updateNews();
+    }
   }
   return {refreshLanguage,stopNews,getPage:()=>currentPage,openNewsArchive,
     openSlideHistory,openWordLibrary};
