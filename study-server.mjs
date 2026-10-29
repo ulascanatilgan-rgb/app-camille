@@ -6,14 +6,33 @@ const LANGUAGE = {
   en:{name:'English',locale:'en-GB',region:'GB',edition:'GB:en'}
 };
 const inMemoryNews = new Map();
-function safeText(value,max=350) {return String(value||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().slice(0,max)}
-function decodeXml(s) {
-  return String(s||'').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,'$1')
-    .replace(/&#x([a-f0-9]+);/gi,(_,v)=>String.fromCodePoint(parseInt(v,16)))
-    .replace(/&#([0-9]+);/g,(_,v)=>String.fromCodePoint(parseInt(v,10)))
-    .replace(/&amp;/g,'&').replace(/&quot;/g,'"')
-    .replace(/&apos;|&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+// The public sources sometimes double-encode HTML (&amp;nbsp;, &nbsp;,
+// numeric references). Decode before stripping tags, never display markup.
+function decodeEntities(value) {
+  let result=String(value||'');
+  const named={nbsp:' ',amp:'&',quot:'"',apos:"'",lt:'<',gt:'>',
+    ndash:'–',mdash:'—',hellip:'…',lsquo:'‘',rsquo:'’',
+    ldquo:'“',rdquo:'”',bull:'•',euro:'€',copy:'©'};
+  for(let i=0;i<3;i++){
+    const next=result.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z][a-z0-9]+);/gi,(match,name)=>{
+      if(name.startsWith('#')){
+        const hex=name[1]?.toLowerCase()==='x',n=parseInt(name.slice(hex?2:1),hex?16:10);
+        return n>0&&n<=0x10ffff?String.fromCodePoint(n):' ';
+      }
+      return named[name.toLowerCase()]??' ';
+    });
+    if(next===result)break;
+    result=next;
+  }
+  return result.replace(/[\u00a0\u200b-\u200d\ufeff]/g,' ').replace(/\uFFFD/g,'');
 }
+function safeText(value,max=350) {
+  return decodeEntities(String(value||'').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,' ')
+    .replace(/<[^>]*>/g,' '))
+    .replace(/\s+/g,' ').trim().slice(0,max);
+}
+function decodeXml(s) {return decodeEntities(String(s||'').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,'$1'));}
 function tag(body,name) {
   const match=body.match(new RegExp('<'+name+'(?:\\s[^>]*)?>([\\s\\S]*?)<\\/'+name+'>','i'));
   return match?decodeXml(match[1]):'';
@@ -25,15 +44,26 @@ function cleanArticleHref(value) {
   }catch{return ''}
 }
 function findFeeds(xml) {
-  const parts=[...xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)];
-  return parts.map(([,body])=>{
-    const headline=safeText(decodeXml(tag(body,'title')),200);
-    const link=cleanArticleHref(tag(body,'link').trim());
-    const description=safeText(decodeXml(tag(body,'description')),450);
+  const rss=[...xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map(([,body])=>{
+    const headline=safeText(tag(body,'title'),240);
+    const link=cleanArticleHref(decodeXml(tag(body,'link')).trim());
+    const description=safeText(tag(body,'description')||tag(body,'content:encoded'),2100);
     const source=safeText(tag(body,'source'),95);
-    const pubDate=tag(body,'pubDate');
-    return {headline,link,description,source, publishedAt:Number.isFinite(Date.parse(pubDate))?new Date(pubDate).toISOString():null};
-  }).filter(x=>x.headline&&x.link);
+    const pubDate=tag(body,'pubDate')||tag(body,'dc:date');
+    return {headline,link,description,source,
+      publishedAt:Number.isFinite(Date.parse(pubDate))?new Date(pubDate).toISOString():null};
+  });
+  // The Conversation and some free-access magazines publish Atom instead.
+  const atom=[...xml.matchAll(/<entry\b[^>]*>([\s\S]*?)<\/entry>/gi)].map(([,body])=>{
+    const headline=safeText(tag(body,'title'),240);
+    const linkMatch=body.match(/<link\b[^>]*\bhref=["']([^"']+)["'][^>]*\/?>/i);
+    const link=cleanArticleHref(decodeXml(linkMatch?.[1]||''));
+    const description=safeText(tag(body,'summary')||tag(body,'content'),2100);
+    const pubDate=tag(body,'published')||tag(body,'updated');
+    return {headline,link,description,source:'The Conversation',
+      publishedAt:Number.isFinite(Date.parse(pubDate))?new Date(pubDate).toISOString():null};
+  });
+  return [...rss,...atom].filter(x=>x.headline&&x.link);
 }
 // Read public source pages only as factual reference material; never copy
 // source articles to ECL users. Some sites restrict scraping, so RSS-only
