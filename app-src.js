@@ -992,7 +992,7 @@ function updateInteractionModeUi() {
   updateTypeModeLayout();
 
   if (interactionMode !== 'button') clearQuickChoices();
-  if (tipButton) tipButton.hidden = interactionMode === 'button';
+  if (tipButton) tipButton.hidden = false; // Tips help both speaking and button learners.
   hideTip();
   // Populate immediately, including a saved Button selection before Start.
   if (interactionMode === 'button') primeButtonChoices();
@@ -1117,17 +1117,23 @@ function hideTip() {
 }
 
 async function showTip() {
-  if (!tipPanel || interactionMode === 'button') return;
+  if (!tipPanel) return;
   if (!tipPanel.hidden) { hideTip(); return; }
 
   const source = subtitleNl?.textContent?.trim() || lastSubtitlePair.nl || '';
-  if (!source) return;
-  const cacheKey = `${targetLanguage}:${source}`;
+  // The last saved avatar message also works before live subtitles arrive.
+  const question=source||[...currentMessages].reverse().find(m=>m.role==='persona')?.content||topicOpening(selectedTopic,targetLanguage)||'';
+  const cacheKey = `${targetLanguage}:${question}`;
   const seq = ++tipRequestSeq;
   tipPanel.hidden = false;
   tipButton?.setAttribute('aria-expanded', 'true');
-  tipTarget.textContent = 'Finding a suggestion…';
-  tipEnglish.textContent = '';
+  // Never leave the learner waiting for a remote suggestion.
+  const quick=[...quickReplyBar?.querySelectorAll('.quick-reply-button')||[]][0];
+  const initial=quick?.querySelector('.quick-reply-target')?.textContent?.trim();
+  const initialEn=quick?.querySelector('.quick-reply-english')?.textContent?.trim();
+  const fallback=defaultButtonChoices('generic')[0];
+  tipTarget.textContent=initial||fallback?.text||'Yes';
+  tipEnglish.textContent=targetLanguage==='en'?'':(initialEn||fallback?.english||'');
 
   if (cachedTip?.key === cacheKey) {
     tipTarget.textContent = cachedTip.text;
@@ -1142,12 +1148,13 @@ async function showTip() {
       .filter(message => message?.content?.trim())
       .slice(-6)
       .map(message => ({ role: normalizedRole(message.role), content: message.content.trim() }));
+    const timeout=window.setTimeout(()=>controller.abort(),4500);
     const response = await fetch('/tip', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
-      body: JSON.stringify({ text: source, targetLanguage, persona:selectedPersona, topic:selectedTopic, recentMessages })
-    });
+      body: JSON.stringify({ text: question, targetLanguage, persona:selectedPersona, topic:selectedTopic, recentMessages })
+    }).finally(()=>window.clearTimeout(timeout));
     if (!response.ok) throw new Error('Tip unavailable');
     const data = await response.json();
     if (seq !== tipRequestSeq || tipPanel.hidden) return;
@@ -1160,8 +1167,7 @@ async function showTip() {
     tipEnglish.textContent = targetLanguage === 'en' ? '' : cachedTip.english;
   } catch (error) {
     if (error?.name === 'AbortError' || seq !== tipRequestSeq) return;
-    tipTarget.textContent = 'No valid suggestion. Tap Tip to retry.';
-    tipEnglish.textContent = '';
+    // Keep the instant, usable suggestion visible when the API fails.
   } finally {
     if (seq === tipRequestSeq) tipAbortController = null;
   }
@@ -1212,7 +1218,7 @@ function renderQuickChoices(choices) {
       }
       if(!anamClient || isResponding)return;
       clearQuickChoices();
-      sendTypedTurn(text,'button');
+      void sendTypedTurn(text,'button');
     });
     quickReplyBar.appendChild(button);
   }
@@ -1801,6 +1807,7 @@ function renderWordsDialog() {
 
 async function sendTypedTurn(text, inputKind = 'type') {
   const clean = String(text || '').trim();
+  if(inputKind==='button'&&!clean)return;
   if(selectedProvider==='voice') {
     if(!clean || !voiceSession || !connected || isResponding)return;
     // Text and Button input are sent to the SAME OpenAI Realtime session,
@@ -1822,6 +1829,8 @@ async function sendTypedTurn(text, inputKind = 'type') {
     return;
   }
   if (!clean || !anamClient || !connected || isResponding) return;
+  const chosenButtonText=clean;
+  const epochAtSend=connectionEpoch;
 
   clearQuickChoices();
   hideTip();
@@ -1839,8 +1848,9 @@ async function sendTypedTurn(text, inputKind = 'type') {
   renderMessages(currentMessages);
 
   isResponding = true;
-  setStatus(personaName()+' denkt…');
+  setStatus(personaName()+' is preparing a reply…');
   activeChatAbort = new AbortController();
+  const answerTimeout=window.setTimeout(()=>activeChatAbort?.abort(),18000);
   activeSubtitleMessageId = personaId;
 
   let full = '';
@@ -1869,6 +1879,38 @@ async function sendTypedTurn(text, inputKind = 'type') {
       throw new Error(await response.text());
     }
 
+    if(inputKind==='button'){
+      // Button replies arrive as a complete text response; they are NOT SSE.
+      // Render immediately, without waiting for Anam's audio stream or translation.
+      full=limitCamilleReply(await response.text()).text.trim();
+      if(!full)throw new Error('Emma returned an empty answer.');
+      if(epochAtSend!==connectionEpoch||!connected)return;
+      renderLiveDutch(full);
+      setSubtitle(full,'');
+      upsertConversationTurn({id:personaId,role:'persona',content:full});
+      processVocabularyProgress(personaId,full,true);
+      saveCurrentHistory();
+      renderMessages(currentMessages);
+      isResponding=false;
+      setStatus('Emma replied · audio starting');
+      // This direct SDK talk path is independent of the microphone and avoids
+      // hanging createTalkMessageStream/endMessage calls in muted button mode.
+      try{
+        const task=anamClient.talk(full);
+        Promise.resolve(task).catch(error=>{
+          console.warn('Avatar voice unavailable; text reply remains usable:',error);
+          if(connected)setStatus('Emma replied · audio unavailable');
+        });
+      }catch(error){console.warn('Avatar voice unavailable:',error)}
+      requestQuickChoices(full);
+      void translateToEnglish(full).then(english=>{
+        if(english&&connected&&epochAtSend===connectionEpoch){
+          translationByMessageId.set(personaId,english);
+          setSubtitle(full,english);
+        }
+      }).catch(()=>{});
+      return;
+    }
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     talkStream = anamClient.createTalkMessageStream();
@@ -1905,11 +1947,15 @@ async function sendTypedTurn(text, inputKind = 'type') {
   } catch (error) {
     if (error?.name !== 'AbortError') {
       console.error('Typed Emma response error:', error);
-      setStatus('Response error');
+      setStatus('Emma reply unavailable · choose again');
+      if(inputKind==='button'&&connected&&interactionMode==='button')renderQuickChoices(defaultButtonChoices('generic'));
     }
   } finally {
+    window.clearTimeout(answerTimeout);
     activeChatAbort = null;
     isResponding = false;
+    if(inputKind==='button'&&connected&&interactionMode==='button'&&quickReplyBar?.hidden)
+      primeButtonChoices();
     if (connected) setStatus(languageConfig().ready);
   }
 }
