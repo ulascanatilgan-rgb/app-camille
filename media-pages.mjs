@@ -22,13 +22,21 @@ async function withStore(mode,work){
 const allClips=()=>withStore('readonly',os=>os.getAll());
 const putClip=clip=>withStore('readwrite',os=>os.put(clip));
 const removeClip=id=>withStore('readwrite',os=>os.delete(id));
+const wordKey=w=>String(w||'').normalize('NFKC').trim().toLocaleLowerCase();
 const safeWords=(getWords,lang)=>{
-  const talk=getWords().filter(w=>w?.nl&&w?.en&&(!w.language||w.language===lang)).map(w=>({word:String(w.nl),english:String(w.en)}));
-  const extra=read('news.words',lang,[]); // compatibility with existing news vocabulary key below
-  const old=(()=>{try{return JSON.parse(localStorage.getItem('ecl.news.words.v1.'+lang)||'[]')}catch{return []}})();
+  const talk=(getWords()||[]).filter(w=>w?.nl&&w?.en&&(!w.language||w.language===lang))
+    .map(w=>({word:String(w.nl).trim(),english:String(w.en).trim(),source:'Talk'}));
+  const news=(()=>{try{return JSON.parse(localStorage.getItem('ecl.news.words.v1.'+lang)||'[]')}catch{return []}})();
+  const older=read('news.words',lang,[]);
+  const candidates=[...talk,...[...older,...news].map(w=>({
+    word:String(w.word||'').trim(),english:String(w.english||'').trim(),source:'News'
+  }))];
   const seen=new Set();
-  return [...talk,...extra,...old.map(w=>({word:String(w.word||''),english:String(w.english||'')}))]
-    .filter(w=>{const k=w.word.trim().toLocaleLowerCase();if(!k||!w.english||seen.has(k))return false;seen.add(k);return true}).slice(-200);
+  return candidates.filter(w=>{
+    const k=wordKey(w.word);
+    if(!k||!w.english||seen.has(k))return false;
+    seen.add(k);return true;
+  });
 };
 function makeOption(select,values){select.replaceChildren();for(const [value,label] of values){const op=document.createElement('option');op.value=value;op.textContent=label;select.append(op)}}
 function renderTokens(target,text,dict,active,onClick){
@@ -51,6 +59,7 @@ function renderTokens(target,text,dict,active,onClick){
 export function initMediaPages({getLanguage,getTalkWords}){
   let current='talk',client=null,recorder=null,clock=null,liveSince=0,stopInProgress=false;
   let activeClip=null,clipUrl='',liveSequence=0,saving=false,abortWait=null;
+  let selectedClipWords=[],clipDraft=null,preparingClip=false,prepareSequence=0;
   const status=(id,msg)=>{const el=$(id);if(el)el.textContent=msg};
   const langName=()=>({nl:'Dutch',fr:'French',en:'English'}[getLanguage()]||'Dutch');
   const dictionary=()=>new Map(safeWords(getTalkWords,getLanguage()).map(w=>[w.word.toLocaleLowerCase(),w.english]));
@@ -59,9 +68,120 @@ export function initMediaPages({getLanguage,getTalkWords}){
     return words.slice(-count).reverse();
   };
   function showInventory(){
-    const words=sourceWords(20);
+    const words=sourceWords(20),universe=safeWords(getTalkWords,getLanguage());
     status('songWordsInfo',words.length+' saved '+langName()+' words available · '+Math.min(words.length,20)+' used for drafts');
-    status('clipWordsInfo',words.length+' saved '+langName()+' words available · up to 12 per video');
+    status('clipWordsInfo',universe.length+' learned '+langName()+' words from Talk + News · Mix to choose up to 20');
+    status('clipUniverseCount',universe.length+' words  ⌄');
+  }
+  function renderClipWordUniverse(){
+    const list=$('clipAllWords');list.replaceChildren();
+    const search=wordKey($('clipWordsSearch').value);
+    const words=safeWords(getTalkWords,getLanguage()).sort((a,b)=>a.word.localeCompare(b.word,getLanguage()));
+    const filtered=words.filter(w=>!search||wordKey(w.word).includes(search)||wordKey(w.english).includes(search));
+    if(!filtered.length){
+      const empty=document.createElement('p');empty.className='media-hint';
+      empty.textContent=words.length?'No matching words.':'No saved words yet. Learn words in Talk or News.';
+      list.append(empty);return;
+    }
+    const fragment=document.createDocumentFragment();
+    for(const w of filtered){
+      const row=document.createElement('div');row.className='clip-universe-row';
+      const name=document.createElement('strong');name.textContent=w.word;
+      const meaning=document.createElement('span');meaning.textContent=w.english;
+      const from=document.createElement('small');from.textContent=w.source;
+      row.append(name,meaning,from);fragment.append(row);
+    }
+    list.append(fragment);
+  }
+  function renderClipSelection(){
+    const chosen=$('clipSelectedWords');chosen.replaceChildren();
+    const universe=safeWords(getTalkWords,getLanguage());
+    status('clipSelectionInfo',selectedClipWords.length
+      ?selectedClipWords.length+' selected of '+universe.length+' learned words · Press Mix for a different set'
+      :'Press Mix to select up to 20 random words from Talk and News.');
+    const fragment=document.createDocumentFragment();
+    for(const [i,w] of selectedClipWords.entries()){
+      const item=document.createElement('span');item.className='clip-selected-chip';
+      const number=document.createElement('small');number.textContent=String(i+1);
+      const label=document.createElement('strong');label.textContent=w.word;
+      item.title=w.english+' · '+(w.source||'Saved');
+      item.append(number,label);fragment.append(item);
+    }
+    chosen.append(fragment);
+    $('clipMixButton').disabled=!universe.length||preparingClip||saving;
+    $('clipPrepareButton').disabled=!selectedClipWords.length||preparingClip||saving;
+    $('clipRunButton').disabled=!clipDraft?.text||preparingClip||saving;
+    $('clipPrepareButton').textContent=preparingClip?'Preparing…':clipDraft?'Prepare · Another script':'Prepare · Script';
+    $('clipPreparedPanel').hidden=!clipDraft?.text;
+    if(clipDraft?.text){
+      status('clipPreparedTitle',clipDraft.title||'Clip script');
+      status('clipPreparedScript',clipDraft.text);
+    }
+  }
+  function restoreClipWorkspace(){
+    const lang=getLanguage(),pool=safeWords(getTalkWords,lang);
+    const known=new Map(pool.map(w=>[wordKey(w.word),w]));
+    selectedClipWords=read('clip.selection',lang,[]).map(w=>known.get(wordKey(w.word))).filter(Boolean).slice(0,20);
+    const draft=read('clip.draft',lang,null);
+    const signature=words=>words.map(w=>wordKey(w.word)).join('|');
+    clipDraft=draft?.text&&signature(draft.selectedWords||[])===signature(selectedClipWords)?draft:null;
+    if(clipDraft?.theme&&[...$('clipTheme').options].some(o=>o.value===clipDraft.theme))
+      $('clipTheme').value=clipDraft.theme;
+    showInventory();renderClipSelection();
+    if(!$('clipWordsPanel').hidden)renderClipWordUniverse();
+  }
+  function invalidateClipDraft(){
+    clipDraft=null;write('clip.draft',getLanguage(),null);
+    renderClipSelection();
+  }
+  function mixClipWords(){
+    if(preparingClip||saving)return;
+    const pool=safeWords(getTalkWords,getLanguage());
+    if(!pool.length){
+      status('clipStatus','Learn words in Talk or News, then return to Clips.');return;
+    }
+    const old=selectedClipWords.map(w=>wordKey(w.word)).sort().join('|');
+    let fresh=[];
+    // Shuffle all learned words, not merely the last few. Re-mix when possible.
+    for(let attempt=0;attempt<7;attempt++){
+      const shuffled=[...pool];
+      for(let i=shuffled.length-1;i>0;i--){
+        const j=Math.floor(Math.random()*(i+1));
+        [shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];
+      }
+      fresh=shuffled.slice(0,20);
+      if(pool.length<=20||fresh.map(w=>wordKey(w.word)).sort().join('|')!==old)break;
+    }
+    selectedClipWords=fresh;
+    write('clip.selection',getLanguage(),selectedClipWords);
+    invalidateClipDraft();
+    status('clipStatus',fresh.length+' words selected. Press Prepare to write a 1-minute script.');
+  }
+  async function prepareClipScript(){
+    if(preparingClip||saving||!selectedClipWords.length)return;
+    const lang=getLanguage(),theme=$('clipTheme').value,words=selectedClipWords.map(w=>({...w}));
+    const seq=++prepareSequence;
+    preparingClip=true;renderClipSelection();
+    status('clipStatus','Writing a 1-minute script with your '+words.length+' selected words…');
+    try{
+      const response=await fetch('/study-media-script',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({kind:'clip',language:lang,theme,words})
+      });
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.error||'Could not prepare the clip script');
+      if(lang!==getLanguage()||seq!==prepareSequence)return;
+      if(!data.text?.trim())throw new Error('The generated script was empty.');
+      clipDraft={...data,theme,selectedWords:words,preparedAt:new Date().toISOString()};
+      if(!write('clip.draft',lang,clipDraft))
+        status('clipStatus','Script ready, but your browser could not save the draft locally.');
+      else status('clipStatus','Script ready. Read it below, press Prepare to try another, or Run to record.');
+    }catch(error){
+      if(seq===prepareSequence&&lang===getLanguage())
+        status('clipStatus',error.message||'Could not prepare script. Try Prepare again.');
+    }finally{
+      if(seq===prepareSequence){preparingClip=false;renderClipSelection();}
+    }
   }
   const asDate=stamp=>{try{return new Date(stamp).toLocaleDateString()}catch{return ''}};
   function songCollection(){return read('songs',getLanguage(),[])}
