@@ -1,4 +1,4 @@
-const CACHE = 'ecl-public-rss-v53';
+const CACHE = 'ecl-public-rss-v54';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -17,7 +17,14 @@ const STATIC_ASSETS = [
 ];
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(STATIC_ASSETS)));
+  // A missing optional avatar or image must never prevent the updated
+  // HTML/JS from installing on an iPhone's home-screen PWA.
+  event.waitUntil(caches.open(CACHE).then(async cache => {
+    await Promise.allSettled(STATIC_ASSETS.map(async asset => {
+      const response=await fetch(asset,{cache:'reload'});
+      if(response.ok)await cache.put(asset,response);
+    }));
+  }));
   self.skipWaiting();
 });
 
