@@ -5976,3 +5976,58 @@ html,body,.app-shell{background:var(--ecl-canvas) !important;color:var(--ecl-ink
   #clipsPage .clip-universe-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px}
   #clipsPage .clip-universe-row small{grid-column:1/-1;justify-self:start}
 }
+
+
+/* ECL v58 — restrained typography in Articles, Song and Clips.
+   Matches familiar modern chat-app system fonts; Talk is intentionally untouched. */
+#newsPage, #newsPage button, #newsPage input, #newsPage select,
+#newsPage h1, #newsPage h2, #newsPage h3, #newsPage p, #newsPage span,
+#newsPage strong, #newsPage label, #newsPage .news-paper-paragraph,
+#newsHistoryDialog, #newsHistoryDialog *,
+#newsWordsDialog, #newsWordsDialog *,
+#songPage, #songPage *, #clipsPage, #clipsPage *{
+  font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,
+    "Helvetica Neue",Arial,sans-serif !important;
+  letter-spacing:normal !important;
+}
+#newsPage, #songPage, #clipsPage{
+  color:#253244 !important;
+  -webkit-font-smoothing:antialiased;
+}
+#newsPage .news-paper-paragraph{
+  font-size:clamp(16px,1.8vw,18px) !important;
+  line-height:1.82 !important;
+  font-weight:400 !important;
+  color:#253144 !important;
+  margin-bottom:18px !important;
+}
+#newsPage .news-read-target{
+  background:#fff !important;
+  border:1px solid #dee5ed !important;
+  border-radius:15px !important;
+  max-height:min(70vh,900px) !important;
+}
+#newsPage .news-reader h2{
+  font-weight:720 !important;
+  letter-spacing:-.02em !important;
+  line-height:1.35 !important;
+}
+#newsPage .news-story-card{gap:10px !important}
+#newsPage .news-story-card strong{font-size:15px !important;line-height:1.5 !important;font-weight:700 !important}
+#newsPage .news-story-card span{line-height:1.5 !important}
+#newsPage .news-source-line{line-height:1.6 !important}
+#songPage .song-lyrics, #clipsPage .clip-prepared-script,
+#clipsPage .clip-transcript, #clipsPage .clip-script-preview{
+  font-size:14px !important;line-height:1.75 !important;font-weight:400 !important;
+}
+#songPage .media-panel h2,#clipsPage .media-panel h2{font-weight:700 !important;letter-spacing:-.015em !important}
+#songPage .media-fields label,#clipsPage .media-fields label{font-weight:600 !important}
+#newsPage .study-primary-button,#newsPage .study-secondary-button,
+#songPage .study-primary-button,#songPage .study-secondary-button,
+#clipsPage .study-primary-button,#clipsPage .study-secondary-button{
+  font-weight:650 !important;
+}
+@media(max-width:760px){
+  #newsPage .news-paper-paragraph{font-size:16px !important;line-height:1.75 !important}
+  #newsPage .news-read-target{padding:20px 17px !important}
+}
