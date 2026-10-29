@@ -803,7 +803,7 @@ app.post('/tip', async (req, res) => {
     'Accented Latin letters are fine. NEVER copy foreign scripts even if present in conversation context.',
     'Do not confuse the target language with the language of any quoted context.',
     'Answer Emma’s specific latest message rather than giving a generic unrelated response.',
-    'Use calm, simple, natural daily language: 3–10 words, maximum 12.',
+    'Use a direct, confident spoken answer of ONLY 2–7 common words, never an explanation.',
     'Return nothing except this JSON object: {"tip":{"text":"...","english":"..."}}.'
   ].join(' ').replaceAll('Emma',activePersonaName).replaceAll('EMMA',activePersonaName.toUpperCase());
 
@@ -813,7 +813,7 @@ app.post('/tip', async (req, res) => {
         systemText + (attempt ? ' REPAIR: previous output had wrong script or language. Latin script only, chosen target language only.' : ''),
         conversationText, 140
       );
-      const text = cleanPracticePhrase(parsed?.tip?.text, 12);
+      const text = cleanPracticePhrase(parsed?.tip?.text, 8);
       const english = cleanPracticePhrase(parsed?.tip?.english, 18);
       if (text && (targetLanguage === 'en' || english)) {
         return res.json({ tip: { text, english: targetLanguage === 'en' ? '' : english } });
