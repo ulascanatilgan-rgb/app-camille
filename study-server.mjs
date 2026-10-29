@@ -204,7 +204,7 @@ export function registerStudyRoutes(app) {
     res.setHeader('Cache-Control','no-store');
     const language=LANGUAGE[req.query?.language]?req.query.language:'nl';
     const key=language+':'+getDay();
-    if(inMemoryNews.has(key))return res.json(inMemoryNews.get(key));
+    if(inMemoryNews.has(key)&&!inMemoryNews.get(key).partial)return res.json(inMemoryNews.get(key));
     if(!process.env.OPENAI_API_KEY)return res.status(503).json({error:'OpenAI API key not configured.'});
     const cfg=LANGUAGE[language];
     try{
@@ -259,48 +259,54 @@ export function registerStudyRoutes(app) {
         if(titles.length>=3)break;
         if(!titles.includes(item))titles.push(item);
       }
-      if(titles.length<3)throw new Error('Not enough public headlines available');
+      if(!titles.length)throw new Error('No public RSS headlines available');
       // Free-access publishers with substantive article text permit more
       // detailed, grounded reports than headlines alone.
       const contexts=await Promise.all(titles.map(sourceContext));
-      const facts=titles.map((item,i)=>({...item,backgroundExcerpt:contexts[i]}));
-      const system=[
-        'You are an engaging international newsroom writer creating ORIGINAL, longer magazine-style educational news articles in '+cfg.name+'.',
-        'Use ONLY verifiable facts in the supplied feed headline, publisher, description and date; add clearly signposted general background and explanation, not fabricated event details.',
-        'Never invent facts, names, amounts, quotations, prices, dates or developments absent from the supplied facts.',
-        'If the headline gives few facts, explain its general context neutrally and explicitly mark uncertainty.',
-        'Never reproduce any publisher article or substantial excerpts. Create distinct original educational reporting based on short RSS facts and general context; give the publisher source link.',
-        'Create exactly 3 original reports in the supplied order, each 23 to 30 natural sentences totaling about 350–480 words in the target language. Write one coherent article with short paragraphs, not isolated vocabulary drills or bullets.',
-        'Each story: its own original target-language title; sentences array of {"target":"...","english":"..."} pairs. Each sentence should flow into the next as a continuous essay.',
-        'The english text must be a natural, faithful English translation of the corresponding target sentence.',
-        'Each story: exactly 10 useful vocabulary entries, {"word":"...","english":"...","definition":"...","example":"..."}.',
-        'definition and example must be in the target language. Example: one practical sentence, no more than 12 words.',
-        'Choose genuinely useful terms that actually appear in the target sentences. Avoid names.',
-        'Use natural, engaging and readable B1-level reporting, gently introducing new vocabulary; not childish, not clipped. Keep each sentence moderate in length and paragraphs logical.',
-        'Do not claim there is up-to-the-minute reporting beyond the supplied feed.',
-        'Return JSON {"stories":[{"title":"...","sentences":[{"target":"...","english":"..."}],"words":[{"word":"...","english":"...","definition":"...","example":"..."}]}]}.'
-      ].join(' ');
-      const generated=await jsonFromOpenAI(process.env.OPENAI_API_KEY,system,JSON.stringify({
-        language,day:getDay(),headlines:facts
-      }),13000);
-      const stories=(Array.isArray(generated.stories)?generated.stories:[]).slice(0,3).map((o,i)=>{
-        const source=titles[i];if(!source)return null;
-        const sentences=(Array.isArray(o.sentences)?o.sentences:[]).slice(0,34)
-          .map(x=>({target:safeText(x?.target,360),english:safeText(x?.english,360)}))
-          .filter(x=>x.target&&x.english);
-        const words=(Array.isArray(o.words)?o.words:[]).slice(0,10)
-          .map(x=>({word:safeText(x?.word,65),english:safeText(x?.english,110),definition:safeText(x?.definition,240),example:safeText(x?.example,240)}))
-          .filter(w=>isValidWord(w.word)&&w.english&&w.definition&&w.example);
-        if(sentences.length<18||words.length<5)return null;
-        return {id:language+'-'+getDay()+'-'+i,title:safeText(o.title,190)||source.headline,
-          sourceHeadline:source.headline,source:source.source||'Google News',url:source.link,
-          publishedAt:source.publishedAt,sentences,words};
-      }).filter(Boolean);
-      if(stories.length!==3)throw new Error('News study article response incomplete');
-      const data={language,updatedAt:new Date().toISOString(),stories};
+      // Generate each report independently and concurrently. One oversized
+      // three-article completion frequently times out or returns truncated JSON.
+      // A malformed story must not prevent the other articles from loading.
+      const results=await Promise.all(titles.map(async(source,i)=>{
+        const system=[
+          'Write ONE original, engaging 350–450-word educational news article in '+cfg.name+'.',
+          'Base current-event claims ONLY on the supplied RSS headline, description, date and publisher article context.',
+          'Never invent event specifics, quotes, numbers, names or developments. For limited facts, add neutral, clearly framed general background.',
+          'Do not copy or closely paraphrase a publisher article. This is original B1-level reporting with a natural continuous newspaper-style narrative.',
+          'Write 22–28 natural connected sentences, with varied transitions, not bullet points or vocabulary drills.',
+          'For precise word highlighting and English support, provide an array of sentence objects with target and faithful English translation.',
+          'Include 8–10 useful vocabulary words that actually occur in the story. Each has an English meaning, a short explanation and a practical example in the target language.',
+          'Return a single valid JSON object: {"story":{"title":"...","sentences":[{"target":"...","english":"..."}],"words":[{"word":"...","english":"...","definition":"...","example":"..."}]}}.'
+        ].join(' ');
+        const input={
+          language,day:getDay(),
+          headline:source.headline,description:source.description,
+          source:source.source||source.feed||'RSS',publishedAt:source.publishedAt,
+          articleContext:contexts[i]?.slice(0,2400)||''
+        };
+        try{
+          const generated=await jsonFromOpenAI(process.env.OPENAI_API_KEY,system,JSON.stringify(input),5400);
+          const output=generated?.story||generated?.stories?.[0]||generated;
+          const sentences=(Array.isArray(output?.sentences)?output.sentences:[]).slice(0,34)
+            .map(x=>({target:safeText(x?.target,360),english:safeText(x?.english,360)}))
+            .filter(x=>x.target&&x.english);
+          const words=(Array.isArray(output?.words)?output.words:[]).slice(0,12)
+            .map(x=>({word:safeText(x?.word,65),english:safeText(x?.english,110),definition:safeText(x?.definition,240),example:safeText(x?.example,240)}))
+            .filter(w=>isValidWord(w.word)&&w.english&&w.definition&&w.example);
+          if(sentences.length<15||words.length<4)throw new Error('Article response incomplete');
+          return {id:language+'-'+getDay()+'-'+i,title:safeText(output.title,190)||source.headline,
+            sourceHeadline:source.headline,source:source.source||source.feed||'RSS',
+            url:source.link,publishedAt:source.publishedAt,sentences,words};
+        }catch(error){
+          console.warn('News article '+(i+1)+' unavailable:',error?.message||error);
+          return null;
+        }
+      }));
+      const stories=results.filter(Boolean);
+      if(!stories.length)throw new Error('All article generation requests failed');
+      const data={language,updatedAt:new Date().toISOString(),stories,partial:stories.length<3};
       inMemoryNews.set(key,data);
       if(inMemoryNews.size>12)inMemoryNews.clear();
       res.json(data);
-    }catch(error){console.error('News study failed:',error);res.status(502).json({error:'Could not load today\'s headlines. Retry Update later.'});}
+    }catch(error){console.error('News study failed:',error);res.status(502).json({error:'News sources or article generation unavailable. Try Update again shortly.'});}
   });
 }
