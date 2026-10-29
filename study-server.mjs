@@ -200,113 +200,111 @@ export function registerStudyRoutes(app) {
       res.status(502).json({error:'Natural narration unavailable. You can use device speech as a fallback.'});
     }
   });
+  // Public RSS-only news reader. Never block article loading on an AI model,
+  // paid API quota, TTS generation, or scraping the publisher's full article.
   app.get('/study-news',async(req,res)=>{
     res.setHeader('Cache-Control','no-store');
     const language=LANGUAGE[req.query?.language]?req.query.language:'nl';
-    const key=language+':'+getDay();
-    if(inMemoryNews.has(key)&&!inMemoryNews.get(key).partial)return res.json(inMemoryNews.get(key));
-    if(!process.env.OPENAI_API_KEY)return res.status(503).json({error:'OpenAI API key not configured.'});
-    const cfg=LANGUAGE[language];
+    const cached=inMemoryNews.get(language);
+    const now=Date.now();
+    if(req.query?.refresh!=='1'&&cached&&now-cached.fetchedAt<15*60*1000)
+      return res.json(cached.data);
+    const feedUrls={
+      fr:[
+        'https://www.france24.com/fr/rss',
+        'https://www.francetvinfo.fr/titres.rss',
+        'https://www.lemonde.fr/rss/une.xml',
+        'https://news.google.com/rss?hl=fr-FR&gl=FR&ceid=FR:fr'
+      ],
+      nl:[
+        'https://www.vrt.be/vrtnieuws/nl.rss.articles.xml',
+        'https://feeds.nos.nl/nosnieuwsalgemeen',
+        'https://feeds.nos.nl/nosnieuwsbuitenland',
+        'https://news.google.com/rss?hl=nl-BE&gl=BE&ceid=BE:nl'
+      ],
+      en:[
+        'https://feeds.bbci.co.uk/news/rss.xml',
+        'https://feeds.bbci.co.uk/news/world/rss.xml',
+        'https://www.theguardian.com/world/rss',
+        'https://www.vrt.be/vrtnws/en.rss.articles.xml',
+        'https://news.google.com/rss?hl=en-GB&gl=GB&ceid=GB:en'
+      ]
+    };
     try{
-      // Use several public, freely accessible RSS sources with links back to the
-      // original publisher. Never copy or republish copyrighted full articles.
-      const feedUrls={
-        fr:[
-          'https://www.france24.com/fr/rss',
-          'https://www.francetvinfo.fr/titres.rss',
-          'https://www.lemonde.fr/rss/une.xml',
-          'https://news.google.com/rss?hl=fr-FR&gl=FR&ceid=FR:fr'
-        ],
-        nl:[
-          'https://www.vrt.be/vrtnieuws/nl.rss.articles.xml',
-          'https://www.vrt.be/vrtnws/nl.rss.xml',
-          'https://feeds.nos.nl/nosnieuwsalgemeen',
-          'https://news.google.com/rss?hl=nl-BE&gl=BE&ceid=BE:nl'
-        ],
-        en:[
-          'https://feeds.bbci.co.uk/news/world/rss.xml',
-          'https://www.theguardian.com/world/rss',
-          'https://feeds.npr.org/1001/rss.xml',
-          'https://news.google.com/rss?hl=en-GB&gl=GB&ceid=GB:en'
-        ]
-      };
-      const feedResults=await Promise.allSettled(feedUrls[language].map(async (url)=>{
-        const response=await fetch(url,{headers:{'User-Agent':'ECL-Learning/1.0 (educational RSS reader)','Accept':'application/rss+xml, application/xml, text/xml, */*'},signal:AbortSignal.timeout(11000)});
-        if(!response.ok)throw new Error('RSS '+response.status);
-        const items=findFeeds(await response.text());
-        return items.map(item=>({...item,feed:new URL(url).hostname}));
+      const results=await Promise.allSettled(feedUrls[language].map(async url=>{
+        const response=await fetch(url,{
+          headers:{'User-Agent':'Mozilla/5.0 (compatible; ECL-NewsReader/1.0)',
+            'Accept':'application/rss+xml,application/atom+xml,application/xml,text/xml,*/*'},
+          signal:AbortSignal.timeout(8500)
+        });
+        if(!response.ok)throw new Error('Feed HTTP '+response.status);
+        const xml=await response.text();
+        return findFeeds(xml).map(item=>({...item,feed:new URL(url).hostname}));
       }));
-      const articles=feedResults.filter(item=>item.status==='fulfilled').flatMap(item=>item.value);
-      const seen=new Set();
-      // Prefer distinct publishers and topical diversity over just the first feed.
-      const unique=articles.filter(item=>{
-        const k=item.headline.toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').slice(0,65);
-        if(seen.has(k))return false;
-        seen.add(k);return true;
-      });
-      const sourceGroups=new Map();
-      for(const item of unique){
-        const name=(item.source||item.feed||'news').toLowerCase();
-        if(!sourceGroups.has(name))sourceGroups.set(name,[]);
-        sourceGroups.get(name).push(item);
+      const entries=results.filter(x=>x.status==='fulfilled').flatMap(x=>x.value);
+      const unique=[],seen=new Set();
+      for(const entry of entries){
+        const normalized=entry.headline.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').slice(0,90);
+        if(!normalized||seen.has(normalized))continue;
+        seen.add(normalized);
+        unique.push(entry);
       }
-      const titles=[];
-      for(const group of sourceGroups.values()){
-        if(titles.length>=3)break;
-        if(group[0])titles.push(group[0]);
+      // Each card is a real, independently sourced short public-news brief.
+      // Prefer informative RSS summaries, variety of publishers and recent posts.
+      const sorted=unique
+        .filter(item=>item.link && item.headline && item.description.length>=20)
+        .sort((a,b)=>{
+          const recentA=Number.isFinite(Date.parse(a.publishedAt))?Date.parse(a.publishedAt):0;
+          const recentB=Number.isFinite(Date.parse(b.publishedAt))?Date.parse(b.publishedAt):0;
+          return recentB-recentA;
+        });
+      const choices=[],hosts=new Set();
+      for(const item of sorted){
+        const host=item.source||item.feed;
+        if(hosts.has(host))continue;
+        hosts.add(host);choices.push(item);
+        if(choices.length===3)break;
       }
-      for(const item of unique){
-        if(titles.length>=3)break;
-        if(!titles.includes(item))titles.push(item);
+      for(const item of sorted){
+        if(choices.length===3)break;
+        if(!choices.includes(item))choices.push(item);
       }
-      if(!titles.length)throw new Error('No public RSS headlines available');
-      // Free-access publishers with substantive article text permit more
-      // detailed, grounded reports than headlines alone.
-      const contexts=await Promise.all(titles.map(sourceContext));
-      // Generate each report independently and concurrently. One oversized
-      // three-article completion frequently times out or returns truncated JSON.
-      // A malformed story must not prevent the other articles from loading.
-      const results=await Promise.all(titles.map(async(source,i)=>{
-        const system=[
-          'Write ONE original, engaging 350–450-word educational news article in '+cfg.name+'.',
-          'Base current-event claims ONLY on the supplied RSS headline, description, date and publisher article context.',
-          'Never invent event specifics, quotes, numbers, names or developments. For limited facts, add neutral, clearly framed general background.',
-          'Do not copy or closely paraphrase a publisher article. This is original B1-level reporting with a natural continuous newspaper-style narrative.',
-          'Write 22–28 natural connected sentences, with varied transitions, not bullet points or vocabulary drills.',
-          'For precise word highlighting and English support, provide an array of sentence objects with target and faithful English translation.',
-          'Include 8–10 useful vocabulary words that actually occur in the story. Each has an English meaning, a short explanation and a practical example in the target language.',
-          'Return a single valid JSON object: {"story":{"title":"...","sentences":[{"target":"...","english":"..."}],"words":[{"word":"...","english":"...","definition":"...","example":"..."}]}}.'
-        ].join(' ');
-        const input={
-          language,day:getDay(),
-          headline:source.headline,description:source.description,
-          source:source.source||source.feed||'RSS',publishedAt:source.publishedAt,
-          articleContext:contexts[i]?.slice(0,2400)||''
+      if(!choices.length){
+        // Some feeds omit descriptions. Still render dated, linked headlines.
+        choices.push(...unique.filter(x=>x.link&&x.headline).slice(0,3));
+      }
+      if(!choices.length)throw new Error('No reachable RSS articles');
+      const stories=choices.map((item,i)=>{
+        const source=item.source||item.feed||'Public RSS';
+        const summary=safeText(item.description,730);
+        // Clean, flowing sentences for word-by-word speech highlighting.
+        const plain=(summary||item.headline).replace(/\s+/g,' ').trim();
+        const chunks=plain.match(/[^.!?…。！？]+(?:[.!?…。！？]+|$)/gu)||[plain];
+        const sentences=chunks.map(part=>part.trim()).filter(Boolean)
+          .map(target=>({target,english:''}));
+        // Feed summaries are provided for syndication; don't copy full articles.
+        const detail=sentences.length?sentences:[{target:item.headline,english:''}];
+        let hash=5381;
+        for(const char of item.link)hash=((hash<<5)+hash)^char.charCodeAt(0);
+        return {
+          id:language+'-rss-'+(hash>>>0).toString(36),
+          kind:'rss',language,title:item.headline,
+          sourceHeadline:item.headline,source,
+          url:item.link,publishedAt:item.publishedAt,
+          sentences:detail,words:[]
         };
-        try{
-          const generated=await jsonFromOpenAI(process.env.OPENAI_API_KEY,system,JSON.stringify(input),5400);
-          const output=generated?.story||generated?.stories?.[0]||generated;
-          const sentences=(Array.isArray(output?.sentences)?output.sentences:[]).slice(0,34)
-            .map(x=>({target:safeText(x?.target,360),english:safeText(x?.english,360)}))
-            .filter(x=>x.target&&x.english);
-          const words=(Array.isArray(output?.words)?output.words:[]).slice(0,12)
-            .map(x=>({word:safeText(x?.word,65),english:safeText(x?.english,110),definition:safeText(x?.definition,240),example:safeText(x?.example,240)}))
-            .filter(w=>isValidWord(w.word)&&w.english&&w.definition&&w.example);
-          if(sentences.length<15||words.length<4)throw new Error('Article response incomplete');
-          return {id:language+'-'+getDay()+'-'+i,title:safeText(output.title,190)||source.headline,
-            sourceHeadline:source.headline,source:source.source||source.feed||'RSS',
-            url:source.link,publishedAt:source.publishedAt,sentences,words};
-        }catch(error){
-          console.warn('News article '+(i+1)+' unavailable:',error?.message||error);
-          return null;
-        }
-      }));
-      const stories=results.filter(Boolean);
-      if(!stories.length)throw new Error('All article generation requests failed');
-      const data={language,updatedAt:new Date().toISOString(),stories,partial:stories.length<3};
-      inMemoryNews.set(key,data);
-      if(inMemoryNews.size>12)inMemoryNews.clear();
+      });
+      const data={language,updatedAt:new Date().toISOString(),stories,
+        format:'public-rss-short',partial:stories.length<3};
+      inMemoryNews.set(language,{fetchedAt:now,data});
       res.json(data);
-    }catch(error){console.error('News study failed:',error);res.status(502).json({error:'News sources or article generation unavailable. Try Update again shortly.'});}
+    }catch(error){
+      console.warn('Public RSS news refresh failed:',error?.message||error);
+      if(cached?.data?.stories?.length)
+        return res.json({...cached.data,stale:true,partial:true});
+      res.status(503).json({
+        error:'Public news feeds are currently unreachable. Please try Update again.'
+      });
+    }
   });
 }
