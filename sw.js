@@ -1,4 +1,4 @@
-const CACHE = 'ecl-clips-audiofix-v56';
+const CACHE = 'ecl-clips-workflow-v57';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
