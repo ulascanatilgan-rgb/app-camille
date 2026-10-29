@@ -10,6 +10,8 @@ export function registerMediaRoutes(app){
     const language=Object.hasOwn(LANG,req.body?.language)?req.body.language:'nl';
     const theme=clean(req.body?.theme,65)||'Daily life';
     const genre=clean(req.body?.genre,35)||'Pop';
+    const previousTitle=kind==='clip'?clean(req.body?.previousTitle,100):'';
+    const previousText=kind==='clip'?clean(req.body?.previousText,650):'';
     const words=(Array.isArray(req.body?.words)?req.body.words:[]).slice(0,24)
       .map(x=>({word:clean(x?.word,55),english:clean(x?.english,90)}))
       .filter(x=>x.word&&x.english);
@@ -27,15 +29,16 @@ export function registerMediaRoutes(app){
         'Write an ORIGINAL, short, singable, easy-to-understand song lyric, including a recurring chorus, in the requested genre '+genre+'. Use 15-20 input vocabulary items when available; for fewer words, use all naturally. Repetition helps memorization. 3 verses/chorus sections maximum. Do not imitate specific artists or copyrighted songs.',
       'Return ONLY JSON {"title":"...","text":"...","usedWords":["..."]}.',
       'The text and title must be solely in the target language. Use newline breaks for song verses.',
-      'Only put words actually used in text in usedWords. No explanation, no adult or unsafe themes.'
+      'Only put words actually used in text in usedWords. No explanation, no adult or unsafe themes.',
+      kind==='clip'&&previousText?'The user previously received a clip script. Write a clearly DIFFERENT narrative, setting and sentence order, without reusing earlier sentences.':''
     ].join(' ');
     try{
       const resp=await fetch('https://api.openai.com/v1/chat/completions',{
         method:'POST',headers:{'Authorization':'Bearer '+process.env.OPENAI_API_KEY,'Content-Type':'application/json'},
         signal:AbortSignal.timeout(55000),
         body:JSON.stringify({
-          model:'gpt-4o-mini',temperature:kind==='clip'?.85:.55,response_format:{type:'json_object'},max_tokens:1450,
-          messages:[{role:'system',content:system},{role:'user',content:JSON.stringify({theme,genre,words})}]
+          model:'gpt-4o-mini',temperature:kind==='clip' ? 0.85 : 0.55,response_format:{type:'json_object'},max_tokens:1450,
+          messages:[{role:'system',content:system},{role:'user',content:JSON.stringify({theme,genre,words,previousTitle,previousText})}]
         })
       });
       if(!resp.ok)throw new Error('Script generation returned HTTP '+resp.status);
