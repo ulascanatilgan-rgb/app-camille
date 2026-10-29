@@ -5119,8 +5119,8 @@ body.type-input-mode .workspace{height:calc(100dvh - 189px) !important;}
 }
 .slide-card.snap-back{transition:transform .22s ease !important;transform:translateX(0) rotate(0) !important;}
 .slide-choice.direction-active{
-  background:#e5edda !important;
-  border-color:#819b7a !important;
+  background:#f4f0e7 !important;
+  border-color:#e4dbcb !important;
 }
 /* News: click any sentence to seek; click words for lesson notes */
 .news-sentence{position:relative;padding-left:33px !important;cursor:pointer;}
@@ -5637,15 +5637,19 @@ body.type-input-mode .workspace {
 /* ECL reader / swipe reliability — 2026-10-29 */
 .slide-card .slide-choice{
   appearance:none;-webkit-appearance:none;display:block;width:100%;min-height:74px;
-  font:inherit;color:#344338;cursor:pointer;touch-action:manipulation;
-  transition:background .15s ease,border-color .15s ease,box-shadow .15s ease;
+  font:inherit;color:#39342e;cursor:pointer;touch-action:manipulation;
+  background:#f4f0e7 !important;border-color:#e4dbcb !important;
+  -webkit-tap-highlight-color:transparent;
 }
-.slide-card .slide-choice:disabled{opacity:.65;cursor:default;}
+.slide-card .slide-choice:disabled{opacity:1;cursor:default;}
 .slide-card .slide-choice:not(:disabled):hover,
+.slide-card .slide-choice:not(:disabled):active,
 .slide-card .slide-choice:not(:disabled):focus-visible{
-  border-color:#6d8b6f !important;background:#e5eedf !important;
-  box-shadow:0 0 0 2px rgba(82,112,79,.15) !important;
-  outline:2px solid #648568;outline-offset:2px;
+  background:#f4f0e7 !important;border-color:#e4dbcb !important;
+  color:#39342e !important;box-shadow:none !important;
+}
+.slide-card .slide-choice:focus-visible{
+  outline:2px solid #8f8270;outline-offset:2px;
 }
 .slide-card .slide-choice strong{font-family:Comfortaa,Inter,sans-serif;}
 .slide-card.dragging .slide-choice{pointer-events:none;}
