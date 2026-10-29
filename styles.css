@@ -5865,3 +5865,6 @@ html,body,.app-shell{background:var(--ecl-canvas) !important;color:var(--ecl-ink
   #studyNav .study-nav-button svg{width:12px !important;height:12px !important;flex-basis:12px !important}
   #studyNav .study-nav-button{font-size:8px !important}
 }
+
+/* Keep nonactive media sections and panels truly hidden in all responsive layouts. */
+#songPage[hidden],#clipsPage[hidden],#clipLivePanel[hidden],#clipPlayback[hidden],#songDraft[hidden]{display:none !important;}
