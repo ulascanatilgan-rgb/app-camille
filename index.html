@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=ecl-20261027" />
   <link rel="icon" type="image/png" href="/favicon-64.png?v=ecl-20261027" />
   <title>ECL — Emma, Charlotte &amp; Louis</title>
-  <link rel="stylesheet" href="/styles.css?v=ecl-clips-workflow-v57-20261030" />
+  <link rel="stylesheet" href="/styles.css?v=ecl-talk-articles-v58-20261030" />
 </head>
 <body>
   <main class="app-shell">
@@ -34,7 +34,7 @@
       <nav id="studyNav" class="study-nav" aria-label="ECL learning sections">
         <button id="talkTab" class="study-nav-button selected" type="button" data-page="talk" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5m-4 0h8"/></svg>Talk</button>
         <button id="slideTab" class="study-nav-button" type="button" data-page="slide"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m8 12 3-3 4 3-4 3M16 9h2"/></svg>Slide</button>
-        <button id="newsTab" class="study-nav-button" type="button" data-page="news"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 8h10M7 12h4M7 16h10M14 12h3"/></svg>News</button>
+        <button id="newsTab" class="study-nav-button" type="button" data-page="news"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 8h10M7 12h4M7 16h10M14 12h3"/></svg>Articles</button>
         <button id="songTab" class="study-nav-button" type="button" data-page="song"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13M9 18c0 2-2 3-4 3s-3-1-3-2 1-3 4-3c1 0 2 0 3 2Zm12-2c0 2-2 3-4 3s-3-1-3-2 1-3 4-3c1 0 2 0 3 2Z"/></svg>Song</button>
         <button id="clipsTab" class="study-nav-button" type="button" data-page="clips"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="15" height="14" rx="3"/><path d="m17 10 5-3v10l-5-3M7 9h5M7 13h5"/></svg>Clips</button>
       </nav>
@@ -256,14 +256,14 @@
         </div>
       </div>
     </section>
-    <section id="newsPage" class="study-page news-page" hidden aria-label="News reading practice">
+    <section id="newsPage" class="study-page news-page" hidden aria-label="Magazine article reading practice">
       <header class="study-page-header">
-        <div><div class="eyebrow">NEWS · LISTEN & LEARN</div><h1>Daily reading</h1>
-          <p>Short public news briefs from freely accessible publishers. Open a story to read and listen.</p></div>
+        <div><div class="eyebrow">ARTICLES · READ & LISTEN</div><h1>Magazine articles</h1>
+          <p>Three coherent, 250+ word learning articles inspired by publicly accessible magazine sources.</p></div>
         <div class="study-header-actions">
-          <button id="newsArticlesButton" class="study-secondary-button" type="button">Articles</button>
+          <button id="newsArticlesButton" class="study-secondary-button" type="button">All articles</button>
           <button id="newsUpdateButton" class="study-primary-button" type="button">Update</button>
-          <button id="newsWordsButton" class="study-secondary-button" type="button">News Words</button>
+          <button id="newsWordsButton" class="study-secondary-button" type="button">Words</button>
           <button id="newsHistoryButton" class="study-secondary-button" type="button">History</button>
         </div>
       </header>
@@ -282,7 +282,7 @@
         </div>
         <h2 id="newsReaderTitle"></h2>
         <div id="newsReaderSource" class="news-source-line"></div>
-        <div id="newsNarrationDisclosure" class="news-voice-disclosure">Source-linked news summary · Tap a word for its English meaning</div>
+        <div id="newsNarrationDisclosure" class="news-voice-disclosure">Original curated reading · Tap words for English explanations</div>
         <div class="news-seek-controls"><label for="newsSeekRange">Article position</label><input id="newsSeekRange" type="range" min="0" max="1000" step="1" value="0" aria-label="Move backward or forward through the article" /><span id="newsSeekLabel">0%</span></div>
         <div id="newsReadTarget" class="news-read-target" aria-live="off"></div>
         <div id="newsReadEnglish" class="news-read-english"></div>
@@ -404,7 +404,7 @@
 
   <dialog id="newsHistoryDialog" class="study-words-dialog">
     <div class="study-words-shell">
-      <header class="study-words-heading"><div><div class="eyebrow">NEWS ARCHIVE</div><h2>Previous articles</h2></div><button id="newsHistoryClose" class="study-secondary-button" type="button">Close</button></header>
+      <header class="study-words-heading"><div><div class="eyebrow">ARTICLE ARCHIVE</div><h2>Saved articles</h2></div><button id="newsHistoryClose" class="study-secondary-button" type="button">Close</button></header>
       <div id="newsHistoryList" class="study-words-list"></div>
     </div>
   </dialog>
@@ -502,6 +502,6 @@
     </form>
   </dialog>
 
-  <script src="/app.bundle.js?v=ecl-clips-workflow-v57-20261030" type="module"></script>
+  <script src="/app.bundle.js?v=ecl-talk-articles-v58-20261030" type="module"></script>
 </body>
 </html>
