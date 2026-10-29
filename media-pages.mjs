@@ -1,5 +1,5 @@
 // Independent ECL Song (draft-only) and Clips (Anam capture) learning libraries.
-import { createClient } from '@anam-ai/js-sdk';
+import { createClient, AnamEvent } from '@anam-ai/js-sdk';
 const $=id=>document.getElementById(id);
 const NAMES={emma:'Emma',charlotte:'Charlotte',louis:'Louis'};
 const THEMES=['Daily life','Work','Travel','Friends','Food','Technology'];
@@ -226,15 +226,45 @@ export function initMediaPages({getLanguage,getTalkWords}){
       if(!tokenResp.ok||!token.sessionToken)throw new Error(token.error||'Anam connection unavailable');
       if(seq!==liveSequence||lang!==getLanguage())return;
       client=createClient(token.sessionToken,{disableInputAudio:true});
+      // Anam delivers video and audio in SEPARATE remote MediaStreams.
+      // The SDK attaches only the video stream to the HTML video element.
+      // Collect both SDK events before creating one recordable MediaStream.
+      let remoteVideo=null,remoteAudio=null,notifyTracks=()=>{};
+      client.addListener(AnamEvent.VIDEO_STREAM_STARTED,stream=>{
+        remoteVideo=stream;notifyTracks();
+      });
+      client.addListener(AnamEvent.AUDIO_STREAM_STARTED,stream=>{
+        remoteAudio=stream;notifyTracks();
+      });
       $('clipLivePanel').hidden=false;
       await client.streamToVideoElement('clipLiveVideo');
       if(seq!==liveSequence||lang!==getLanguage()){stopStream();return}
-      const video=$('clipLiveVideo'),media=video.srcObject;
-      if(!(media instanceof MediaStream))throw new Error('Anam did not provide a recordable video stream.');
-      const audioTracks=media.getAudioTracks(),videoTracks=media.getVideoTracks();
+      const tracksReady=()=>remoteVideo?.getVideoTracks().length>0 &&
+        remoteAudio?.getAudioTracks().length>0;
+      if(!tracksReady()){
+        status('clipStatus','Waiting for avatar video and voice…');
+        await new Promise((resolve,reject)=>{
+          const timeout=setTimeout(()=>{
+            notifyTracks=()=>{};
+            reject(new Error('Anam video or audio did not arrive. Please try again.'));
+          },15000);
+          notifyTracks=()=>{
+            if(tracksReady()){clearTimeout(timeout);notifyTracks=()=>{};resolve()}
+          };
+          notifyTracks();
+        });
+      }
+      if(seq!==liveSequence||lang!==getLanguage()){stopStream();return}
+      const audioTracks=remoteAudio.getAudioTracks();
+      const videoTracks=remoteVideo.getVideoTracks();
       if(!audioTracks.length||!videoTracks.length)
-        throw new Error('This Anam session does not expose both audio and video tracks for saving. No clip was stored.');
+        throw new Error('Anam did not send both audio and video tracks.');
       const combined=new MediaStream([...videoTracks,...audioTracks]);
+      const video=$('clipLiveVideo');
+      video.srcObject=combined;
+      // An explicit play attempt is helpful when Safari changes tracks after
+      // the first frame. Recording still uses the original remote tracks.
+      void video.play().catch(()=>{});
       const type=mime(),r=new MediaRecorder(combined,{mimeType:type});
       recorder=r;
       r.addEventListener('dataavailable',e=>{if(e.data.size)recorded.push(e.data)});
