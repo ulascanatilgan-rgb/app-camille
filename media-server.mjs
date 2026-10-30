@@ -16,7 +16,12 @@ const FOREIGN_EN = new Set(('i my your their our them they the and with because 
   'after before during while work working learning learned learning '+
   'beautiful great interesting important understand understand can '+
   'however therefore although different going want wanted need '+
-  'needs have having had has').split(/\s+/));
+  'needs have having had has am see sees saw looking look liked like '+
+  'love loves loved enjoy enjoys happy home friend friends city '+
+  'day week year work office school very new old feeling feel felt '+
+  'want wants wanted going went come came know knows knew '+
+  'make makes made do does did go gets get got '+
+  'please yes okay fine thanks great nice').split(/\s+/));
 const FOREIGN_NL = new Set(('ik jij wij zij mijn jouw onze niet het een '+
   'maar want omdat vandaag morgen gisteren graag leuk goed '+
   'hebben heeft gaan kunnen zullen misschien altijd nooit '+
@@ -33,11 +38,14 @@ function foreignSentences(text,language){
       [FOREIGN_NL,FOREIGN_FR];
   return pieces.filter(line=>{
     const tokens=(line.toLocaleLowerCase().match(/[\p{L}]+/gu)||[]);
-    if(tokens.length<2)return false;
+    if(tokens.length<2){
+      return language!=='en'&&tokens.some(t=>['hello','thanks','please','today',
+        'tomorrow','yesterday','goodbye'].includes(t));
+    }
     // Avoid rejecting shared loanwords (e.g. "meeting") or isolated proper
     // names. One strong marker or several foreign function words is enough.
     const en=tokens.filter(t=>FOREIGN_EN.has(t)&&
-      !['can','good','work','important'].includes(t)).length;
+      !(language==='fr'&&t==='important')).length;
     const nl=tokens.filter(t=>FOREIGN_NL.has(t)&&t!=='hoe').length;
     const fr=tokens.filter(t=>FOREIGN_FR.has(t)).length;
     const counts={nl:[en,fr],fr:[en,nl],en:[nl,fr]}[language]||[];
