@@ -64,8 +64,21 @@ export function initMediaPages({getLanguage,getTalkWords}){
   let captionRequestId=0,captionFrame=0,captionSentenceIndex=-1,captionWordIndex=-2;
   const captionPending=new Map();
   let selectedClipWords=[],clipDraft=null,preparingClip=false,prepareSequence=0;
+  let clipView='clips',clipsRenderSequence=0;
   const status=(id,msg)=>{const el=$(id);if(el)el.textContent=msg};
   const langName=()=>({nl:'Dutch',fr:'French',en:'English'}[getLanguage()]||'Dutch');
+  function setClipView(view){
+    clipView=view==='new'?'new':'clips';
+    $('clipsPage').querySelector('.clip-media-grid').dataset.view=clipView;
+    $('clipNewPanel').hidden=clipView!=='new';
+    $('clipLibraryPanel').hidden=clipView!=='clips';
+    $('clipVideosTab').classList.toggle('selected',clipView==='clips');
+    $('clipNewTab').classList.toggle('selected',clipView==='new');
+    $('clipVideosTab').setAttribute('aria-selected',String(clipView==='clips'));
+    $('clipNewTab').setAttribute('aria-selected',String(clipView==='new'));
+    if(clipView==='clips')void renderClips();
+    else restoreClipWorkspace();
+  }
   const dictionary=(language=getLanguage())=>{
     const words=language===getLanguage()?getTalkWords():(()=>{
       try{return JSON.parse(localStorage.getItem('camille.words.v3.'+language)||'[]')}
@@ -536,9 +549,10 @@ export function initMediaPages({getLanguage,getTalkWords}){
     }
   }
   async function renderClips(){
-    const lang=getLanguage(),list=$('clipLibrary');
+    const lang=getLanguage(),list=$('clipLibrary'),seq=++clipsRenderSequence;
     list.replaceChildren();
     const all=await allClips();
+    if(seq!==clipsRenderSequence||lang!==getLanguage())return;
     let highest=Math.max(read('clip.last-number','all',0),
       all.reduce((max,c)=>Math.max(max,Number(c.number)||0),0));
     // Stable chronological Clip 1, Clip 2, etc., including legacy videos.
@@ -549,12 +563,14 @@ export function initMediaPages({getLanguage,getTalkWords}){
       await putClip(clip);
     }
     write('clip.last-number','all',highest);
-    // The Clips folder is global across NL/FR/EN; language switching must
-    // never hide or orphan recordings saved under another study language.
-    const clips=all.sort((a,b)=>Number(a.number)-Number(b.number));
-    status('clipLibraryCount',clips.length+' saved clips · Clips folder');
+    // Keep one IndexedDB (no destructive migration) but show only the
+    // current language. Other-language videos remain untouched and accessible
+    // immediately when the user switches their learning language.
+    const clips=all.filter(c=>c.language===lang)
+      .sort((a,b)=>Number(a.number)-Number(b.number));
+    status('clipLibraryCount',clips.length+' '+langName()+' clips');
     if(!clips.length){
-      list.textContent='No saved clips yet. Create Clip 1 with Mix → Prepare → Run.';
+      list.textContent='No '+langName()+' clips yet. Select New to create one.';
       $('clipPlayback').hidden=true;activeClip=null;cleanClipVideo();return;
     }
     for(const clip of clips){
@@ -592,6 +608,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
       });
       row.append(b,del);list.append(row);
     }
+    if(seq!==clipsRenderSequence||lang!==getLanguage())return;
     const requested=clips.find(x=>x.id===activeClip?.id)||clips[clips.length-1];
     await selectClip(requested);
     for(const b of list.querySelectorAll('.clip-folder-item')){
@@ -721,7 +738,8 @@ export function initMediaPages({getLanguage,getTalkWords}){
       await putClip(clip);
       write('clip.last-number','all',nextNumber);
       status('clipStatus','Saved! Replay this video any time without starting Anam again.');
-      await renderClips();await selectClip(clip);
+      setClipView('clips');
+      await renderClips();
     }catch(e){
       console.warn('Clip creation failed',e);
       status('clipStatus',String(e.message||'Could not save clip.'));
@@ -738,6 +756,8 @@ export function initMediaPages({getLanguage,getTalkWords}){
   $('clipPersona').value=localStorage.getItem('ecl.selectedPersona.v1')||'emma';
   restoreClipWorkspace();
   $('songRunButton').addEventListener('click',makeSong);
+  $('clipVideosTab').addEventListener('click',()=>setClipView('clips'));
+  $('clipNewTab').addEventListener('click',()=>setClipView('new'));
   $('clipWordsButton').addEventListener('click',()=>{
     const panel=$('clipWordsPanel');panel.hidden=!panel.hidden;
     $('clipWordsButton').setAttribute('aria-expanded',String(!panel.hidden));
@@ -783,7 +803,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
     if(current==='clips'&&next!=='clips')void cancelClip();
     current=next;
     if(next==='song'){showInventory();renderSongs()}
-    if(next==='clips'){restoreClipWorkspace();void renderClips()}
+    if(next==='clips'){restoreClipWorkspace();setClipView(clipView)}
   }
   function refreshLanguage(){
     if(current==='clips')void cancelClip();
@@ -793,7 +813,8 @@ export function initMediaPages({getLanguage,getTalkWords}){
       $('clipWordsPanel').hidden=true;
       $('clipWordsButton').setAttribute('aria-expanded','false');
       $('clipWordsSearch').value='';
-      restoreClipWorkspace();activeClip=null;void renderClips();
+      clipsRenderSequence++;
+      restoreClipWorkspace();activeClip=null;cleanClipVideo();setClipView(clipView);
     }
   }
   return {onPage,refreshLanguage,stop:cancelClip};
