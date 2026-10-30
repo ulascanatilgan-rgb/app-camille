@@ -822,8 +822,12 @@ export function initMediaPages({getLanguage,getTalkWords}){
           const seconds=Math.max(0,Math.floor((now-liveSince)/1000));
           status('clipStatus','Finishing voice · '+seconds+'s');
           const sinceFinal=now-finalSentAt;
-          const finishedByAudio=soundStarted&&sinceFinal>=1500&&now-lastSoundAt>=1900;
-          const finishedByEvent=!soundStarted&&personaDoneAt&&now-personaDoneAt>=2800&&sinceFinal>=2400;
+          // Allow the final short sentence to enter the TTS/audio queue.
+          // Do not cut a recording on a brief between-sentence silence.
+          const finishedByAudio=soundStarted&&sinceFinal>=3500&&
+            now-lastSoundAt>=2200&&(personaDoneAt>0||sinceFinal>=7000);
+          const finishedByEvent=!soundStarted&&personaDoneAt&&
+            now-personaDoneAt>=3200&&sinceFinal>=4500;
           // Some Safari WebRTC streams cannot be analyzed, and some Anam
           // versions don't report persona endOfSpeech. Still end the recording
           // promptly rather than storing 30 seconds of silence.
