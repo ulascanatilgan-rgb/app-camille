@@ -56,6 +56,21 @@ const sessionHistoryContent = document.getElementById('sessionHistoryContent');
 const sessionHistoryCount = document.getElementById('sessionHistoryCount');
 const closeSessionHistory = document.getElementById('closeSessionHistory');
 const workspaceEl = document.querySelector('.workspace');
+const talkImmersiveHeader = document.getElementById('talkImmersiveHeader');
+const talkImmersiveClose = document.getElementById('talkImmersiveClose');
+const talkImmersiveTitle = document.getElementById('talkImmersiveTitle');
+function setTalkImmersive(active){
+  const visible=Boolean(active&&(!studyPages||studyPages.getPage()==='talk'));
+  document.body.classList.toggle('talk-immersive',visible);
+  if(talkImmersiveHeader)talkImmersiveHeader.hidden=!visible;
+  if(visible){
+    if(talkImmersiveTitle)talkImmersiveTitle.textContent=personaName()+' · '+
+      ({nl:'Dutch',fr:'French',en:'English'}[targetLanguage]||'Dutch');
+    updateTypeKeyboardOffset();
+  }else{
+    document.documentElement.style.removeProperty('--ecl-live-visible-height');
+  }
+}
 
 const wordCard = document.getElementById('wordCard');
 const wordNl = document.getElementById('wordNl');
@@ -955,6 +970,8 @@ async function finalizeSubtitle(nlText, messageId) {
 function updateTypeKeyboardOffset() {
   const vv=window.visualViewport;
   const visible=vv?.height || window.innerHeight;
+  document.documentElement.style.setProperty('--ecl-live-visible-height',
+    Math.max(350,Math.round(visible))+'px');
   const header=document.querySelector('.topbar')?.getBoundingClientRect().height || 100;
   const themeBar=document.querySelector('.topic-strip')?.getBoundingClientRect().height || 42;
   const providerBar=document.querySelector('.conversation-provider-strip')?.getBoundingClientRect().height || 42;
@@ -2340,6 +2357,7 @@ async function connectVoiceOnly() {
   if(connected || connecting)return;
   const epoch=++connectionEpoch;
   connecting=true;
+  setTalkImmersive(true);
   updatePersonaUi();
   updateTopicUi();
   languageToggle.disabled=true;
@@ -2439,6 +2457,7 @@ async function connectVoiceOnly() {
     micLabel.textContent='Try again';
     avatarBadge.textContent='VOICE OFFLINE';
     setStatus('Voice unavailable');
+    setTalkImmersive(false);
     avatarPlaceholderText.textContent=String(error?.message||'OpenAI Realtime could not connect.').slice(0,165);
     updatePersonaUi();
     updateTopicUi();
@@ -2451,6 +2470,7 @@ async function connect() {
 
   const epoch=++connectionEpoch;
   connecting = true;
+  setTalkImmersive(true);
   updatePersonaUi();
   languageToggle.disabled = true;
   const requestedLanguage = targetLanguage;
@@ -2554,10 +2574,12 @@ async function connect() {
     const message = String(error?.message || 'Emma could not connect to Anam.').slice(0, 180);
     avatarPlaceholderText.textContent = message;
     setStatus('Could not connect');
+    setTalkImmersive(false);
   }
 }
 
 function resetUiAfterDisconnect() {
+  setTalkImmersive(false);
   if(voiceButtonTimer){window.clearTimeout(voiceButtonTimer);voiceButtonTimer=null;}
   sessionOpeningSeq += 1;
   languageToggle.disabled = false;
@@ -2623,6 +2645,12 @@ async function disconnect() {
   resetUiAfterDisconnect();
 }
 
+talkImmersiveClose?.addEventListener('click',async()=>{
+  // One close action ends the paid session and restores all main navigation.
+  talkImmersiveClose.disabled=true;
+  try{await disconnect();}
+  finally{setTalkImmersive(false);talkImmersiveClose.disabled=false;}
+});
 micButton.addEventListener('click', () => {
   primePopAudio();
   if(selectedProvider==='voice' && connected){
