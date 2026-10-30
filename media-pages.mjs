@@ -309,8 +309,18 @@ export function initMediaPages({getLanguage,getTalkWords}){
       }
       tokenIndex=Math.max(0,hi);
     }
-    const index=Math.max(0,sentences.findIndex((s,i)=>tokenIndex>=s.startToken&&
-      tokenIndex<s.endToken)||0);
+    if(tokenIndex<0){
+      // While a legacy recording awaits speech alignment, advance WHOLE
+      // bilingual sentences with video time. Do not fake word highlights.
+      const video=$('clipSavedVideo');
+      const duration=Number.isFinite(video.duration)&&video.duration>0?
+        video.duration:(clip.duration||60);
+      const progress=Math.min(.999,Math.max(0,time/Math.max(.1,duration)));
+      const tokenTotal=clipTokens(clip.text).length;
+      tokenIndex=Math.min(Math.max(0,tokenTotal-1),Math.floor(progress*tokenTotal));
+    }
+    const found=sentences.findIndex(item=>tokenIndex>=item.startToken&&tokenIndex<item.endToken);
+    const index=Math.max(0,found);
     return {index,sentence:sentences[index]||sentences[0]};
   }
   function updateSubtitles(){
@@ -333,8 +343,10 @@ export function initMediaPages({getLanguage,getTalkWords}){
         button.addEventListener('click',()=>showClipWord(words[i],dictionary().get(normalized)));
         box.append(button);
       }
-      english.textContent=activeClip.language==='en'?'':(sentence.english||'');
-      english.hidden=activeClip.language==='en'||!sentence.english;
+      const englishText=activeClip.language==='en'?'':String(sentence.english||'');
+      english.textContent=englishText||(
+        activeClip.language==='en'?'':'English translation is being prepared…');
+      english.hidden=activeClip.language==='en';
       captionWordIndex=-2;
     }
     if(index!==captionWordIndex){
