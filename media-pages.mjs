@@ -793,7 +793,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
         if(seq!==liveSequence||lang!==getLanguage())throw new Error('Clip cancelled');
         // Each short segment is transmitted separately, preserving the exact
         // approved script. This avoids one long TTS burst at full speed.
-        await stream.streamMessageChunk(phrases[i],false);
+        await stream.streamMessageChunk(phrases[i]+(i<phrases.length-1?' ':''),false);
         emittedWords+=clipTokens(phrases[i]).length;
         status('clipStatus','Speaking · '+Math.min(100,Math.round(emittedWords/wordCount*100))+'%');
         if(i<phrases.length-1)
