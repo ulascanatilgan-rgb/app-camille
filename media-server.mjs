@@ -237,8 +237,8 @@ export function registerMediaRoutes(app){
           language==='fr'?
             'FRANÇAIS UNIQUEMENT: chaque phrase, titre, transition et expression doit être entièrement en français. Aucune phrase anglaise ou néerlandaise.':
             'ENGLISH ONLY: every sentence must be fully in English, without Dutch or French.',
-        'Write a cohesive, natural 110–130 word, approximately one-minute monologue, in 12–17 full sentences.',
-        'Use the supplied vocabulary as naturally as possible while keeping every sentence grammatically correct.',
+        'Write one calm, very simple, natural monologue of about 85–100 words, across 11–15 SHORT sentences, for a slow one-minute learning clip. Do not exceed 110 words.',
+        'Use as many selected vocabulary words as fit naturally. Prioritize correct simple language and a connected story over forcing every word into one clip.',
         'The vocabulary list contains words ONLY in the selected language; never translate the words in this output.',
         'Do NOT add translations, examples in another language, bilingual dialogue, explanations, commentary, headings inside text, markdown, labels or stage directions.',
         'Write one completely fresh story on the supplied theme.',
@@ -256,7 +256,7 @@ export function registerMediaRoutes(app){
             'Use fully English sentences throughout, converting Dutch/French sentences to English.',
         'The title also must be in the requested target language.',
         'Be especially suspicious of hidden English sentences in the middle and the final paragraph.',
-        'Keep this one connected natural spoken story of approximately 110–130 words (minimum 85).',
+        'Keep one calm, coherent, natural speech of 85–100 words (acceptable range 75–110), each sentence short and easy for an A2/B1 learner. Do not make it a long fast recital.',
         'NEVER provide English translations or bilingual content in this step.',
         'Return STRICT JSON {"title":"corrected title","text":"corrected full monologue","checkedLanguage":"'+language+'","valid":true}.',
         'Only set valid true after the entire title and text have been corrected into the required language.'
@@ -278,7 +278,7 @@ export function registerMediaRoutes(app){
         const count=clipTokens(text).length;
         const problems=[...foreignSentences(text,language),...foreignSentences(title,language)];
         if(edited.checkedLanguage===language&&edited.valid===true&&
-          count>=85&&count<=190&&title.length>=4&&problems.length===0){
+          count>=75&&count<=110&&title.length>=4&&problems.length===0){
           verified={title,text};break;
         }
         console.warn('Rejected mixed-language Clip script:',{
