@@ -423,7 +423,8 @@ export function initMediaPages({getLanguage,getTalkWords}){
           headers:{'Content-Type':'application/octet-stream',
             'X-Clip-Language':clip.language,
             'X-Clip-Format':format,
-            'X-Clip-Script':encodeURIComponent(clip.text.slice(0,3800))},
+            'X-Clip-Script':encodeURIComponent(clip.text.slice(0,3800)),
+            'X-Clip-Translations-Ready':clip.captionSentences?.some(s=>s.english)?'1':'0'},
           body:clip.blob,signal:AbortSignal.timeout(110000)
         });
         const data=await response.json().catch(()=>({}));
@@ -517,11 +518,22 @@ export function initMediaPages({getLanguage,getTalkWords}){
         clip.createdAt.slice(0,10)+(clip.blob.type.includes('mp4')?'.mp4':'.webm');
       a.click();
     };
-    // Previously saved videos also receive the same audio-based alignment,
-    // without re-recording their content or changing their stored script.
-    if(!clip.aligned||!clip.wordTimes?.length||
-       (clip.language!=='en'&&!clip.captionSentences?.some(x=>x.english)))
+    // Show BOTH French/Dutch and English immediately if this Clip was
+    // prepared with bilingual subtitles. For legacy videos, translate their
+    // saved script first, independently of the slower audio alignment.
+    const englishReady=clip.language==='en'||clip.captionSentences?.some(x=>x.english);
+    if(!englishReady){
+      void translateOldClip(clip).then(translated=>{
+        const updated=translated||clip;
+        if(!updated.aligned||!updated.wordTimes?.length)
+          return syncClipSubtitles(updated);
+      }).catch(error=>{
+        console.warn('Legacy subtitle translation:',error);
+        return syncClipSubtitles(clip);
+      });
+    }else if(!clip.aligned||!clip.wordTimes?.length){
       void syncClipSubtitles(clip);
+    }
   }
   async function renderClips(){
     const lang=getLanguage(),list=$('clipLibrary');
@@ -704,6 +716,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
       const clip={id:'clip-'+Date.now(),number:nextNumber,createdAt:new Date().toISOString(),
         language:lang,persona,title:data.title,text:script,theme:data.theme,
         usedWords:data.usedWords,selectedWords:data.selectedWords,mimeType:type,
+        captionSentences:Array.isArray(data.captionSentences)?data.captionSentences:[],
         blob,duration:(Date.now()-liveSince)/1000};
       await putClip(clip);
       write('clip.last-number','all',nextNumber);
