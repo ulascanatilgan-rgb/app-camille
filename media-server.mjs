@@ -9,6 +9,46 @@ export function registerMediaRoutes(app){
   // Existing videos and new Clips both use their ACTUAL recorded speech.
   // No transcoding, source deletion or Anam re-recording is required.
   const captionRate=new Map();
+  // English translation also works when an older video is too large or
+  // unsupported for automatic speech alignment. It never modifies the video.
+  const translationRate=new Map();
+  app.post('/study-clip-translate',async(req,res)=>{
+    res.set('Cache-Control','no-store');
+    const language=Object.hasOwn(LANG,req.body?.language)?req.body.language:'nl';
+    const script=String(req.body?.text||'').trim().slice(0,4200);
+    if(!script||script.length<20)return res.status(400).json({error:'Saved clip script missing.'});
+    const sentences=clipSentences(script);
+    if(language==='en')return res.json({sentences:sentences.map(x=>({...x,english:''}))});
+    if(!process.env.OPENAI_API_KEY)return res.status(503).json({error:'Translation API is not configured.'});
+    const ip=req.ip||'anonymous',now=Date.now();
+    const attempts=(translationRate.get(ip)||[]).filter(x=>now-x<15*60000);
+    if(attempts.length>=15)return res.status(429).json({error:'Caption translation limit reached.'});
+    attempts.push(now);translationRate.set(ip,attempts);
+    if(translationRate.size>400)translationRate.clear();
+    try{
+      const response=await fetch('https://api.openai.com/v1/chat/completions',{
+        method:'POST',
+        headers:{Authorization:'Bearer '+process.env.OPENAI_API_KEY,'Content-Type':'application/json'},
+        signal:AbortSignal.timeout(45000),
+        body:JSON.stringify({model:'gpt-4o-mini',temperature:0,
+          response_format:{type:'json_object'},max_tokens:1700,
+          messages:[
+            {role:'system',content:'Translate every supplied Dutch/Flemish or French sentence into natural, faithful English. Return JSON {"english":["..."]} with exactly the same number of sentences and in the same order. Never omit, merge or invent a sentence.'},
+            {role:'user',content:JSON.stringify({language,sentences:sentences.map(x=>x.text)})}
+          ]})
+      });
+      if(!response.ok)throw new Error('Translation HTTP '+response.status);
+      const content=(await response.json()).choices?.[0]?.message?.content||'{}';
+      const english=JSON.parse(content).english;
+      if(!Array.isArray(english)||english.length!==sentences.length)
+        throw new Error('Incomplete sentence translation');
+      res.json({sentences:sentences.map((x,i)=>({...x,english:String(english[i]||'').trim().slice(0,360)}))});
+    }catch(error){
+      console.warn('Clip translation failed:',error?.message||error);
+      res.status(502).json({error:'English subtitle translation unavailable right now.'});
+    }
+  });
+
   app.post('/study-clip-align',express.raw({type:'application/octet-stream',limit:'24mb'}),async(req,res)=>{
     res.set('Cache-Control','no-store');
     if(!process.env.OPENAI_API_KEY)
