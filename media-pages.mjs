@@ -68,6 +68,10 @@ export function initMediaPages({getLanguage,getTalkWords}){
   const status=(id,msg)=>{const el=$(id);if(el)el.textContent=msg};
   const langName=()=>({nl:'Dutch',fr:'French',en:'English'}[getLanguage()]||'Dutch');
   function setClipView(view){
+    if(saving&&view!==clipView){
+      status('clipStatus','Stop recording before leaving New.');
+      return;
+    }
     clipView=view==='new'?'new':'clips';
     $('clipsPage').querySelector('.clip-media-grid').dataset.view=clipView;
     $('clipNewPanel').hidden=clipView!=='new';
@@ -104,7 +108,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
     const filtered=words.filter(w=>!search||wordKey(w.word).includes(search)||wordKey(w.english).includes(search));
     if(!filtered.length){
       const empty=document.createElement('p');empty.className='media-hint';
-      empty.textContent=words.length?'No matching words.':'No saved words yet. Learn words in Talk or News.';
+      empty.textContent=words.length?'No matching words.':'No saved words yet. Learn words in Talk or Articles.';
       list.append(empty);return;
     }
     const fragment=document.createDocumentFragment();
@@ -145,7 +149,8 @@ export function initMediaPages({getLanguage,getTalkWords}){
   function restoreClipWorkspace(){
     const lang=getLanguage(),pool=safeWords(getTalkWords,lang);
     const known=new Map(pool.map(w=>[wordKey(w.word),w]));
-    selectedClipWords=read('clip.selection',lang,[]).map(w=>known.get(wordKey(w.word))).filter(Boolean).slice(0,20);
+    selectedClipWords=read('clip.selection',lang,[]).map(w=>
+      known.get(wordKey(w.word))||(w?.word&&w?.english?w:null)).filter(Boolean).slice(0,20);
     const draft=read('clip.draft',lang,null);
     const signature=words=>words.map(w=>wordKey(w.word)).join('|');
     clipDraft=draft?.text&&signature(draft.selectedWords||[])===signature(selectedClipWords)?draft:null;
@@ -708,7 +713,8 @@ export function initMediaPages({getLanguage,getTalkWords}){
       let r=null,type='';
       for(const candidate of ['video/mp4','video/webm;codecs=vp8,opus',
         'video/webm;codecs=vp9,opus','video/webm']){
-        if(!MediaRecorder.isTypeSupported(candidate))continue;
+        if(typeof MediaRecorder.isTypeSupported==='function'&&
+           !MediaRecorder.isTypeSupported(candidate))continue;
         try{r=new MediaRecorder(combined,{mimeType:candidate});type=candidate;break}
         catch(error){console.warn('Clip format fallback:',candidate,error)}
       }
