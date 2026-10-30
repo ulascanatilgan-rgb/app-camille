@@ -1,5 +1,6 @@
 // Independent ECL Song (draft-only) and Clips (Anam capture) learning libraries.
 import { createClient, AnamEvent } from '@anam-ai/js-sdk';
+import {clipTokens,clipSentences} from './clip-alignment.mjs';
 const $=id=>document.getElementById(id);
 const NAMES={emma:'Emma',charlotte:'Charlotte',louis:'Louis'};
 const THEMES=['Daily life','Work','Travel','Friends','Food','Technology'];
@@ -59,6 +60,8 @@ function renderTokens(target,text,dict,active,onClick){
 export function initMediaPages({getLanguage,getTalkWords}){
   let current='talk',client=null,recorder=null,clock=null,liveSince=0,stopInProgress=false;
   let activeClip=null,clipUrl='',liveSequence=0,saving=false,abortWait=null;
+  let captionRequestId=0,captionFrame=0,captionSentenceIndex=-1,captionWordIndex=-2;
+  const captionPending=new Map();
   let selectedClipWords=[],clipDraft=null,preparingClip=false,prepareSequence=0;
   const status=(id,msg)=>{const el=$(id);if(el)el.textContent=msg};
   const langName=()=>({nl:'Dutch',fr:'French',en:'English'}[getLanguage()]||'Dutch');
@@ -235,35 +238,146 @@ export function initMediaPages({getLanguage,getTalkWords}){
       .find(v=>MediaRecorder.isTypeSupported(v))||'';
   }
   function cleanClipVideo(){
+    if(captionFrame){cancelAnimationFrame(captionFrame);captionFrame=0;}
     if(clipUrl){URL.revokeObjectURL(clipUrl);clipUrl=''}
     $('clipSavedVideo').pause();$('clipSavedVideo').removeAttribute('src');
     $('clipSavedVideo').load();
+    captionSentenceIndex=-1;captionWordIndex=-2;
+    $('clipSubtitles').replaceChildren();
+    $('clipEnglishSubtitles').replaceChildren();
   }
   function showClipWord(word,english){
     $('clipSavedVideo').pause();
     status('clipWordDetail',word+' — '+(english||'Not in saved vocabulary'));
   }
+  // Display actual recorded-speech timestamps; never claim a proportional
+  // script-duration approximation is synchronized with Anam's voice.
+  function activeClipIndex(time){
+    const words=activeClip?.wordTimes;
+    if(!activeClip?.aligned||!Array.isArray(words)||!words.length||time<words[0].start)return -1;
+    let low=0,high=words.length-1;
+    while(low<=high){
+      const mid=(low+high)>>1;
+      if(words[mid].start<=time)low=mid+1;else high=mid-1;
+    }
+    const index=Math.max(0,high);
+    return time<=words[index].end+.16?index:-1;
+  }
+  function subtitleSentenceAt(time,wordIndex){
+    const clip=activeClip;
+    const sentences=clip?.captionSentences?.length?clip.captionSentences:clipSentences(clip?.text||'');
+    if(!sentences.length)return {index:-1,sentence:null};
+    let tokenIndex=wordIndex;
+    if(tokenIndex<0&&clip?.aligned&&Array.isArray(clip.wordTimes)){
+      let lo=0,hi=clip.wordTimes.length-1;
+      while(lo<=hi){
+        const mid=(lo+hi)>>1;
+        if(clip.wordTimes[mid].start<=time)lo=mid+1;else hi=mid-1;
+      }
+      tokenIndex=Math.max(0,hi);
+    }
+    const index=Math.max(0,sentences.findIndex((s,i)=>tokenIndex>=s.startToken&&
+      tokenIndex<s.endToken)||0);
+    return {index,sentence:sentences[index]||sentences[0]};
+  }
   function updateSubtitles(){
     if(!activeClip)return;
-    const video=$('clipSavedVideo');
-    const all=activeClip.text.split(/\s+/).filter(Boolean);
-    const duration=Number.isFinite(video.duration)&&video.duration>0?video.duration:(activeClip.duration||60);
-    const index=Math.min(all.length-1,Math.max(0,Math.floor((video.currentTime/Math.max(.1,duration)) * all.length)));
-    const start=Math.max(0,Math.floor(index/11)*11),end=Math.min(all.length,start+11);
-    const strip=t=>t.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,'').toLocaleLowerCase();
-    const dict=dictionary();const box=$('clipSubtitles');box.replaceChildren();
-    for(let i=start;i<end;i++){
-      if(i>start)box.append(document.createTextNode(' '));
-      const word=all[i],b=document.createElement('button');
-      b.type='button';b.textContent=word;b.className='media-subtitle-word'+(i===index?' media-speaking':'');
-      b.addEventListener('click',()=>showClipWord(word,dict.get(strip(word))));
-      box.append(b);
+    const video=$('clipSavedVideo'),time=Number(video.currentTime)||0;
+    const index=activeClipIndex(time);
+    const {index:sentenceIndex,sentence}=subtitleSentenceAt(time,index);
+    if(!sentence)return;
+    const box=$('clipSubtitles'),english=$('clipEnglishSubtitles');
+    if(sentenceIndex!==captionSentenceIndex){
+      captionSentenceIndex=sentenceIndex;
+      box.replaceChildren();
+      const words=clipTokens(activeClip.text);
+      for(let i=sentence.startToken;i<sentence.endToken&&i<words.length;i++){
+        if(i>sentence.startToken)box.append(document.createTextNode(' '));
+        const button=document.createElement('button');
+        button.type='button';button.textContent=words[i];
+        button.className='media-subtitle-word';button.dataset.index=String(i);
+        const normalized=words[i].replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,'').toLocaleLowerCase();
+        button.addEventListener('click',()=>showClipWord(words[i],dictionary().get(normalized)));
+        box.append(button);
+      }
+      english.textContent=activeClip.language==='en'?'':(sentence.english||'');
+      english.hidden=activeClip.language==='en'||!sentence.english;
+      captionWordIndex=-2;
     }
-    const transcript=$('clipTranscript');
-    const prev=transcript.querySelector('.media-speaking');
-    if(prev)prev.classList.remove('media-speaking');
-    const active=transcript.querySelector('[data-index="'+index+'"]');
-    if(active)active.classList.add('media-speaking');
+    if(index!==captionWordIndex){
+      const old=box.querySelector('.media-speaking');old?.classList.remove('media-speaking');
+      const active=index>=0?box.querySelector('[data-index="'+index+'"]'):null;
+      active?.classList.add('media-speaking');
+      const transcript=$('clipTranscript');
+      transcript.querySelector('.media-speaking')?.classList.remove('media-speaking');
+      const target=index>=0?transcript.querySelector('[data-index="'+index+'"]'):null;
+      target?.classList.add('media-speaking');
+      captionWordIndex=index;
+    }
+  }
+  function animateClipCaptions(){
+    if(captionFrame){cancelAnimationFrame(captionFrame);captionFrame=0;}
+    const tick=()=>{
+      captionFrame=0;
+      updateSubtitles();
+      if(activeClip&&!$('clipSavedVideo').paused&&!$('clipSavedVideo').ended)
+        captionFrame=requestAnimationFrame(tick);
+    };
+    captionFrame=requestAnimationFrame(tick);
+  }
+  async function syncClipSubtitles(clip,{force=false}={}){
+    if(!clip?.blob?.size)return;
+    if(clip.aligned&&clip.wordTimes?.length===clipTokens(clip.text).length&&
+      (clip.language==='en'||clip.captionSentences?.some(s=>s.english))&&!force)return;
+    if(captionPending.has(clip.id))return captionPending.get(clip.id);
+    const requestedId=clip.id;
+    if(activeClip?.id===requestedId){
+      $('clipSyncButton').disabled=true;
+      status('clipSyncStatus','Analyzing recorded speech and aligning English subtitles…');
+    }
+    const work=(async()=>{
+      try{
+        if(clip.blob.size>=24*1024*1024)throw new Error('This video is too large for automatic alignment (24 MB limit).');
+        const format=/mp4/i.test(clip.blob.type)?'mp4':'webm';
+        const response=await fetch('/study-clip-align',{
+          method:'POST',
+          headers:{'Content-Type':'application/octet-stream',
+            'X-Clip-Language':clip.language,
+            'X-Clip-Format':format,
+            'X-Clip-Script':encodeURIComponent(clip.text.slice(0,3800))},
+          body:clip.blob,signal:AbortSignal.timeout(110000)
+        });
+        const data=await response.json().catch(()=>({}));
+        if(!response.ok)throw new Error(data.error||'Could not synchronize subtitles.');
+        const expected=clipTokens(clip.text).length;
+        const wordTimes=Array.isArray(data.wordTimes)&&data.wordTimes.length===expected?data.wordTimes:[];
+        const aligned=data.aligned===true&&wordTimes.length===expected;
+        const original=clipSentences(clip.text);
+        const captions=Array.isArray(data.sentences)&&data.sentences.length===original.length?
+          original.map((s,i)=>({...s,english:String(data.sentences[i].english||'')})):original;
+        const revised={...clip,wordTimes,aligned,captionSentences:captions,
+          captionConfidence:Number(data.confidence)||0,captionUpdatedAt:new Date().toISOString()};
+        await putClip(revised);
+        if(activeClip?.id===requestedId){
+          activeClip=revised;captionSentenceIndex=-1;captionWordIndex=-2;
+          updateSubtitles();
+          status('clipSyncStatus',aligned?
+            'Synchronized to the recorded voice · English captions ready':
+            'English captions ready · Word alignment needs another attempt');
+        }
+        return revised;
+      }catch(error){
+        console.warn('Clip subtitle alignment unavailable:',error);
+        if(activeClip?.id===requestedId)
+          status('clipSyncStatus','Unable to sync this recording: '+String(error.message||error).slice(0,130));
+        return null;
+      }finally{
+        captionPending.delete(requestedId);
+        if(activeClip?.id===requestedId)$('clipSyncButton').disabled=false;
+      }
+    })();
+    captionPending.set(requestedId,work);
+    return work;
   }
   async function selectClip(clip){
     cleanClipVideo();
