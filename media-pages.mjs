@@ -650,7 +650,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
     if(data.theme!==$('clipTheme').value){
       status('clipStatus','Topic changed. Press Prepare again before Run.');return;
     }
-    if(!mime()){status('clipStatus','This browser cannot record avatar video. Try an updated Safari or Chrome.');return}
+    if(!window.MediaRecorder){status('clipStatus','Recording is not supported on this browser. Use updated Safari or Chrome.');return}
     saving=true;let seq=++liveSequence,recorded=[];
     renderClipSelection();
     $('clipCancelButton').hidden=false;
@@ -660,7 +660,8 @@ export function initMediaPages({getLanguage,getTalkWords}){
       const tokenResp=await fetch('/anam-session',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({persona,targetLanguage:lang,topic:'open'})});
       const token=await tokenResp.json();
-      if(!tokenResp.ok||!token.sessionToken)throw new Error(token.error||'Anam connection unavailable');
+      if(!tokenResp.ok||!token.sessionToken)throw new Error(
+        [token.error||'Anam connection unavailable',token.anamMessage].filter(Boolean).join(' · '));
       if(seq!==liveSequence||lang!==getLanguage())return;
       client=createClient(token.sessionToken,{disableInputAudio:true});
       // Anam delivers video and audio in SEPARATE remote MediaStreams.
@@ -702,7 +703,16 @@ export function initMediaPages({getLanguage,getTalkWords}){
       // An explicit play attempt is helpful when Safari changes tracks after
       // the first frame. Recording still uses the original remote tracks.
       void video.play().catch(()=>{});
-      const type=mime(),r=new MediaRecorder(combined,{mimeType:type});
+      // Browser format support differs by iOS version. Try each supported
+      // container and only start recording when the constructor accepts it.
+      let r=null,type='';
+      for(const candidate of ['video/mp4','video/webm;codecs=vp8,opus',
+        'video/webm;codecs=vp9,opus','video/webm']){
+        if(!MediaRecorder.isTypeSupported(candidate))continue;
+        try{r=new MediaRecorder(combined,{mimeType:candidate});type=candidate;break}
+        catch(error){console.warn('Clip format fallback:',candidate,error)}
+      }
+      if(!r){r=new MediaRecorder(combined);type=r.mimeType||'video/webm'}
       recorder=r;
       r.addEventListener('dataavailable',e=>{if(e.data.size)recorded.push(e.data)});
       const script=data.text,wordCount=script.split(/\s+/).length;
@@ -711,7 +721,12 @@ export function initMediaPages({getLanguage,getTalkWords}){
       r.start(1000);
       status('clipStatus','Recording '+NAMES[persona]+' speaking… about 1 minute.');
       const stream=client.createTalkMessageStream();
-      await stream.streamMessageChunk(script,true);
+      // Dutch/Flemish and French Clips must use the SAME complete-message
+      // protocol as the working Talk section: a non-final text chunk, then
+      // endMessage(). Passing true without closing the message could leave
+      // the avatar silent throughout the recording.
+      await stream.streamMessageChunk(script,false);
+      await stream.endMessage();
       await new Promise((resolve,reject)=>{
         abortWait=()=>{clearInterval(clock);clock=null;reject(new Error('Clip cancelled'));};
         clock=setInterval(()=>{
@@ -739,7 +754,6 @@ export function initMediaPages({getLanguage,getTalkWords}){
       write('clip.last-number','all',nextNumber);
       status('clipStatus','Saved! Replay this video any time without starting Anam again.');
       setClipView('clips');
-      await renderClips();
     }catch(e){
       console.warn('Clip creation failed',e);
       status('clipStatus',String(e.message||'Could not save clip.'));
