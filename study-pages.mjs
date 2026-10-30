@@ -27,7 +27,9 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   const newsArchive=()=>read(key('news.archive'),[]).filter(articleMatches);
   const currentArticle=()=>archiveStory||newsData?.stories?.[newsReaderIndex];
   function saveNewsArchive(stories){
-    const archive=newsArchive(),byId=new Map(archive.map((a,i)=>[a.id,i]));
+    // Preserve every legacy record, including any accidentally saved under
+    // another language. Filtering belongs only to the visible view.
+    const archive=read(key('news.archive'),[]),byId=new Map(archive.map((a,i)=>[a.id,i]));
     for(const story of stories) {
       if(!story?.id||!articleMatches(story))continue;
       const oldIndex=byId.get(story.id);
@@ -523,7 +525,9 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   $('studyWordsDialog').addEventListener('click',e=>{if(e.target===$('studyWordsDialog'))e.target.close()});
 
   function saveNewsWords(words,articleId){
-    const existing=newsWords(),known=new Set(existing.map(w=>String(w.word||'').toLocaleLowerCase()));
+    const existing=read(key('news.words'),[]),known=new Set(
+      existing.filter(w=>!w.language||w.language===getLanguage())
+        .map(w=>String(w.word||'').toLocaleLowerCase()));
     let changed=false;
     for(const w of words){
       if(!w?.word||!w.english)continue;
