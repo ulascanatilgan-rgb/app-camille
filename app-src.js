@@ -707,7 +707,15 @@ function prepareSpokenTurn(text,english,messageId){
   prefetchedSpeech={text:clean,english:translation,messageId,startedAt:Date.now()};
   lastSubtitlePair={nl:clean,en:translation};
   setSubtitle(clean,translation);
-  renderLiveDutch(clean,'',messageId);
+  // Paint the COMPLETE bilingual reply immediately. Start word highlighting
+  // when SDK speech transcript arrives; a delayed fallback covers avatars
+  // that do not emit stream events for talk(text).
+  const expected=prefetchedSpeech;
+  window.setTimeout(()=>{
+    if(prefetchedSpeech!==expected||!connected||!captionsToggle.checked)return;
+    if(liveCaptionId===null&&activeSubtitleMessageId===messageId)
+      renderLiveDutch(clean,'',messageId);
+  },1050);
 }
 function stopLiveCaption(){
   ++liveCaptionRun;
@@ -2081,20 +2089,23 @@ async function streamCamilleResponse(messages = currentMessages, kickoff = false
       throw new Error(await response.text());
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    activeTalkStream = anamClient.createTalkMessageStream();
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value, { stream: true });
-      if (!chunk) continue;
-
-      await activeTalkStream.streamMessageChunk(chunk, false);
+    const reader=response.body.getReader();
+    const decoder=new TextDecoder();
+    let full='';
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      full+=decoder.decode(value,{stream:true});
     }
-
+    full=limitCamilleReply(full+decoder.decode()).text.trim();
+    if(!full||!connected)return;
+    const messageId='custom-persona-'+Date.now();
+    const epochAtStart=connectionEpoch;
+    const english=await translateToEnglish(full);
+    if(epochAtStart!==connectionEpoch||!connected)return;
+    prepareSpokenTurn(full,english,messageId);
+    activeTalkStream=anamClient.createTalkMessageStream();
+    await activeTalkStream.streamMessageChunk(full,false);
     await activeTalkStream.endMessage();
   } catch (error) {
     if (error?.name !== 'AbortError') {
