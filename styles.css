@@ -6242,6 +6242,7 @@ body.talk-immersive #talkPage .live-exchange-toolbar{
 }
 body.talk-immersive #talkPage .controls{
   flex:0 0 auto!important;
+  position:static!important;inset:auto!important;
   display:grid!important;
   grid-template-columns:minmax(0,1fr)!important;
   grid-template-areas:"modes" "choices" "composer"!important;
@@ -6308,9 +6309,13 @@ body.talk-immersive #talkPage #typeInput{
   min-width:0!important;flex:1 1 auto!important;
   font-size:15px!important;
 }
-body.talk-immersive #talkPage .tip-panel{
+body.talk-immersive #talkPage .tip-panel:not([hidden]){
   z-index:4!important;
-  background:#f6f9fc!important;border-color:#d3dfec!important;
+  display:block!important;position:static!important;
+  width:100%!important;max-width:none!important;inset:auto!important;
+  margin:0 0 12px!important;padding:12px 15px!important;
+  background:#f6f9fc!important;border:1px solid #d3dfec!important;
+  box-shadow:none!important;border-radius:12px!important;
 }
 body.talk-immersive #talkPage .live-speaker{min-height:0}
 @media(max-width:760px){
