@@ -370,6 +370,33 @@ export function initMediaPages({getLanguage,getTalkWords}){
     };
     captionFrame=requestAnimationFrame(tick);
   }
+  async function translateOldClip(clip){
+    if(!clip?.text||clip.language==='en')return null;
+    const response=await fetch('/study-clip-translate',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({language:clip.language,text:clip.text}),
+      signal:AbortSignal.timeout(55000)
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||'Cannot translate clip script.');
+    const sentences=clipSentences(clip.text);
+    if(!Array.isArray(data.sentences)||data.sentences.length!==sentences.length)
+      throw new Error('Incomplete bilingual subtitles');
+    const captions=sentences.map((part,i)=>({
+      ...part,english:String(data.sentences[i].english||'').trim()
+    }));
+    const stored=await getClip(clip.id)||clip;
+    const revised={...stored,captionSentences:captions};
+    await putClip(revised);
+    if(activeClip?.id===clip.id){
+      activeClip={...activeClip,captionSentences:captions};
+      captionSentenceIndex=-1;updateSubtitles();
+      status('clipSyncStatus',activeClip.aligned?
+        'Accurate spoken-word timing · English translation ready':
+        'Bilingual subtitles ready · Word timing is estimated until synced');
+    }
+    return revised;
+  }
   async function syncClipSubtitles(clip,{force=false}={}){
     if(!clip?.blob?.size)return;
     if(clip.aligned&&clip.wordTimes?.length===clipTokens(clip.text).length&&
@@ -400,23 +427,39 @@ export function initMediaPages({getLanguage,getTalkWords}){
         const original=clipSentences(clip.text);
         const captions=Array.isArray(data.sentences)&&data.sentences.length===original.length?
           original.map((s,i)=>({...s,english:String(data.sentences[i].english||'')})):original;
-        const revised={...clip,wordTimes,aligned,captionSentences:captions,
+        const latest=await getClip(clip.id)||clip;
+        const availableCaptions=captions.some(c=>c.english)?captions:
+          (latest.captionSentences?.some(c=>c.english)?latest.captionSentences:captions);
+        const revised={...latest,wordTimes,aligned,captionSentences:availableCaptions,
           captionConfidence:Number(data.confidence)||0,captionUpdatedAt:new Date().toISOString()};
         await putClip(revised);
         if(activeClip?.id===requestedId){
           activeClip=revised;captionSentenceIndex=-1;captionWordIndex=-2;
           updateSubtitles();
-          const englishReady=revised.language==='en'||captions.some(x=>x.english);
+          const englishReady=revised.language==='en'||revised.captionSentences.some(x=>x.english);
           status('clipSyncStatus',aligned
             ?'Synchronized to recorded speech'+(englishReady?' · Bilingual captions ready':' · English translation pending')
             :(englishReady?'English captions ready · Word alignment needs another attempt':
               'Subtitle alignment unavailable · Try Sync subtitles again'));
         }
+        if(revised.language!=='en'&&!revised.captionSentences?.some(x=>x.english)){
+          try{await translateOldClip(revised)}catch(error){
+            console.warn('Supplemental translation unavailable:',error);
+          }
+        }
         return revised;
       }catch(error){
         console.warn('Clip subtitle alignment unavailable:',error);
+        // Even oversized or unsupported legacy videos can still have their
+        // FR/NL + English captions translated from the stored script.
+        if(clip.language!=='en'&&!clip.captionSentences?.some(x=>x.english)){
+          try{return await translateOldClip(clip)}catch(translationError){
+            console.warn('Clip bilingual translation unavailable:',translationError);
+          }
+        }
         if(activeClip?.id===requestedId)
-          status('clipSyncStatus','Unable to sync this recording: '+String(error.message||error).slice(0,130));
+          status('clipSyncStatus','Word timing unavailable: '+String(error.message||error).slice(0,110)+
+            '. Video playback and original script remain available.');
         return null;
       }finally{
         captionPending.delete(requestedId);
