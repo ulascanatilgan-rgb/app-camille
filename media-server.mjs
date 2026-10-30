@@ -4,6 +4,63 @@ import {alignClipWords,clipSentences} from './clip-alignment.mjs';
 const LANG={nl:'Belgian Dutch (natural Flemish)',fr:'French',en:'English'};
 const recent=new Map();
 function clean(s,max=110){return String(s||'').replace(/\s+/g,' ').trim().slice(0,max)}
+// Fast independent guard. A second AI editor checks the full language and
+// fixes false friends, but obvious English/French/Dutch sentences must still
+// be rejected server-side rather than saved or spoken.
+const FOREIGN_EN = new Set(('i my your their our them they the and with because '+
+  'from this that these those what which who why where when about '+
+  'would could should will were are does did dont didn thought '+
+  'there here today tomorrow yesterday together always never anything '+
+  'everything something everyone someone anybody people every '+
+  'then than also very much often please thanks hello good morning '+
+  'after before during while work working learning learned learning '+
+  'beautiful great interesting important understand understand can '+
+  'however therefore although different going want wanted need '+
+  'needs have having had has').split(/\s+/));
+const FOREIGN_NL = new Set(('ik jij wij zij mijn jouw onze niet het een '+
+  'maar want omdat vandaag morgen gisteren graag leuk goed '+
+  'hebben heeft gaan kunnen zullen misschien altijd nooit '+
+  'daar hier samen leren spreken luisteren werken veel weinig '+
+  'waarom wanneer welke hoeveel wie hoe').split(/\s+/));
+const FOREIGN_FR = new Set(('nous vous avec aujourd demain pourquoi parce '+
+  'bonjour merci beaucoup maintenant toujours jamais vraiment '+
+  'suis êtes avons avez allez bien très voilà '+
+  'quand comment chez souvent encore ensemble parler travail').split(/\s+/));
+function foreignSentences(text,language){
+  const pieces=clipSentences(String(text||'')).map(x=>x.text);
+  const foreign=language==='nl'?[FOREIGN_EN,FOREIGN_FR]:
+    language==='fr'?[FOREIGN_EN,FOREIGN_NL]:
+      [FOREIGN_NL,FOREIGN_FR];
+  return pieces.filter(line=>{
+    const tokens=(line.toLocaleLowerCase().match(/[\p{L}]+/gu)||[]);
+    if(tokens.length<2)return false;
+    // Avoid rejecting shared loanwords (e.g. "meeting") or isolated proper
+    // names. One strong marker or several foreign function words is enough.
+    const en=tokens.filter(t=>FOREIGN_EN.has(t)&&
+      !['can','good','work','important'].includes(t)).length;
+    const nl=tokens.filter(t=>FOREIGN_NL.has(t)&&t!=='hoe').length;
+    const fr=tokens.filter(t=>FOREIGN_FR.has(t)).length;
+    const counts={nl:[en,fr],fr:[en,nl],en:[nl,fr]}[language]||[];
+    const highSignalEnglish=tokens.some(t=>['the','and','because','your','their',
+      'would','could','should','there','where','which','those','these','about'].includes(t));
+    // For Dutch, "je" and "de" are shared with French, therefore excluded.
+    return counts.some(c=>c>=2)||(language!=='en'&&en>=1&&highSignalEnglish);
+  });
+}
+async function mediaJson(apiKey,system,user,{temperature=.4,maxTokens=1600}={}){
+  const response=await fetch('https://api.openai.com/v1/chat/completions',{
+    method:'POST',
+    headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json'},
+    signal:AbortSignal.timeout(50000),
+    body:JSON.stringify({model:'gpt-4o-mini',temperature,
+      response_format:{type:'json_object'},max_tokens:maxTokens,
+      messages:[{role:'system',content:system},{role:'user',content:JSON.stringify(user)}]})
+  });
+  if(!response.ok)throw new Error('Media generation HTTP '+response.status);
+  const raw=await response.json();
+  return JSON.parse(raw.choices?.[0]?.message?.content||'{}');
+}
+
 export function registerMediaRoutes(app){
 
   // Existing videos and new Clips both use their ACTUAL recorded speech.
@@ -143,45 +200,121 @@ export function registerMediaRoutes(app){
     const attempts=(recent.get(ip)||[]).filter(t=>now-t<3600000);
     if(attempts.length>=20)return res.status(429).json({error:'Content creation limit reached. Please try again later.'});
     attempts.push(now);recent.set(ip,attempts);
-    const system=[
-      'You write ORIGINAL copyright-safe educational material for language learners.',
-      'Target language is '+LANG[language]+'. NEVER mix French and Dutch.',
-      'The user supplies vocabulary with English translations.',
-      kind==='clip'?
-        'Create ONE fresh, ORIGINAL one-person spoken monologue for an avatar, about 110-130 words lasting around 60 seconds at a calm speaking pace. Incorporate ALL the supplied selected vocabulary (up to 20), naturally and grammatically, with one cohesive story rather than a word list. Prefer everyday B1 language, fluid short sentences and a fresh angle each time even for identical inputs. No dialogue labels, stage directions or markdown.':
-        'Write an ORIGINAL, short, singable, easy-to-understand song lyric, including a recurring chorus, in the requested genre '+genre+'. Use 15-20 input vocabulary items when available; for fewer words, use all naturally. Repetition helps memorization. 3 verses/chorus sections maximum. Do not imitate specific artists or copyrighted songs.',
-      kind==='clip'?
-        'Return ONLY JSON {"title":"...","text":"...","usedWords":["..."],"englishSentences":["..."]}. For each full sentence in text, add precisely one natural English translation to englishSentences in the SAME order. Match sentence count exactly. Do not insert blank entries. If the target language is English, translations may be the same.':
-        'Return ONLY JSON {"title":"...","text":"...","usedWords":["..."]}.',
-      'The text and title must be solely in the target language. Use newline breaks for song verses.',
-      'Only put words actually used in text in usedWords. No explanation, no adult or unsafe themes.',
-      kind==='clip'&&previousText?'The user previously received a clip script. Write a clearly DIFFERENT narrative, setting and sentence order, without reusing earlier sentences.':''
-    ].join(' ');
     try{
-      const resp=await fetch('https://api.openai.com/v1/chat/completions',{
-        method:'POST',headers:{'Authorization':'Bearer '+process.env.OPENAI_API_KEY,'Content-Type':'application/json'},
-        signal:AbortSignal.timeout(55000),
-        body:JSON.stringify({
-          model:'gpt-4o-mini',temperature:kind==='clip' ? 0.85 : 0.55,response_format:{type:'json_object'},max_tokens:kind==='clip'?2100:1450,
-          messages:[{role:'system',content:system},{role:'user',content:JSON.stringify({theme,genre,words,previousTitle,previousText})}]
-        })
+      if(kind==='song'){
+        const system=[
+          'Create ORIGINAL, short, singable educational lyrics exclusively in '+LANG[language]+'.',
+          'All lyrics, heading, verses and chorus must be in the selected language, NOT English unless English is selected.',
+          'Use selected vocabulary naturally, with a recurring chorus. 3 verse/chorus sections maximum.',
+          'Never imitate particular artists or copyrighted songs.',
+          'Return JSON {"title":"...","text":"...","usedWords":["..."]}. No translations or markdown.'
+        ].join(' ');
+        const result=await mediaJson(process.env.OPENAI_API_KEY,system,
+          {theme,genre,words:words.map(x=>x.word)},{temperature:.55,maxTokens:1450});
+        const text=String(result.text||'').trim().slice(0,4200);
+        if(text.length<50)throw new Error('Song lyrics are too short');
+        return res.json({title:clean(result.title,100)||theme,text,usedWords:
+          words.filter(w=>text.toLocaleLowerCase().includes(w.word.toLocaleLowerCase())),
+          language,theme,genre,kind});
+      }
+      const langName=LANG[language],savedWords=words.map(w=>w.word);
+      // Phase 1: the writing model NEVER sees the English word definitions
+      // and NEVER produces English translations in the same JSON request.
+      // That separation is vital for Dutch and French language purity.
+      const drafting=[
+        'You are a native '+langName+' magazine writer and language educator.',
+        'MANDATORY LANGUAGE LOCK: ALL words of the title and ALL sentences of "text" MUST be written ONLY in '+langName+'.',
+        language==='nl'?
+          'DUTCH / VLAAMS ONLY: never write any English sentences, English phrases or French sentences. Use correct Dutch syntax and Dutch verbs in every single sentence.':
+          language==='fr'?
+            'FRANÇAIS UNIQUEMENT: chaque phrase, titre, transition et expression doit être entièrement en français. Aucune phrase anglaise ou néerlandaise.':
+            'ENGLISH ONLY: every sentence must be fully in English, without Dutch or French.',
+        'Write a cohesive, natural 110–130 word, approximately one-minute monologue, in 12–17 full sentences.',
+        'Use the supplied vocabulary as naturally as possible while keeping every sentence grammatically correct.',
+        'The vocabulary list contains words ONLY in the selected language; never translate the words in this output.',
+        'Do NOT add translations, examples in another language, bilingual dialogue, explanations, commentary, headings inside text, markdown, labels or stage directions.',
+        'Write one completely fresh story on the supplied theme.',
+        'Return ONLY JSON {"title":"native-language title","text":"native-language monologue"}.',
+        'Before responding, inspect every sentence for foreign-language words or grammar and rewrite them into the requested language.'
+      ].join(' ');
+      const audit=[
+        'You are an exceptionally strict independent '+langName+' native-language copy editor.',
+        'Your task is LANGUAGE VERIFICATION AND REPAIR of a one-minute learning clip.',
+        'Rewrite the provided draft into 100% '+langName+' while keeping its meaning and selected target-language vocabulary.',
+        language==='nl'?
+          'Every complete sentence must use Dutch/Flemish words and grammar. Translate any English/French sentence COMPLETELY into natural Dutch. No English sentences anywhere.':
+          language==='fr'?
+            'Chaque phrase doit être entièrement en français. Traduisez toute phrase anglaise/néerlandaise en français naturel. Aucun anglais dans le texte ni dans le titre.':
+            'Use fully English sentences throughout, converting Dutch/French sentences to English.',
+        'The title also must be in the requested target language.',
+        'Be especially suspicious of hidden English sentences in the middle and the final paragraph.',
+        'Keep this one connected natural spoken story of approximately 110–130 words (minimum 85).',
+        'NEVER provide English translations or bilingual content in this step.',
+        'Return STRICT JSON {"title":"corrected title","text":"corrected full monologue","checkedLanguage":"'+language+'","valid":true}.',
+        'Only set valid true after the entire title and text have been corrected into the required language.'
+      ].join(' ');
+      let verified=null;
+      for(let attempt=0;attempt<3;attempt++){
+        const draft=await mediaJson(process.env.OPENAI_API_KEY,drafting+
+          (attempt?' IMPORTANT: Previous output contained foreign-language sentences. Do NOT write English inside Dutch or French. Write every sentence correctly.':''),
+          {language,theme,selectedVocabulary:savedWords,
+            previousTopic:previousTitle||'',previousStoryAvoid:previousText?
+              'Choose a different plot and different wording from the previous script.':''},
+          {temperature:.38,maxTokens:1350});
+        const edited=await mediaJson(process.env.OPENAI_API_KEY,audit,
+          {targetLanguage:language,theme,selectedVocabulary:savedWords,
+            title:String(draft.title||''),text:String(draft.text||'')},
+          {temperature:0,maxTokens:1500});
+        const text=String(edited.text||'').trim().slice(0,4200);
+        const title=clean(edited.title,100);
+        const count=clipTokens(text).length;
+        const problems=[...foreignSentences(text,language),...foreignSentences(title,language)];
+        if(edited.checkedLanguage===language&&edited.valid===true&&
+          count>=85&&count<=190&&title.length>=4&&problems.length===0){
+          verified={title,text};break;
+        }
+        console.warn('Rejected mixed-language Clip script:',{
+          language,attempt:attempt+1,wordCount:count,
+          unexpected:problems.length,verified:edited.checkedLanguage===language&&edited.valid===true
+        });
+      }
+      if(!verified){
+        return res.status(422).json({error:
+          'The script failed the '+LANG[language]+' language check. Nothing was saved or sent to the avatar. Press Prepare to retry.'});
+      }
+      const originals=clipSentences(verified.text);
+      // Phase 3: only AFTER the target script passes the language audit,
+      // translate the immutable script separately into English subtitles.
+      let english=[];
+      if(language!=='en'){
+        try{
+          const result=await mediaJson(process.env.OPENAI_API_KEY,[
+            'Translate each provided '+langName+' sentence into natural English.',
+            'Return ONLY JSON {"english":["..."]} with exactly '+originals.length+' items, one per original sentence in order.',
+            'NEVER change the original text, do not supply the original language inside an English translation.',
+            'Keep sentence meaning and timing, no extra text.'
+          ].join(' '),{sentences:originals.map(x=>x.text),language},
+          {temperature:0,maxTokens:1900});
+          if(Array.isArray(result.english)&&result.english.length===originals.length)
+            english=result.english.map(x=>clean(x,320));
+        }catch(error){
+          // The validated original is still safe: captions can be translated
+          // later through /study-clip-translate without rewriting the script.
+          console.warn('English captions pending:',error.message);
+        }
+      }
+      const captionSentences=originals.map((part,i)=>({...part,english:english[i]||''}));
+      const normalized=words.filter(w=>
+        verified.text.toLocaleLowerCase().includes(w.word.toLocaleLowerCase()));
+      return res.json({
+        title:verified.title,text:verified.text,usedWords:normalized,
+        language,languageValidated:true,validationVersion:2,
+        theme,genre,kind,captionSentences
       });
-      if(!resp.ok)throw new Error('Script generation returned HTTP '+resp.status);
-      const raw=await resp.json();
-      const obj=JSON.parse(raw.choices?.[0]?.message?.content||'{}');
-      const text=String(obj.text||'').trim().slice(0,4200);
-      if(text.length<65)throw new Error('The resulting script was too short.');
-      const title=clean(obj.title,100)||theme;
-      const normalized=words.filter(w=>text.toLocaleLowerCase().includes(w.word.toLocaleLowerCase()));
-      const originals=kind==='clip'?clipSentences(text):[];
-      const translation=Array.isArray(obj.englishSentences)?obj.englishSentences:[];
-      const captionSentences=originals.map((part,i)=>({...part,
-        english:translation.length===originals.length?
-          clean(translation[i],320):''}));
-      res.json({title,text,usedWords:normalized,language,theme,genre,kind,captionSentences});
-    }catch(e){
-      console.warn('Media script generation:',e.message);
-      res.status(502).json({error:'Could not create this text right now. Please retry.'});
+    }catch(error){
+      console.warn('Media script generation:',error?.message||error);
+      res.status(502).json({error:
+        'Clip preparation could not pass language verification. Nothing was saved. Please press Prepare again.'});
     }
   });
 }
