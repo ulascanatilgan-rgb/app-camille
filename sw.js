@@ -1,4 +1,4 @@
-const CACHE = 'ecl-talk-avatar-v66';
+const CACHE = 'ecl-clip-tabs-talk-v67';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
