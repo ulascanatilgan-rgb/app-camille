@@ -4,14 +4,16 @@ export const clipTokens=text=>String(text||'').trim().split(/\s+/).filter(Boolea
 const canonical=text=>String(text||'').normalize('NFD').replace(/\p{M}/gu,'')
   .replace(/[^\p{L}\p{N}]/gu,'').toLocaleLowerCase();
 export function clipSentences(script){
-  const parts=(String(script||'').replace(/\n+/g,' ').match(/[^.!?。！？]+(?:[.!?。！？]+|$)/gu)||[])
-    .map(x=>x.trim()).filter(Boolean);
-  const result=[];let cursor=0;
-  for(const text of parts){
-    const count=clipTokens(text).length;
-    if(!count)continue;
-    result.push({text,startToken:cursor,endToken:cursor+count});
-    cursor+=count;
+  const words=clipTokens(script),result=[];
+  let start=0;
+  // Segment by COMPLETE whitespace tokens. Never create or discard script
+  // words (e.g., abbreviations like "e.g." or decimal numbers).
+  for(let i=0;i<words.length;i++){
+    const stop=/[.!?。！？][”"'’»)]?$/.test(words[i])||i===words.length-1;
+    if(!stop)continue;
+    result.push({text:words.slice(start,i+1).join(' '),
+      startToken:start,endToken:i+1});
+    start=i+1;
   }
   return result;
 }
