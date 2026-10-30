@@ -1,4 +1,4 @@
-const CACHE = 'ecl-talk-articles-v58';
+const CACHE = 'ecl-talk-articles-v59';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
