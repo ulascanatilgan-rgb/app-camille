@@ -29,7 +29,7 @@ const safeWords=(getWords,lang)=>{
   const news=(()=>{try{return JSON.parse(localStorage.getItem('ecl.news.words.v1.'+lang)||'[]')}catch{return []}})();
   const older=read('news.words',lang,[]);
   const candidates=[...talk,...[...older,...news].map(w=>({
-    word:String(w.word||'').trim(),english:String(w.english||'').trim(),source:'News'
+    word:String(w.word||'').trim(),english:String(w.english||'').trim(),source:'Articles'
   }))];
   const seen=new Set();
   return candidates.filter(w=>{
@@ -70,7 +70,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
   function showInventory(){
     const words=sourceWords(20),universe=safeWords(getTalkWords,getLanguage());
     status('songWordsInfo',words.length+' saved '+langName()+' words available · '+Math.min(words.length,20)+' used for drafts');
-    status('clipWordsInfo',universe.length+' learned '+langName()+' words from Talk + News · Mix to choose up to 20');
+    status('clipWordsInfo',universe.length+' learned '+langName()+' words from Talk + Articles · Mix to choose up to 20');
     status('clipUniverseCount',universe.length+' words  ⌄');
   }
   function renderClipWordUniverse(){
@@ -98,7 +98,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
     const universe=safeWords(getTalkWords,getLanguage());
     status('clipSelectionInfo',selectedClipWords.length
       ?selectedClipWords.length+' selected of '+universe.length+' learned words · Press Mix for a different set'
-      :'Press Mix to select up to 20 random words from Talk and News.');
+      :'Press Mix to select up to 20 random words from Talk and Articles.');
     const fragment=document.createDocumentFragment();
     for(const [i,w] of selectedClipWords.entries()){
       const item=document.createElement('span');item.className='clip-selected-chip';
