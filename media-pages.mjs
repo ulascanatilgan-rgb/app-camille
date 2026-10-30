@@ -284,35 +284,37 @@ export function initMediaPages({getLanguage,getTalkWords}){
     $('clipSubtitles').replaceChildren();
     $('clipEnglishSubtitles').replaceChildren();
   }
-  function showClipPlaybackMessage(message){
-    status('clipPlaybackStatus',message);
+  function showClipPlaybackMessage(message,{error=false}={}){
+    const messageEl=$('clipPlaybackStatus');
+    messageEl.textContent=error?message:'';
+    messageEl.hidden=!error;
   }
   function playSavedClip(){
     const video=$('clipSavedVideo');
     if(!activeClip?.blob?.size){
-      showClipPlaybackMessage('This saved recording is missing its video file.');
+      showClipPlaybackMessage('This saved recording is missing its video file.',{error:true});
       return;
     }
     // Keep play() directly inside the tap handler for iOS user activation.
     if(video.ended||video.currentTime>=video.duration-.12){
       try{video.currentTime=0}catch{}
     }
-    showClipPlaybackMessage('Starting Clip '+(activeClip.number||'')+'…');
+    showClipPlaybackMessage('');
     try{
       const started=video.play();
       if(started&&typeof started.then==='function')
         started.then(()=>{
           $('clipPlayButton').hidden=true;
-          showClipPlaybackMessage('Playing · Both subtitle lines follow the recorded video.');
+          showClipPlaybackMessage('');
         }).catch(error=>{
           $('clipPlayButton').hidden=false;
           showClipPlaybackMessage('Playback unavailable: '+String(error?.message||'Unsupported video format')+
-            '. Try the Download video option.');
+            '. Try the Download video option.',{error:true});
         });
     }catch(error){
       $('clipPlayButton').hidden=false;
       showClipPlaybackMessage('Cannot play this recording: '+String(error?.message||error)+
-        '. Use Download video to open it in a compatible player.');
+        '. Use Download video to open it in a compatible player.',{error:true});
     }
   }
   function showClipWord(word,english){
@@ -531,7 +533,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
     video.src=clipUrl;
     video.load();
     $('clipPlayButton').hidden=false;
-    showClipPlaybackMessage('Clip '+(clip.number||'')+' ready · Tap Play to watch again.');
+    showClipPlaybackMessage('');
     status('clipWordDetail','Tap a script word to pause the video and see its English meaning.');
     renderTokens($('clipTranscript'),clip.text,dictionary(clip.language),-1,showClipWord);
     captionSentenceIndex=-1;captionWordIndex=-2;
@@ -820,7 +822,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
   });
   $('clipSavedVideo').addEventListener('ended',()=>{
     $('clipPlayButton').hidden=false;
-    showClipPlaybackMessage('Video finished · Tap Play to watch again.');
+    showClipPlaybackMessage('');
     updateSubtitles();
   });
   $('clipSavedVideo').addEventListener('error',()=>{
@@ -828,7 +830,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
     const code=$('clipSavedVideo').error?.code;
     showClipPlaybackMessage(code===4?
       'This older video format is not supported by this browser. Try Download video.':
-      'The saved video could not be loaded. Try Play again or Download video.');
+      'The saved video could not be loaded. Try Play again or Download video.',{error:true});
   });
   window.addEventListener('pagehide',()=>{void cancelClip();cleanClipVideo()});
   function onPage(next){
