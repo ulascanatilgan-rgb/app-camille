@@ -321,8 +321,7 @@
             <label>Music style<select id="songGenre"></select></label>
           </div>
           <button id="songRunButton" class="study-primary-button media-run" type="button">Create lyrics</button>
-          <div id="songStatus" class="study-message" role="status">Music production: not connected yet.</div>
-          <div class="media-connection-note">ElevenLabs connection planned · No music-generation credits used</div>
+          <div id="songStatus" class="study-message" role="status"></div>
           <div class="media-library-heading"><h2>My Songs</h2><span id="songLibraryCount">0 drafts</span></div>
           <div id="songLibrary" class="media-library"></div>
         </div>
@@ -335,7 +334,7 @@
             <div id="songWordMeaning" class="media-word-detail"></div>
             <p id="songDraftNote" class="media-hint"></p>
           </div>
-          <p class="media-placeholder">Create a draft to see your lyrics here. Audio player, synced lyrics and song replay will be added after music integration.</p>
+          <p class="media-placeholder">Create lyrics to begin.</p>
         </div>
       </div>
     </section>
@@ -375,7 +374,7 @@
             <div class="media-eyebrow">PREPARED · 1-MINUTE SCRIPT</div>
             <h3 id="clipPreparedTitle"></h3>
             <p id="clipPreparedScript" class="clip-prepared-script"></p>
-            <p class="media-hint">Not happy? Press Prepare again for another script using the same words.</p>
+            <p class="media-hint">Press Prepare again for a different script.</p>
           </div>
           <button id="clipRunButton" class="study-primary-button media-run" type="button" disabled>Run · Create 1-minute video</button>
           <button id="clipCancelButton" class="study-secondary-button media-run" type="button" hidden>Stop recording</button>
@@ -411,7 +410,6 @@
             <button id="clipDownloadButton" type="button" class="study-secondary-button media-download">Download video</button>
             <div id="clipWordDetail" class="media-word-detail">Tap a word for its meaning.</div>
             <h3>Full script · interactive transcript</h3><div id="clipTranscript" class="clip-transcript"></div>
-            <p class="media-hint">Highlighting follows timestamps from the recorded voice. Existing Clips can be re-synchronized; replay does not use Anam credits.</p>
           </div>
           <p class="media-placeholder">Select a clip to play.</p>
         </div>
