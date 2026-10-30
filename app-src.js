@@ -86,6 +86,7 @@ const speakModeButton = document.getElementById('speakModeButton');
 const typeModeButton = document.getElementById('typeModeButton');
 const buttonModeButton = document.getElementById('buttonModeButton');
 const quickReplyBar = document.getElementById('quickReplyBar');
+const talkAnswerDock = document.getElementById('talkAnswerDock');
 const languageToggle = document.getElementById('languageToggle');
 const languageToggleLabel = document.getElementById('languageToggleLabel');
 const topicSelect = document.getElementById('topicSelect');
@@ -1228,6 +1229,7 @@ function clearQuickChoices() {
   if (!quickReplyBar) return;
   quickReplyBar.innerHTML = '';
   quickReplyBar.hidden = true;
+  if(talkAnswerDock)talkAnswerDock.hidden=true;
 }
 
 function renderQuickChoices(choices) {
@@ -1272,6 +1274,7 @@ function renderQuickChoices(choices) {
   }
 
   quickReplyBar.hidden = quickReplyBar.children.length !== 3;
+  if(talkAnswerDock)talkAnswerDock.hidden=quickReplyBar.hidden;
 }
 
 async function requestQuickChoices(camilleText) {
