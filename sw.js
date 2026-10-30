@@ -1,4 +1,4 @@
-const CACHE = 'ecl-talk-clips-v64';
+const CACHE = 'ecl-slide-clips-ui-v65';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
