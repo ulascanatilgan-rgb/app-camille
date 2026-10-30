@@ -613,7 +613,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
           // without requiring a manual scroll through the whole editor.
           if(window.innerWidth<=1010)
             $('clipPlayback').scrollIntoView?.({behavior:'smooth',block:'start'});
-        }).catch(error=>showClipPlaybackMessage('Could not open saved clip: '+error.message));
+        }).catch(error=>showClipPlaybackMessage('Could not open saved clip: '+error.message,{error:true}));
       });
       const del=document.createElement('button');del.type='button';
       del.className='media-delete';del.textContent='Delete';
