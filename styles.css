@@ -6718,3 +6718,140 @@ body.talk-immersive #talkPage .live-exchange-card{
   }
   #slidePage .slide-card:before{left:19px}
 }
+
+
+/* ECL v66 — half-screen face-to-face Talk with an unobstructed avatar.
+   The New Word card lives in the transcript column, never on a face. */
+#talkPage .word-card{
+  position:relative!important;inset:auto!important;
+  display:block;width:100%;min-width:0;max-width:none;
+  z-index:2!important;flex:0 0 auto!important;
+  margin:0 0 9px!important;padding:9px 13px!important;
+  background:rgba(24,27,34,.96)!important;color:#fff!important;
+  border:1px solid #333b44!important;border-left:4px solid #f0c941!important;
+  border-radius:11px!important;
+  box-shadow:0 3px 12px rgba(24,32,43,.09)!important;
+  backdrop-filter:blur(12px);
+}
+#talkPage .word-card[hidden]{display:none!important}
+#talkPage .word-card-label{
+  color:#f0c941!important;font-size:9px!important;
+  margin:0 0 3px!important;font-weight:800!important;
+}
+#talkPage .word-card-pair{
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:8px!important;
+  color:#fff!important;
+}
+#talkPage .word-card-nl{
+  color:#fff!important;font-size:clamp(13px,1.5vw,18px)!important;
+}
+#talkPage .word-card-en{
+  color:#f3f4f7!important;font-size:clamp(11px,1.25vw,15px)!important;
+}
+#talkPage .word-card-arrow{color:#f0c941!important}
+body.talk-immersive #talkPage.workspace,
+body.talk-immersive.type-input-mode #talkPage.workspace{
+  grid-template-columns:minmax(0,50%) minmax(0,50%)!important;
+  grid-template-rows:minmax(0,1fr)!important;
+}
+body.talk-immersive #talkPage .avatar-column{
+  padding:0!important;
+  background:#151b22!important;
+  border-right:1px solid #28303b!important;
+}
+body.talk-immersive #talkPage .portrait-wrap{
+  width:100%!important;height:100%!important;
+  border-radius:0!important;background:#151b22!important;
+  overflow:hidden!important;
+}
+body.talk-immersive #talkPage .anam-video,
+body.talk-immersive #talkPage .emma-placeholder-image{
+  object-fit:cover!important;
+  object-position:center 37%!important;
+}
+body.talk-immersive #talkPage .conversation-column{
+  padding-top:68px!important;
+  min-width:0!important;
+}
+body.talk-immersive #talkPage .live-exchange-card{
+  overflow-y:auto!important;min-height:0!important;
+}
+body.talk-immersive #talkPage .live-exchange-card .english-line{
+  display:block!important;min-height:1.5em!important;
+  color:#5d6979!important;
+  font-weight:550!important;
+  opacity:1!important;
+  visibility:visible!important;
+  line-height:1.55!important;
+  white-space:normal!important;
+}
+body.talk-immersive #talkPage .live-exchange-card .dutch-line{
+  display:block!important;
+  color:#202c39!important;line-height:1.52!important;
+}
+body.talk-immersive #talkPage .dutch-line .replay-word-active,
+body.talk-immersive #talkPage .dutch-line .spoken-word{
+  background:#f1d166!important;color:#171e26!important;
+  border-radius:4px!important;
+  box-shadow:0 0 0 2px #f1d166!important;
+  font-weight:800!important;
+}
+@media(max-width:760px){
+  body.talk-immersive #talkPage.workspace,
+  body.talk-immersive.type-input-mode #talkPage.workspace{
+    grid-template-columns:minmax(0,1fr)!important;
+    grid-template-rows:minmax(0,54%) minmax(0,46%)!important;
+    grid-template-areas:"avatar" "conversation"!important;
+  }
+  body.talk-immersive #talkPage .avatar-column{
+    padding:0!important;
+    border-right:0!important;
+  }
+  body.talk-immersive #talkPage .portrait-wrap{
+    border-radius:0!important;
+  }
+  body.talk-immersive #talkPage .conversation-column{
+    padding:8px 10px 0!important;
+    border-top:1px solid #dfe5ed!important;
+  }
+  body.talk-immersive #talkPage .word-card{
+    margin:0 0 6px!important;
+    padding:7px 10px!important;
+    border-radius:9px!important;
+  }
+  body.talk-immersive #talkPage .word-card-label{
+    font-size:8px!important;margin-bottom:2px!important;
+  }
+  body.talk-immersive #talkPage .word-card-nl{font-size:13px!important}
+  body.talk-immersive #talkPage .word-card-en{font-size:11px!important}
+  body.talk-immersive #talkPage .live-exchange-card{
+    padding:10px!important;margin-bottom:6px!important;
+  }
+  body.talk-immersive #talkPage .live-exchange-card .dutch-line{
+    font-size:clamp(15px,3.8vw,18px)!important;
+  }
+  body.talk-immersive #talkPage .live-exchange-card .english-line{
+    font-size:clamp(12px,3vw,14px)!important;
+  }
+  body.talk-immersive #talkPage .talk-answer-dock:not([hidden]){
+    margin-bottom:5px!important;padding:7px 9px!important;
+  }
+  body.talk-immersive #talkPage .talk-answer-dock .quick-reply-button{
+    min-height:60px!important;padding:6px 4px!important;
+  }
+  body.talk-immersive #talkPage .talk-answer-dock .quick-reply-target{font-size:12px!important}
+  body.talk-immersive #talkPage .talk-answer-dock .quick-reply-english{font-size:10px!important}
+  body.talk-immersive #talkPage .controls{
+    padding:4px 0 calc(6px + env(safe-area-inset-bottom))!important;
+    gap:3px!important;
+  }
+}
+@media(max-width:760px){
+  /* When the iPhone keyboard is visible, reserve space for typing. */
+  body.talk-immersive.ecl-keyboard-visible #talkPage.workspace,
+  body.talk-immersive.type-input-mode.ecl-keyboard-visible #talkPage.workspace{
+    height:var(--ecl-live-visible-height,100dvh)!important;
+    max-height:var(--ecl-live-visible-height,100dvh)!important;
+    grid-template-rows:minmax(0,34%) minmax(0,66%)!important;
+  }
+}
