@@ -316,8 +316,10 @@ export function registerStudyRoutes(app) {
               (attempt?' The previous response was too short or malformed: write 300–360 full words, with complete sentences.':''),
               JSON.stringify(sourceMaterial),4400);
             const rows=(Array.isArray(data.sentences)?data.sentences:[])
-              .map(row=>({target:safeText(typeof row==='string'?row:row?.target,430),english:''}))
-              .filter(row=>row.target&&/[.!?。！？]$/.test(row.target));
+              .map(row=>safeText(typeof row==='string'?row:row?.target,430))
+              .filter(sentence=>sentence.length>=20)
+              .map(sentence=>({target:/[.!?。！？][”"'’»)]?$/.test(sentence)
+                ?sentence:sentence+'.',english:''}));
             const count=rows.map(r=>r.target).join(' ').split(/\s+/).filter(Boolean).length;
             if(count<250||rows.length<15)throw new Error('Only '+count+' words / '+rows.length+' sentences');
             const words=(Array.isArray(data.words)?data.words:[]).slice(0,10)
