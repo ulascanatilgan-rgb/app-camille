@@ -6134,3 +6134,245 @@ html,body,.app-shell{background:var(--ecl-canvas) !important;color:var(--ecl-ink
   #clipsPage .clip-caption-panel .clip-english-subtitles{font-size:12px!important}
   #clipsPage .clip-sync-controls{flex-wrap:wrap}
 }
+
+
+/* ECL v61 — Focus Talk overlay. Start => immersive teaching surface;
+   X => stop live Anam/OpenAI session and return to the ordinary app menu.
+   Existing avatar/translation/modes remain their original DOM elements. */
+.talk-immersive-header[hidden]{display:none!important}
+body.talk-immersive{overflow:hidden!important;overscroll-behavior:none}
+body.talk-immersive:before{
+  content:"";position:fixed;inset:0;
+  z-index:970;background:rgba(25,38,54,.27);
+  -webkit-backdrop-filter:blur(15px);backdrop-filter:blur(15px);
+  pointer-events:auto;
+}
+body.talk-immersive #talkPage.workspace,
+body.talk-immersive.type-input-mode #talkPage.workspace{
+  position:fixed!important;
+  inset:0!important;
+  z-index:980!important;
+  width:100%!important;
+  height:100dvh!important;
+  min-height:0!important;max-height:none!important;
+  display:grid!important;
+  grid-template-columns:minmax(270px,41%) minmax(0,59%)!important;
+  grid-template-rows:minmax(0,1fr)!important;
+  grid-template-areas:"avatar conversation"!important;
+  overflow:hidden!important;
+  padding:0!important;margin:0!important;
+  background:rgba(247,249,252,.97)!important;
+  box-shadow:0 0 65px rgba(10,25,48,.22);
+}
+body.talk-immersive #talkImmersiveHeader{
+  display:flex!important;align-items:center;justify-content:space-between;
+  position:absolute!important;top:0;left:0;right:0;z-index:30;
+  height:58px;min-height:58px;
+  padding:6px max(18px,env(safe-area-inset-right));
+  background:rgba(248,250,252,.76)!important;
+  -webkit-backdrop-filter:blur(22px);backdrop-filter:blur(22px);
+  border-bottom:1px solid rgba(193,207,223,.64);
+  color:#2e4257;
+}
+body.talk-immersive .talk-immersive-heading{
+  display:flex;align-items:center;gap:10px;
+  font:650 13px/1.4 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+body.talk-immersive .talk-live-indicator{
+  width:8px;height:8px;background:#259b67;
+  border-radius:50%;box-shadow:0 0 0 4px rgba(37,155,103,.1);
+}
+body.talk-immersive .talk-immersive-close{
+  width:42px;height:42px;min-width:42px;
+  display:grid;place-items:center;
+  background:rgba(232,238,246,.92);
+  border:1px solid rgba(175,193,210,.8);
+  border-radius:12px;color:#2d3c4d;
+  font:500 30px/1 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  cursor:pointer;
+}
+body.talk-immersive .talk-immersive-close:hover{background:#e2e9f2}
+body.talk-immersive .talk-immersive-close:focus-visible{
+  outline:3px solid #8fb5dd;outline-offset:2px
+}
+body.talk-immersive #talkPage .avatar-column{
+  grid-area:avatar!important;
+  height:100%!important;min-height:0!important;
+  padding:69px 12px 12px 13px!important;
+  overflow:hidden!important;
+  background:#edf2f7!important;
+  border-right:1px solid #dce5ee!important;
+}
+body.talk-immersive #talkPage .portrait-wrap{
+  width:100%!important;height:100%!important;min-height:0!important;
+  border-radius:18px!important;overflow:hidden!important;
+}
+body.talk-immersive #talkPage .conversation-column{
+  grid-area:conversation!important;
+  display:flex!important;flex-direction:column!important;
+  height:100%!important;min-height:0!important;
+  padding:70px clamp(13px,2vw,28px) 0!important;
+  overflow:hidden!important;
+  background:rgba(249,250,252,.98)!important;
+  border:0!important;
+}
+body.talk-immersive #talkPage .conversation-head,
+body.talk-immersive #talkPage .difficulty-control,
+body.talk-immersive #talkPage .action-row,
+body.talk-immersive #talkPage #modeHint,
+body.talk-immersive #talkPage #sessionHistoryButton,
+body.talk-immersive #talkPage .messages{
+  display:none!important;
+}
+body.talk-immersive #talkPage .live-exchange-card{
+  flex:1 1 auto!important;
+  width:100%!important;
+  height:auto!important;min-height:0!important;max-height:none!important;
+  margin:0 0 10px!important;
+  overflow-x:hidden!important;overflow-y:auto!important;
+  padding:clamp(14px,2vw,23px)!important;
+  background:rgba(255,255,255,.95)!important;
+  border:1px solid #dbe4ed!important;border-radius:17px!important;
+  box-shadow:0 7px 23px rgba(31,50,73,.06)!important;
+}
+body.talk-immersive #talkPage .live-exchange-toolbar{
+  position:sticky;top:0;z-index:3;
+  background:rgba(255,255,255,.96);
+  padding-bottom:11px;margin-bottom:12px!important;
+}
+body.talk-immersive #talkPage .controls{
+  flex:0 0 auto!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  grid-template-areas:"modes" "choices" "composer"!important;
+  grid-template-rows:auto auto auto!important;
+  align-items:stretch!important;justify-items:stretch!important;
+  width:100%!important;height:auto!important;min-height:0!important;
+  max-height:min(40dvh,285px)!important;
+  overflow-y:auto!important;
+  margin:0!important;
+  padding:12px 2px calc(13px + env(safe-area-inset-bottom))!important;
+  gap:9px!important;
+  background:rgba(248,250,252,.92)!important;
+  -webkit-backdrop-filter:blur(14px);
+  backdrop-filter:blur(14px);
+  border-top:1px solid #dce4ee!important;
+  box-shadow:0 -8px 18px rgba(35,55,75,.025)!important;
+}
+body.talk-immersive #talkPage .interaction-mode-bar{
+  grid-area:modes!important;
+  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  width:100%!important;max-width:none!important;
+  position:static!important;margin:0!important;padding:0!important;
+  gap:9px!important;transform:none!important;
+}
+body.talk-immersive #talkPage .interaction-mode-button{
+  min-height:42px!important;height:42px!important;
+  font-size:13px!important;font-weight:700!important;
+  border-radius:11px!important;padding:8px 10px!important;
+}
+body.talk-immersive #talkPage #quickReplyBar:not([hidden]){
+  grid-area:choices!important;display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  position:static!important;max-height:none!important;
+  width:100%!important;margin:0!important;padding:0!important;
+  border:0!important;gap:9px!important;background:transparent!important;
+}
+body.talk-immersive #talkPage #quickReplyBar[hidden]{display:none!important}
+body.talk-immersive #talkPage .quick-reply-button{
+  min-width:0!important;max-width:none!important;
+  width:100%!important;min-height:65px!important;
+  padding:10px 8px!important;
+  border:1px solid #c7d5e2!important;border-radius:12px!important;
+  background:#edf3f9!important;
+  color:#25384b!important;
+  text-align:center!important;justify-content:center!important;
+}
+body.talk-immersive #talkPage .quick-reply-button:hover{background:#dfeaf6!important}
+body.talk-immersive #talkPage .quick-reply-target{
+  font-size:13px!important;font-weight:730!important;line-height:1.4!important;
+}
+body.talk-immersive #talkPage .quick-reply-english{
+  font-size:11px!important;line-height:1.35!important;color:#60758b!important;
+}
+body.talk-immersive #talkPage #typeComposer:not([hidden]){
+  grid-area:composer!important;
+  display:flex!important;position:static!important;
+  transform:none!important;inset:auto!important;
+  width:100%!important;margin:0!important;padding:6px!important;
+  border-radius:12px!important;
+  background:#fff!important;border:1px solid #cfdae6!important;
+}
+body.talk-immersive #talkPage #typeComposer[hidden]{display:none!important}
+body.talk-immersive #talkPage #typeInput{
+  min-width:0!important;flex:1 1 auto!important;
+  font-size:15px!important;
+}
+body.talk-immersive #talkPage .tip-panel{
+  z-index:4!important;
+  background:#f6f9fc!important;border-color:#d3dfec!important;
+}
+body.talk-immersive #talkPage .live-speaker{min-height:0}
+@media(max-width:760px){
+  body.talk-immersive #talkPage.workspace,
+  body.talk-immersive.type-input-mode #talkPage.workspace{
+    grid-template-columns:minmax(0,1fr)!important;
+    grid-template-rows:minmax(130px,33%) minmax(0,67%)!important;
+    grid-template-areas:"avatar" "conversation"!important;
+  }
+  body.talk-immersive #talkImmersiveHeader{
+    height:53px;min-height:53px;
+    padding:5px calc(10px + env(safe-area-inset-right))
+      5px calc(13px + env(safe-area-inset-left));
+  }
+  body.talk-immersive #talkPage .avatar-column{
+    padding:58px 8px 3px!important;
+    border-right:0!important;
+    background:#f0f4f9!important;
+  }
+  body.talk-immersive #talkPage .portrait-wrap{
+    border-radius:12px!important;
+  }
+  body.talk-immersive #talkPage .conversation-column{
+    padding:8px 10px 0!important;
+    border-top:1px solid #dfe6ee!important;
+  }
+  body.talk-immersive #talkPage .live-exchange-card{
+    flex:1 1 auto!important;
+    margin:0 0 7px!important;
+    padding:12px!important;
+    border-radius:12px!important;
+    min-height:0!important;
+  }
+  body.talk-immersive #talkPage .live-exchange-toolbar{margin-bottom:8px!important}
+  body.talk-immersive #talkPage .controls{
+    flex:0 0 auto!important;
+    max-height:45dvh!important;
+    grid-template-areas:"modes" "choices" "composer"!important;
+    padding:8px 0 calc(9px + env(safe-area-inset-bottom))!important;
+    gap:7px!important;margin:0!important;
+  }
+  body.talk-immersive #talkPage .interaction-mode-button{
+    height:42px!important;min-height:42px!important;
+    font-size:12px!important;
+  }
+  body.talk-immersive #talkPage .quick-reply-button{
+    min-height:67px!important;padding:8px 4px!important;
+  }
+  body.talk-immersive #talkPage .quick-reply-target{font-size:12px!important}
+  body.talk-immersive #talkPage .quick-reply-english{font-size:10px!important}
+}
+@media(max-width:760px){
+  body.talk-immersive.type-input-mode #talkPage.workspace{
+    height:var(--ecl-live-visible-height,100dvh)!important;
+    max-height:var(--ecl-live-visible-height,100dvh)!important;
+    grid-template-rows:minmax(80px,23%) minmax(0,77%)!important;
+  }
+}
+@media(max-height:570px) and (max-width:760px){
+  body.talk-immersive #talkPage.workspace{
+    grid-template-rows:minmax(85px,25%) minmax(0,75%)!important;
+  }
+  body.talk-immersive #talkPage .avatar-column{padding-top:54px!important;}
+  body.talk-immersive #talkPage .live-exchange-card{padding:9px!important}
+}
