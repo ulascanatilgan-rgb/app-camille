@@ -312,8 +312,8 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   function openWordLibrary(which) {
     stopNews();
     const dialog=$('studyWordsDialog'),lang=getLanguage(),isSlide=which==='slide';
-    info('studyWordsTitle',isSlide?'Slide Words':'News Words');
-    info('studyWordsEyebrow',(isSlide?'TALK WORDS':'NEWS VOCABULARY')+' · '+lang.toUpperCase());
+    info('studyWordsTitle',isSlide?'Slide Words':'Article Words');
+    info('studyWordsEyebrow',(isSlide?'TALK WORDS':'ARTICLE VOCABULARY')+' · '+lang.toUpperCase());
     const filters=$('studyWordsFilters');filters.replaceChildren();
     const options=isSlide?['All Words','Wrong Words','Correct Words']:['All Words'];
     const records=isSlide?validWords():newsWords(),results=score(),list=$('studyWordsList');
@@ -498,15 +498,15 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     try{
       const resp=await fetch('/study-news?language='+encodeURIComponent(lang)+(force?'&refresh=1':''),{cache:'no-store',signal:AbortSignal.timeout(110000)});
       const data=await resp.json();
-      if(!resp.ok)throw new Error(data?.error||'News unavailable');
-      if(!Array.isArray(data.stories)||data.stories.length===0)throw new Error('No articles in news update');
+      if(!resp.ok)throw new Error(data?.error||'Articles unavailable');
+      if(!Array.isArray(data.stories)||data.stories.length===0)throw new Error('No articles in update');
       store(key('news.daily.magazine.v6',lang),data);
       if(lang===getLanguage()){
         saveNewsArchive(data.stories);
         newsData=data;newsLang=lang;newsReaderIndex=-1;archiveStory=null;renderNews();
       }
     }catch(error){
-      info('newsStatus',(newsData?.stories?.length?'Could not refresh; saved stories remain available. ':'')+String(error.message||'News update could not finish'));
+      info('newsStatus',(newsData?.stories?.length?'Could not refresh; saved stories remain available. ':'')+String(error.message||'Article update could not finish'));
     }
     finally{$('newsUpdateButton').disabled=false;}
   }
@@ -521,7 +521,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     list.replaceChildren();
     const history=newsArchive();
     if(!history.length){
-      const empty=document.createElement('p');empty.textContent='No past news yet. Tap Update to save your first articles.';
+      const empty=document.createElement('p');empty.textContent='No saved articles yet. Tap Update to prepare your first articles.';
       list.append(empty);
     }
     history.forEach(story=>{
@@ -548,7 +548,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     const article=currentArticle();if(!article)return;
     wordLookupSeq++;
     info('newsStatus',archiveStory
-      ? 'News History · Saved article · Replay any sentence or select words'
+      ? 'Article History · Saved reading · Replay or select words'
       : 'Today\'s lesson · Select a sentence or press Run');
     $('newsStoryList').hidden=true;
     const reader=$('newsReader');reader.hidden=false;
@@ -835,7 +835,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     if(activeAudioId!==id||!newsAudio.src){
       let url=newsAudioCache.get(id);
       if(!url){
-        info('newsStatus','Preparing natural AI newsreader voice…');
+        info('newsStatus','Preparing a natural article narration…');
         const response=await fetch('/study-news-audio',{
           method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({storyId:article.id,language:getLanguage(),text:fullText})
@@ -885,7 +885,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       $('newsRunButton').textContent='▶ Continue';
       return;
     }
-    info('newsStatus','Playing a natural AI-generated voice · Tap any word for explanation');
+    info('newsStatus','Natural article narration · Tap any word for explanation');
   }
   function startNews(){
     const story=currentArticle();if(!story)return;
