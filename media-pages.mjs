@@ -380,43 +380,91 @@ export function initMediaPages({getLanguage,getTalkWords}){
     return work;
   }
   async function selectClip(clip){
+    if(!clip)return;
     cleanClipVideo();
     activeClip=clip;
     $('clipPlayback').hidden=false;
-    status('clipPlaybackTitle',clip.title+' · '+(NAMES[clip.persona]||'Emma'));
-    status('clipPlaybackMeta',asDate(clip.createdAt)+' · '+clip.language.toUpperCase()+' · saved on this device');
+    const number=clip.number?'Clip '+clip.number:'Saved clip';
+    status('clipPlaybackTitle',number+' · '+clip.title);
+    status('clipPlaybackMeta',(NAMES[clip.persona]||'Avatar')+' · '+asDate(clip.createdAt)+
+      ' · '+clip.language.toUpperCase()+' · Saved in My Clips on this device');
     clipUrl=URL.createObjectURL(clip.blob);
     $('clipSavedVideo').src=clipUrl;
-    status('clipWordDetail','Tap any word to pause and see its English meaning.');
+    status('clipWordDetail','Tap a script word to pause the video and see its English meaning.');
     renderTokens($('clipTranscript'),clip.text,dictionary(),-1,showClipWord);
+    captionSentenceIndex=-1;captionWordIndex=-2;
+    status('clipSyncStatus',clip.aligned&&clip.wordTimes?.length?
+      'Synchronized from the recorded voice · Replaying costs no Anam credits':
+      'Preparing accurate audio timing and English sentence subtitles…');
+    $('clipSyncButton').disabled=false;
+    $('clipSyncButton').onclick=()=>void syncClipSubtitles(activeClip,{force:true});
     updateSubtitles();
     $('clipDownloadButton').onclick=()=>{
       const a=document.createElement('a');a.href=clipUrl;
-      a.download='ecl-'+clip.persona+'-'+clip.createdAt.slice(0,10)+(clip.blob.type.includes('mp4')?'.mp4':'.webm');
+      a.download='ecl-clip-'+(clip.number||'saved')+'-'+clip.persona+'-'+
+        clip.createdAt.slice(0,10)+(clip.blob.type.includes('mp4')?'.mp4':'.webm');
       a.click();
     };
+    // Previously saved videos also receive the same audio-based alignment,
+    // without re-recording their content or changing their stored script.
+    if(!clip.aligned||!clip.wordTimes?.length||
+       (clip.language!=='en'&&!clip.captionSentences?.some(x=>x.english)))
+      void syncClipSubtitles(clip);
   }
   async function renderClips(){
-    const lang=getLanguage(),list=$('clipLibrary');list.replaceChildren();
-    const clips=(await allClips()).filter(c=>c.language===lang)
-      .sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
-    status('clipLibraryCount',clips.length+' saved clips');
+    const lang=getLanguage(),list=$('clipLibrary');
+    list.replaceChildren();
+    const all=await allClips();
+    let highest=all.reduce((max,c)=>Math.max(max,Number(c.number)||0),0);
+    // Stable chronological Clip 1, Clip 2, etc., including legacy videos.
+    // Never reuse a number after deleting an existing saved Clip.
+    for(const clip of [...all].sort((a,b)=>a.createdAt.localeCompare(b.createdAt))){
+      if(Number(clip.number)>0)continue;
+      clip.number=++highest;
+      await putClip(clip);
+    }
+    const clips=all.filter(c=>c.language===lang)
+      .sort((a,b)=>Number(a.number)-Number(b.number));
+    status('clipLibraryCount',clips.length+' saved clips · Clips folder');
     if(!clips.length){
-      list.textContent='Your saved Anam videos will appear here. Replay does not open a new session.';
+      list.textContent='No saved clips in '+langName()+'. Create your first Clip with Mix → Prepare → Run.';
       $('clipPlayback').hidden=true;activeClip=null;cleanClipVideo();return;
     }
     for(const clip of clips){
       const row=document.createElement('div');row.className='media-library-row';
-      const b=document.createElement('button');b.type='button';b.className='media-library-item';
+      const b=document.createElement('button');b.type='button';
+      b.className='media-library-item clip-folder-item'+(activeClip?.id===clip.id?' clip-folder-active':'');
+      b.setAttribute('aria-label','Open Clip '+clip.number+': '+clip.title);
+      const number=document.createElement('span');number.className='clip-file-number';
+      number.textContent='Clip '+clip.number;
       const title=document.createElement('strong');title.textContent=clip.title;
-      const meta=document.createElement('small');meta.textContent=(NAMES[clip.persona]||'Avatar')+' · '+asDate(clip.createdAt)+' · '+Math.round(clip.duration||60)+'s';
-      b.append(title,meta);b.addEventListener('click',()=>selectClip(clip));
-      const del=document.createElement('button');del.type='button';del.className='media-delete';del.textContent='Delete';
-      del.setAttribute('aria-label','Delete '+clip.title);
-      del.addEventListener('click',async()=>{if(!confirm('Delete this saved video?'))return;await removeClip(clip.id);await renderClips()});
+      const meta=document.createElement('small');
+      meta.textContent=(NAMES[clip.persona]||'Avatar')+' · '+asDate(clip.createdAt)+
+        ' · '+Math.round(clip.duration||60)+'s';
+      b.append(number,title,meta);
+      b.addEventListener('click',()=>{
+        for(const item of list.querySelectorAll('.clip-folder-active'))
+          item.classList.remove('clip-folder-active');
+        b.classList.add('clip-folder-active');
+        void selectClip(clip);
+      });
+      const del=document.createElement('button');del.type='button';
+      del.className='media-delete';del.textContent='Delete';
+      del.setAttribute('aria-label','Delete Clip '+clip.number);
+      del.addEventListener('click',async()=>{
+        if(!confirm('Delete Clip '+clip.number+' permanently from this device?'))return;
+        await removeClip(clip.id);
+        if(activeClip?.id===clip.id)activeClip=null;
+        await renderClips();
+      });
       row.append(b,del);list.append(row);
     }
-    if(!activeClip||activeClip.language!==lang||!clips.some(x=>x.id===activeClip.id))await selectClip(clips[0]);
+    const requested=clips.find(x=>x.id===activeClip?.id)||clips[clips.length-1];
+    await selectClip(requested);
+    for(const b of list.querySelectorAll('.clip-folder-item')){
+      b.classList.toggle('clip-folder-active',
+        b.getAttribute('aria-label')==='Open Clip '+requested.number+': '+requested.title);
+    }
   }
   function stopStream(){
     const previous=client;client=null;
@@ -529,7 +577,9 @@ export function initMediaPages({getLanguage,getTalkWords}){
       if(!recorded.length)throw new Error('No recorded video data was received.');
       const blob=new Blob(recorded,{type:r.mimeType||type});
       if(blob.size<10000)throw new Error('The recording was incomplete. Please retry.');
-      const clip={id:'clip-'+Date.now(),createdAt:new Date().toISOString(),
+      const allSaved=await allClips();
+      const nextNumber=allSaved.reduce((n,c)=>Math.max(n,Number(c.number)||0),0)+1;
+      const clip={id:'clip-'+Date.now(),number:nextNumber,createdAt:new Date().toISOString(),
         language:lang,persona,title:data.title,text:script,theme:data.theme,
         usedWords:data.usedWords,selectedWords:data.selectedWords,blob,duration:(Date.now()-liveSince)/1000};
       await putClip(clip);
@@ -568,6 +618,12 @@ export function initMediaPages({getLanguage,getTalkWords}){
   $('clipSavedVideo').addEventListener('timeupdate',updateSubtitles);
   $('clipSavedVideo').addEventListener('loadedmetadata',updateSubtitles);
   $('clipSavedVideo').addEventListener('seeked',updateSubtitles);
+  $('clipSavedVideo').addEventListener('play',animateClipCaptions);
+  $('clipSavedVideo').addEventListener('pause',()=>{
+    if(captionFrame){cancelAnimationFrame(captionFrame);captionFrame=0;}
+    updateSubtitles();
+  });
+  $('clipSavedVideo').addEventListener('ended',updateSubtitles);
   window.addEventListener('pagehide',()=>{void cancelClip();cleanClipVideo()});
   function onPage(next){
     if(current==='clips'&&next!=='clips')void cancelClip();
