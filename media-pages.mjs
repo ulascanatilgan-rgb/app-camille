@@ -138,7 +138,9 @@ export function initMediaPages({getLanguage,getTalkWords}){
     chosen.append(fragment);
     $('clipMixButton').disabled=!universe.length||preparingClip||saving;
     $('clipPrepareButton').disabled=!selectedClipWords.length||preparingClip||saving;
-    $('clipRunButton').disabled=!clipDraft?.text||preparingClip||saving;
+    $('clipRunButton').disabled=!clipDraft?.text||clipDraft.language!==getLanguage()||
+      clipDraft.languageValidated!==true||clipDraft.validationVersion!==2||
+      preparingClip||saving;
     $('clipPrepareButton').textContent=preparingClip?'Preparing…':clipDraft?'Prepare · Another script':'Prepare · Script';
     $('clipPreparedPanel').hidden=!clipDraft?.text;
     if(clipDraft?.text){
@@ -153,10 +155,16 @@ export function initMediaPages({getLanguage,getTalkWords}){
       known.get(wordKey(w.word))||(w?.word&&w?.english?w:null)).filter(Boolean).slice(0,20);
     const draft=read('clip.draft',lang,null);
     const signature=words=>words.map(w=>wordKey(w.word)).join('|');
-    clipDraft=draft?.text&&signature(draft.selectedWords||[])===signature(selectedClipWords)?draft:null;
+    // Keep legacy drafts safely in localStorage, but never run a draft
+    // that predates the strict server language validation. Prepare again.
+    clipDraft=draft?.text&&draft.language===lang&&
+      draft.languageValidated===true&&draft.validationVersion===2&&
+      signature(draft.selectedWords||[])===signature(selectedClipWords)?draft:null;
     if(clipDraft?.theme&&[...$('clipTheme').options].some(o=>o.value===clipDraft.theme))
       $('clipTheme').value=clipDraft.theme;
     showInventory();renderClipSelection();
+    if(draft?.text&&!clipDraft)
+      status('clipStatus','Previous draft is not language-verified. Your words are safe. Press Prepare to write a '+langName()+'-only script.');
     if(!$('clipWordsPanel').hidden)renderClipWordUniverse();
   }
   function invalidateClipDraft(){
@@ -191,7 +199,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
     const lang=getLanguage(),theme=$('clipTheme').value,words=selectedClipWords.map(w=>({...w}));
     const seq=++prepareSequence;
     preparingClip=true;renderClipSelection();
-    status('clipStatus','Writing a 1-minute script with your '+words.length+' selected words…');
+    status('clipStatus','Writing and checking a '+langName()+'-only script…');
     try{
       const response=await fetch('/study-media-script',{
         method:'POST',headers:{'Content-Type':'application/json'},
@@ -205,6 +213,9 @@ export function initMediaPages({getLanguage,getTalkWords}){
       if(!response.ok)throw new Error(data.error||'Could not prepare the clip script');
       if(lang!==getLanguage()||seq!==prepareSequence)return;
       if(!data.text?.trim())throw new Error('The generated script was empty.');
+      if(data.kind!=='clip'||data.language!==lang||
+         data.languageValidated!==true||data.validationVersion!==2)
+        throw new Error('This script did not pass the selected-language check. Nothing was saved. Press Prepare again.');
       clipDraft={...data,theme,selectedWords:words,preparedAt:new Date().toISOString()};
       if(!write('clip.draft',lang,clipDraft))
         status('clipStatus','Script ready, but your browser could not save the draft locally.');
@@ -649,8 +660,9 @@ export function initMediaPages({getLanguage,getTalkWords}){
     if(saving||preparingClip)return;
     const lang=getLanguage(),persona=$('clipPersona').value;
     const data=clipDraft;
-    if(!data?.text||!selectedClipWords.length){
-      status('clipStatus','First press Mix, then Prepare. Run only records the approved script.');return;
+    if(!data?.text||!selectedClipWords.length||data.language!==lang||
+       data.languageValidated!==true||data.validationVersion!==2){
+      status('clipStatus','This script is not verified as '+langName()+' only. Press Prepare again before Run.');return;
     }
     if(data.theme!==$('clipTheme').value){
       status('clipStatus','Topic changed. Press Prepare again before Run.');return;
