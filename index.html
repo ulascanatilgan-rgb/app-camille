@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=ecl-20261027" />
   <link rel="icon" type="image/png" href="/favicon-64.png?v=ecl-20261027" />
   <title>ECL — Emma, Charlotte &amp; Louis</title>
-  <link rel="stylesheet" href="/styles.css?v=ecl-clips-sync-v60-20261030" />
+  <link rel="stylesheet" href="/styles.css?v=ecl-immersive-talk-v61-20261030" />
 </head>
 <body>
   <main class="app-shell">
@@ -89,6 +89,13 @@
     </div>
 
     <section id="talkPage" class="workspace">
+      <div id="talkImmersiveHeader" class="talk-immersive-header" hidden>
+        <div class="talk-immersive-heading">
+          <span class="talk-live-indicator" aria-hidden="true"></span>
+          <span id="talkImmersiveTitle">Live conversation</span>
+        </div>
+        <button id="talkImmersiveClose" class="talk-immersive-close" type="button" aria-label="End conversation and return to main menu" title="End conversation and return to main menu">×</button>
+      </div>
       <section id="avatarColumn" class="avatar-column" aria-label="Selected Anam live avatar">
         <div id="portraitWrap" class="portrait-wrap">
           <div id="avatarPlaceholder" class="avatar-placeholder">
@@ -158,7 +165,7 @@
             </div>
           </div>
 
-          <div id="quickReplyBar" class="quick-reply-bar" hidden aria-label="Quick reply choices"></div>
+
         </section>
 
         <section id="messages" class="messages inline-history-store" hidden aria-hidden="true"></section>
@@ -219,6 +226,7 @@
             <button id="typeModeButton" class="interaction-mode-button" type="button" data-mode="type" aria-pressed="false">Type</button>
             <button id="buttonModeButton" class="interaction-mode-button" type="button" data-mode="button" aria-pressed="false">Button</button>
           </div>
+          <div id="quickReplyBar" class="quick-reply-bar" hidden aria-label="Quick reply choices"></div>
 
           <button id="sessionHistoryButton" class="session-history-button" type="button">Recent Talks</button>
         </section>
@@ -509,6 +517,6 @@
     </form>
   </dialog>
 
-  <script src="/app.bundle.js?v=ecl-clips-sync-v60-20261030" type="module"></script>
+  <script src="/app.bundle.js?v=ecl-immersive-talk-v61-20261030" type="module"></script>
 </body>
 </html>
