@@ -1,4 +1,4 @@
-const CACHE = 'ecl-clips-sync-v60';
+const CACHE = 'ecl-immersive-talk-v61';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
