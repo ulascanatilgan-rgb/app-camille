@@ -21,6 +21,7 @@ async function withStore(mode,work){
   })}finally{db.close()}
 }
 const allClips=()=>withStore('readonly',os=>os.getAll());
+const getClip=id=>withStore('readonly',os=>os.get(id));
 const putClip=clip=>withStore('readwrite',os=>os.put(clip));
 const removeClip=id=>withStore('readwrite',os=>os.delete(id));
 const wordKey=w=>String(w||'').normalize('NFKC').trim().toLocaleLowerCase();
@@ -383,6 +384,11 @@ export function initMediaPages({getLanguage,getTalkWords}){
   }
   async function selectClip(clip){
     if(!clip)return;
+    const selection=++captionRequestId;
+    // Reload metadata after subtitle alignment was saved. The folder button
+    // may still hold an older copy from the previous render.
+    clip=await getClip(clip.id)||clip;
+    if(selection!==captionRequestId)return;
     cleanClipVideo();
     activeClip=clip;
     $('clipPlayback').hidden=false;
