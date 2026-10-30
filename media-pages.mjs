@@ -671,6 +671,17 @@ export function initMediaPages({getLanguage,getTalkWords}){
     }
     if(!window.MediaRecorder){status('clipStatus','Recording is not supported on this browser. Use updated Safari or Chrome.');return}
     saving=true;let seq=++liveSequence,recorded=[];
+    // Start WebAudio from the Run tap (iOS may otherwise suspend analyzers).
+    // It only MEASURES remote speech: it never changes or replays the audio.
+    let soundContext=null,speechAnalyser=null,soundSamples=null,soundStarted=false;
+    let lastSoundAt=0,personaDoneAt=0,personaSpoken=false;
+    try{
+      const Context=window.AudioContext||window.webkitAudioContext;
+      if(Context){
+        soundContext=new Context();
+        void soundContext.resume?.().catch?.(()=>{});
+      }
+    }catch(error){console.warn('Voice monitor unavailable:',error)}
     renderClipSelection();
     $('clipCancelButton').hidden=false;
     status('clipScript',data.text);
@@ -693,6 +704,13 @@ export function initMediaPages({getLanguage,getTalkWords}){
       client.addListener(AnamEvent.AUDIO_STREAM_STARTED,stream=>{
         remoteAudio=stream;notifyTracks();
       });
+      if(AnamEvent.MESSAGE_STREAM_EVENT_RECEIVED){
+        client.addListener(AnamEvent.MESSAGE_STREAM_EVENT_RECEIVED,event=>{
+          if(event?.role!=='persona')return;
+          if(event.content)personaSpoken=true;
+          if(event.endOfSpeech)personaDoneAt=Date.now();
+        });
+      }
       $('clipLivePanel').hidden=false;
       await client.streamToVideoElement('clipLiveVideo');
       if(seq!==liveSequence||lang!==getLanguage()){stopStream();return}
@@ -717,6 +735,19 @@ export function initMediaPages({getLanguage,getTalkWords}){
       if(!audioTracks.length||!videoTracks.length)
         throw new Error('Anam did not send both audio and video tracks.');
       const combined=new MediaStream([...videoTracks,...audioTracks]);
+      if(soundContext){
+        try{
+          const source=soundContext.createMediaStreamSource(remoteAudio);
+          speechAnalyser=soundContext.createAnalyser();
+          speechAnalyser.fftSize=1024;
+          soundSamples=new Uint8Array(speechAnalyser.fftSize);
+          source.connect(speechAnalyser);
+          // No connection to speakers: the video itself already plays audio.
+        }catch(error){
+          console.warn('Clip speech energy unavailable:',error);
+          speechAnalyser=null;
+        }
+      }
       const video=$('clipLiveVideo');
       video.srcObject=combined;
       // An explicit play attempt is helpful when Safari changes tracks after
@@ -735,26 +766,76 @@ export function initMediaPages({getLanguage,getTalkWords}){
       if(!r){r=new MediaRecorder(combined);type=r.mimeType||'video/webm'}
       recorder=r;
       r.addEventListener('dataavailable',e=>{if(e.data.size)recorded.push(e.data)});
-      const script=data.text,wordCount=script.split(/\s+/).length;
-      const targetMs=Math.max(54000,Math.min(80000,wordCount*570+3500));
+      const script=data.text;
+      const wordCount=clipTokens(script).length;
+      // Deliver at a learner-friendly ~80–115 wpm. The avatar may have a
+      // fixed built-in TTS voice speed, so sentence spacing is deliberate and
+      // the total narration is spread calmly rather than rushed in 30s.
+      const millisPerWord=Math.max(500,Math.min(760,56000/Math.max(1,wordCount)));
+      const phrases=clipSentences(script).flatMap(sentence=>{
+        const tokens=clipTokens(sentence.text);
+        const chunks=[];
+        for(let offset=0;offset<tokens.length;offset+=9)
+          chunks.push(tokens.slice(offset,offset+9).join(' '));
+        return chunks;
+      }).filter(Boolean);
+      if(!phrases.length)throw new Error('Empty clip script.');
+      const waitDuringClip=ms=>new Promise((resolve,reject)=>{
+        const timer=setTimeout(()=>{abortWait=null;resolve()},Math.max(0,ms));
+        abortWait=()=>{clearTimeout(timer);abortWait=null;reject(new Error('Clip cancelled'))};
+      });
       liveSince=Date.now();
       r.start(1000);
-      status('clipStatus','Recording '+NAMES[persona]+' speaking… about 1 minute.');
+      status('clipStatus','Recording · speaking slowly');
       const stream=client.createTalkMessageStream();
-      // Dutch/Flemish and French Clips must use the SAME complete-message
-      // protocol as the working Talk section: a non-final text chunk, then
-      // endMessage(). Passing true without closing the message could leave
-      // the avatar silent throughout the recording.
-      await stream.streamMessageChunk(script,false);
+      let emittedWords=0;
+      for(let i=0;i<phrases.length;i++){
+        if(seq!==liveSequence||lang!==getLanguage())throw new Error('Clip cancelled');
+        // Each short segment is transmitted separately, preserving the exact
+        // approved script. This avoids one long TTS burst at full speed.
+        await stream.streamMessageChunk(phrases[i],false);
+        emittedWords+=clipTokens(phrases[i]).length;
+        status('clipStatus','Speaking · '+Math.min(100,Math.round(emittedWords/wordCount*100))+'%');
+        if(i<phrases.length-1)
+          await waitDuringClip(clipTokens(phrases[i]).length*millisPerWord);
+      }
       await stream.endMessage();
+      const finalSentAt=Date.now();
+      // Stop at the end of the ACTUAL voice, not a fixed 60/80-second timer.
+      // Prefer observed audio silence. When WebAudio is unavailable in Safari,
+      // use the avatar end-of-speech event or a short fallback tail.
       await new Promise((resolve,reject)=>{
-        abortWait=()=>{clearInterval(clock);clock=null;reject(new Error('Clip cancelled'));};
+        abortWait=()=>{clearInterval(clock);clock=null;abortWait=null;
+          reject(new Error('Clip cancelled'))};
         clock=setInterval(()=>{
-          if(seq!==liveSequence){const abort=abortWait;abortWait=null;if(abort)abort();return}
-          const elapsed=Date.now()-liveSince;
-          status('clipStatus','Recording · '+Math.min(100,Math.round(elapsed/targetMs*100))+'%');
-          if(elapsed>=targetMs){clearInterval(clock);clock=null;abortWait=null;resolve()}
-        },300);
+          if(seq!==liveSequence||lang!==getLanguage()){
+            const cancel=abortWait;abortWait=null;if(cancel)cancel();return;
+          }
+          const now=Date.now();
+          if(speechAnalyser&&soundSamples&&soundContext?.state==='running'){
+            speechAnalyser.getByteTimeDomainData(soundSamples);
+            let total=0;
+            for(const value of soundSamples){const n=(value-128)/128;total+=n*n}
+            const rms=Math.sqrt(total/soundSamples.length);
+            if(rms>.014){soundStarted=true;lastSoundAt=now}
+          }
+          const seconds=Math.max(0,Math.floor((now-liveSince)/1000));
+          status('clipStatus','Finishing voice · '+seconds+'s');
+          const sinceFinal=now-finalSentAt;
+          const finishedByAudio=soundStarted&&sinceFinal>=1500&&now-lastSoundAt>=1900;
+          const finishedByEvent=!soundStarted&&personaDoneAt&&now-personaDoneAt>=2800&&sinceFinal>=2400;
+          // Some Safari WebRTC streams cannot be analyzed, and some Anam
+          // versions don't report persona endOfSpeech. Still end the recording
+          // promptly rather than storing 30 seconds of silence.
+          const finishedByFallback=!soundStarted&&!personaDoneAt&&sinceFinal>=7500;
+          const deadline=now-liveSince>=105000;
+          if(finishedByAudio||finishedByEvent||finishedByFallback||deadline){
+            clearInterval(clock);clock=null;abortWait=null;
+            if(deadline&&speechAnalyser&&soundStarted&&now-lastSoundAt<1200)
+              reject(new Error('Avatar speech exceeded the recording limit. Clip not saved.'));
+            else resolve();
+          }
+        },250);
       });
       if(seq!==liveSequence)return;
       saving=false;
@@ -780,6 +861,8 @@ export function initMediaPages({getLanguage,getTalkWords}){
       if(recorder)await finishRecording(false);else stopStream();
     }finally{
       saving=false;abortWait=null;recorded=[];$('clipCancelButton').hidden=true;
+      if(clock){clearInterval(clock);clock=null}
+      if(soundContext)void soundContext.close?.().catch?.(()=>{});
       renderClipSelection();
     }
   }
