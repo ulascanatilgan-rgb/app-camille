@@ -6381,3 +6381,138 @@ body.talk-immersive #talkPage .live-speaker{min-height:0}
   body.talk-immersive #talkPage .avatar-column{padding-top:54px!important;}
   body.talk-immersive #talkPage .live-exchange-card{padding:9px!important}
 }
+
+
+/* ECL v63 — answers belong to the live conversation, not the mode toolbar. */
+#talkAnswerDock[hidden]{display:none!important}
+body.talk-immersive #talkPage .talk-answer-dock:not([hidden]){
+  display:block!important;position:relative!important;flex:0 0 auto!important;
+  width:100%!important;min-height:0!important;
+  margin:2px 0 16px!important;padding:15px 15px 16px!important;
+  border:1px solid #c6d6e6!important;border-radius:17px!important;
+  background:linear-gradient(155deg,#f3f8ff 0%,#eaf2fb 100%)!important;
+  box-shadow:0 7px 24px rgba(36,77,115,.085)!important;
+}
+body.talk-immersive #talkPage .talk-answer-heading{
+  font:700 10px/1.4 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;
+  letter-spacing:.1em!important;color:#59728e!important;
+  margin-bottom:11px!important;
+}
+body.talk-immersive #talkPage #quickReplyBar:not([hidden]){
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  position:static!important;inset:auto!important;
+  width:100%!important;max-width:none!important;max-height:none!important;
+  padding:0!important;margin:0!important;gap:12px!important;
+  border:0!important;background:transparent!important;
+}
+body.talk-immersive #talkPage .talk-answer-dock .quick-reply-button{
+  min-height:83px!important;
+  padding:12px 8px!important;
+  border-radius:13px!important;
+  background:#fff!important;border:1px solid #b5c9de!important;
+  box-shadow:0 3px 9px rgba(27,64,98,.055)!important;
+  color:#24384e!important;
+  cursor:pointer!important;
+}
+body.talk-immersive #talkPage .talk-answer-dock .quick-reply-button:hover{
+  background:#e4eef9!important;border-color:#7c9fbf!important;
+}
+body.talk-immersive #talkPage .talk-answer-dock .quick-reply-target{
+  font-size:clamp(13px,1.4vw,16px)!important;
+  font-weight:750!important;line-height:1.45!important;
+}
+body.talk-immersive #talkPage .talk-answer-dock .quick-reply-english{
+  font-size:clamp(10px,1.05vw,12px)!important;
+  color:#617991!important;line-height:1.45!important;
+}
+body.talk-immersive #talkPage .controls{
+  grid-template-areas:"composer" "modes"!important;
+  padding:7px 0 calc(10px + env(safe-area-inset-bottom))!important;
+  border-top:1px solid #dfe5ed!important;
+  max-height:min(25dvh,160px)!important;
+  gap:5px!important;margin:0!important;
+  box-shadow:none!important;
+  background:rgba(250,251,253,.97)!important;
+}
+body.talk-immersive #talkPage .interaction-mode-bar{
+  grid-area:modes!important;
+  width:min(310px,100%)!important;
+  justify-self:center!important;
+  gap:7px!important;margin:0!important;
+  border:0!important;padding:0!important;
+}
+body.talk-immersive #talkPage .interaction-mode-button{
+  min-height:30px!important;height:30px!important;
+  font-size:10px!important;font-weight:600!important;
+  padding:4px 6px!important;border-radius:8px!important;
+  letter-spacing:0!important;
+}
+body.talk-immersive #talkPage .live-exchange-card{
+  margin-bottom:9px!important;
+}
+#clipsPage .clip-player{
+  position:relative!important;
+  min-height:160px;
+}
+#clipsPage .clip-play-overlay{
+  position:absolute;z-index:5;
+  left:50%;top:50%;transform:translate(-50%,-50%);
+  display:flex;align-items:center;justify-content:center;gap:12px;
+  min-width:130px;min-height:55px;padding:12px 24px;
+  border-radius:15px;background:rgba(250,252,255,.94);
+  border:1px solid #b5c9dd;color:#20354b;
+  font:750 15px/1.2 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  box-shadow:0 8px 28px rgba(1,10,28,.25);cursor:pointer;
+}
+#clipsPage .clip-play-overlay:hover{background:#fff}
+#clipsPage .clip-play-overlay[hidden]{display:none!important}
+#clipsPage .clip-play-overlay span{font-size:19px}
+#clipsPage .clip-player video{background:#111827}
+@media(max-width:760px){
+  body.talk-immersive #talkPage.workspace,
+  body.talk-immersive.type-input-mode #talkPage.workspace{
+    grid-template-rows:minmax(105px,28%) minmax(0,72%)!important;
+  }
+  body.talk-immersive #talkPage .talk-answer-dock:not([hidden]){
+    padding:10px 10px 12px!important;
+    margin:0 0 14px!important;
+    border-radius:13px!important;
+  }
+  body.talk-immersive #talkPage .talk-answer-heading{
+    font-size:9px!important;margin-bottom:8px!important;
+  }
+  body.talk-immersive #talkPage #quickReplyBar:not([hidden]){gap:8px!important}
+  body.talk-immersive #talkPage .talk-answer-dock .quick-reply-button{
+    min-height:78px!important;padding:9px 5px!important;
+    border-radius:10px!important;
+  }
+  body.talk-immersive #talkPage .talk-answer-dock .quick-reply-target{
+    font-size:13px!important;
+  }
+  body.talk-immersive #talkPage .talk-answer-dock .quick-reply-english{
+    font-size:10px!important;
+  }
+  body.talk-immersive #talkPage .controls{
+    max-height:22dvh!important;
+    padding:6px 0 calc(8px + env(safe-area-inset-bottom))!important;
+  }
+  body.talk-immersive #talkPage .interaction-mode-button{
+    height:29px!important;min-height:29px!important;font-size:10px!important;
+  }
+  body.talk-immersive.type-input-mode #talkPage.workspace{
+    grid-template-rows:minmax(72px,19%) minmax(0,81%)!important;
+  }
+  #clipsPage .clip-play-overlay{
+    min-height:48px;min-width:112px;
+    font-size:13px;padding:10px 18px;
+  }
+}
+@media(max-width:760px) and (max-height:620px){
+  body.talk-immersive #talkPage.workspace{
+    grid-template-rows:minmax(76px,22%) minmax(0,78%)!important;
+  }
+  body.talk-immersive #talkPage .talk-answer-dock .quick-reply-button{
+    min-height:64px!important;padding:7px 4px!important;
+  }
+}
