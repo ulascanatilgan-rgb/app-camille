@@ -534,6 +534,7 @@ async function replayText(text, element = null, { useAvatarVoice = false } = {})
   }
 
   const runId = ++replaySequence;
+  stopLiveCaption();
   if (replayHighlightTimer) window.clearTimeout(replayHighlightTimer);
   replayHighlightTimer = null;
   window.speechSynthesis?.cancel?.();
@@ -693,6 +694,21 @@ function celebrateUserTurn() {
 let liveCaptionTimer=null,liveCaptionRun=0,liveCaptionId=null;
 let liveCaptionText='',liveCaptionIndex=0,liveCaptionFinal=false;
 let lockedEnglishTurn=null;
+let prefetchedSpeech=null;
+function prepareSpokenTurn(text,english,messageId){
+  const clean=String(text||'').trim();
+  const translation=String(english||'').trim();
+  if(!clean)return;
+  activeSubtitleMessageId=messageId;
+  if(translation&&messageId){
+    translationByMessageId.set(messageId,translation);
+    lockedEnglishTurn=messageId;
+  }else lockedEnglishTurn=null;
+  prefetchedSpeech={text:clean,english:translation,messageId,startedAt:Date.now()};
+  lastSubtitlePair={nl:clean,en:translation};
+  setSubtitle(clean,translation);
+  renderLiveDutch(clean,'',messageId);
+}
 function stopLiveCaption(){
   ++liveCaptionRun;
   if(liveCaptionTimer){window.clearTimeout(liveCaptionTimer);liveCaptionTimer=null}
@@ -1970,8 +1986,11 @@ async function sendTypedTurn(text, inputKind = 'type') {
       full=limitCamilleReply(await response.text()).text.trim();
       if(!full)throw new Error('Emma returned an empty answer.');
       if(epochAtSend!==connectionEpoch||!connected)return;
-      renderLiveDutch(full);
-      setSubtitle(full,'');
+      // Translate the COMPLETE reply BEFORE its voice starts. Keep that
+      // English line fixed while the avatar speaks.
+      const english=await translateToEnglish(full);
+      if(epochAtSend!==connectionEpoch||!connected)return;
+      prepareSpokenTurn(full,english,personaId);
       upsertConversationTurn({id:personaId,role:'persona',content:full});
       processVocabularyProgress(personaId,full,true);
       saveCurrentHistory();
@@ -1988,39 +2007,26 @@ async function sendTypedTurn(text, inputKind = 'type') {
         });
       }catch(error){console.warn('Avatar voice unavailable:',error)}
       requestQuickChoices(full);
-      void translateToEnglish(full).then(english=>{
-        if(english&&connected&&epochAtSend===connectionEpoch){
-          translationByMessageId.set(personaId,english);
-          setSubtitle(full,english);
-        }
-      }).catch(()=>{});
       return;
     }
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    talkStream = anamClient.createTalkMessageStream();
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value, { stream: true });
-      if (!chunk) continue;
-
-      full += chunk;
-      const limited = limitCamilleReply(full);
-      renderLiveDutch(limited.text, chunk);
-      schedulePartialTranslation(limited.text, personaId);
-      await talkStream.streamMessageChunk(chunk, false);
+    const reader=response.body.getReader();
+    const decoder=new TextDecoder();
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      full+=decoder.decode(value,{stream:true});
     }
-
+    full=limitCamilleReply(full+decoder.decode()).text.trim();
+    if(!full)throw new Error('No complete Talk response');
+    if(epochAtSend!==connectionEpoch||!connected)return;
+    const english=await translateToEnglish(full);
+    if(epochAtSend!==connectionEpoch||!connected)return;
+    prepareSpokenTurn(full,english,personaId);
+    // Sending text only after its complete bilingual subtitle is available
+    // prevents the English line from jumping during speech.
+    talkStream=anamClient.createTalkMessageStream();
+    await talkStream.streamMessageChunk(full,false);
     await talkStream.endMessage();
-
-    full = limitCamilleReply(full).text;
-    const english = await translateToEnglish(full);
-    if (english) translationByMessageId.set(personaId, english);
-
-    setSubtitle(full, english);
 
     upsertConversationTurn({ id: personaId, role: 'persona', content: full });
 
@@ -2170,6 +2176,18 @@ function handleStreamEvent(event) {
 
     if (isNewMessage) {
       hideTip();
+      const fragment=String(event.content||'').trim().toLocaleLowerCase();
+      const prefetched=prefetchedSpeech&&Date.now()-prefetchedSpeech.startedAt<30000&&
+        fragment.length>=2&&prefetchedSpeech.text.toLocaleLowerCase().startsWith(fragment);
+      if(prefetched){
+        lockedEnglishTurn=event.id;
+        translationByMessageId.set(event.id,prefetchedSpeech.english);
+        if(liveCaptionId===prefetchedSpeech.messageId)liveCaptionId=event.id;
+        if(captionsToggle.checked)subtitleEn.textContent=prefetchedSpeech.english;
+      }else{
+        lockedEnglishTurn=null;
+        prefetchedSpeech=null;
+      }
       // Never clear the initial options on the first avatar word:
       // some published Anam personas never send endOfSpeech.
       if (interactionMode === 'button') {
@@ -2185,7 +2203,8 @@ function handleStreamEvent(event) {
       }
       partialTranslationSeq += 1;
       lastPartialTranslationAt = 0;
-      if (captionsToggle.checked) subtitleEn.textContent = '…';
+      if(captionsToggle.checked&&lockedEnglishTurn!==event.id)
+        subtitleEn.textContent=targetLanguage==='en'?'':'Translating complete sentence…';
     }
 
     const limited = limitCamilleReply(next);
@@ -2200,8 +2219,15 @@ function handleStreamEvent(event) {
     }
 
     if (captionsToggle.checked) {
-      renderLiveDutch(limited.text, event.content);
-      schedulePartialTranslation(limited.text, event.id);
+      if(prefetchedSpeech&&lockedEnglishTurn===event.id){
+        // SDK transcription chunks can arrive ahead of the actual voice.
+        // Keep the full prepared sentence and frozen English translation.
+        if(liveCaptionId!==event.id)
+          renderLiveDutch(prefetchedSpeech.text,'',event.id);
+      }else{
+        renderLiveDutch(limited.text,event.content,event.id);
+        schedulePartialTranslation(limited.text,event.id);
+      }
     }
 
     processVocabularyProgress(event.id, limited.text, event.endOfSpeech);
@@ -2213,7 +2239,8 @@ function handleStreamEvent(event) {
       saveCurrentHistory();
       partialTranslationSeq += 1;
       lastPartialTranslationAt = 0;
-      finalizeSubtitle(limited.text, event.id);
+      finalizeSubtitle(prefetchedSpeech&&lockedEnglishTurn===event.id?
+        prefetchedSpeech.text:limited.text,event.id);
       if (interactionMode === 'button') requestQuickChoices(limited.text);
     }
 
@@ -2613,7 +2640,7 @@ function resetUiAfterDisconnect() {
   languageToggle.disabled = false;
   updateTopicUi();
   replaySequence += 1;
-  stopLiveCaption();lockedEnglishTurn=null;
+  stopLiveCaption();lockedEnglishTurn=null;prefetchedSpeech=null;
   window.speechSynthesis?.cancel?.();
   replayingAudio = false;
   clearQuickChoices();
