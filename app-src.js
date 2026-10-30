@@ -2399,6 +2399,11 @@ async function speakLocalizedOpening(client = anamClient) {
   const greeting = languageConfig();
   const phrase = topicOpening(selectedTopic,targetLanguage);
   if (!phrase) return;
+  const openingEnglish=selectedTopic==='open'?(greeting.greetingEn||''):
+    (targetLanguage==='en'?'':topicOpening(selectedTopic,'en'));
+  const id=`ecl-greeting-${Date.now()}-${sequence}`;
+  // Prepare both complete subtitle lines before the opening voice starts.
+  prepareSpokenTurn(phrase,openingEnglish,id);
   try {
     const stream = client.createTalkMessageStream();
     await stream.streamMessageChunk(phrase, false);
@@ -2406,9 +2411,7 @@ async function speakLocalizedOpening(client = anamClient) {
     if (sequence !== sessionOpeningSeq || client !== anamClient ||
         languageAtStart !== targetLanguage || personaAtStart !== selectedPersona) return;
     // The first visible / recorded message also obeys the selected language.
-    const id = `ecl-greeting-${Date.now()}-${sequence}`;
     upsertConversationTurn({ id, role: 'persona', content: phrase });
-    setSubtitle(phrase, selectedTopic==='open' ? greeting.greetingEn || '' : (targetLanguage==='en'?'':topicOpening(selectedTopic,'en')));
     saveCurrentHistory();
     renderMessages(currentMessages);
     if (interactionMode === 'button') requestQuickChoices(phrase);
