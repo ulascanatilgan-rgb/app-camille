@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=ecl-20261027" />
   <link rel="icon" type="image/png" href="/favicon-64.png?v=ecl-20261027" />
   <title>ECL — Emma, Charlotte &amp; Louis</title>
-  <link rel="stylesheet" href="/styles.css?v=ecl-talk-articles-v59-20261030" />
+  <link rel="stylesheet" href="/styles.css?v=ecl-clips-sync-v60-20261030" />
 </head>
 <body>
   <main class="app-shell">
@@ -379,14 +379,21 @@
             <p id="clipPlaybackMeta" class="media-hint"></p>
             <div class="clip-player">
               <video id="clipSavedVideo" controls playsinline preload="metadata" aria-label="Saved avatar clip"></video>
-              <div id="clipSubtitles" class="clip-subtitles" aria-label="Timed subtitles"></div>
+            </div>
+            <div class="clip-caption-panel" aria-label="Bilingual subtitles below video">
+              <div id="clipSubtitles" class="clip-subtitles" aria-label="Spoken words, synchronized to recorded audio"></div>
+              <div id="clipEnglishSubtitles" class="clip-english-subtitles" aria-label="Synchronized English sentence translation"></div>
+            </div>
+            <div class="clip-sync-controls">
+              <span id="clipSyncStatus" class="media-hint" role="status">Checking subtitle synchronization…</span>
+              <button id="clipSyncButton" class="study-secondary-button" type="button">Sync subtitles</button>
             </div>
             <button id="clipDownloadButton" type="button" class="study-secondary-button media-download">Download video</button>
             <div id="clipWordDetail" class="media-word-detail">Tap a word for its meaning.</div>
             <h3>Full script · interactive transcript</h3><div id="clipTranscript" class="clip-transcript"></div>
-            <p class="media-hint">Word highlighting follows estimated playback timing. Video replay does not use Anam credits.</p>
+            <p class="media-hint">Highlighting follows timestamps from the recorded voice. Existing Clips can be re-synchronized; replay does not use Anam credits.</p>
           </div>
-          <p class="media-placeholder">Your latest clip will appear here after recording. Browse the saved videos on the left.</p>
+          <p class="media-placeholder">Choose Clip 1, Clip 2, and other saved videos to watch again and review the complete script.</p>
         </div>
       </div>
     </section>
@@ -502,6 +509,6 @@
     </form>
   </dialog>
 
-  <script src="/app.bundle.js?v=ecl-talk-articles-v59-20261030" type="module"></script>
+  <script src="/app.bundle.js?v=ecl-clips-sync-v60-20261030" type="module"></script>
 </body>
 </html>
