@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=ecl-20261027" />
   <link rel="icon" type="image/png" href="/favicon-64.png?v=ecl-20261027" />
   <title>ECL — Emma, Charlotte &amp; Louis</title>
-  <link rel="stylesheet" href="/styles.css?v=ecl-immersive-talk-v62-20261030" />
+  <link rel="stylesheet" href="/styles.css?v=ecl-talk-clips-v63-20261030" />
 </head>
 <body>
   <main class="app-shell">
@@ -168,6 +168,10 @@
 
         </section>
 
+        <section id="talkAnswerDock" class="talk-answer-dock" hidden aria-label="Suggested replies to the current conversation">
+          <div class="talk-answer-heading">CHOOSE YOUR REPLY</div>
+          <div id="quickReplyBar" class="quick-reply-bar" hidden aria-label="Quick reply choices"></div>
+        </section>
         <section id="messages" class="messages inline-history-store" hidden aria-hidden="true"></section>
 
         <section class="controls">
@@ -226,7 +230,6 @@
             <button id="typeModeButton" class="interaction-mode-button" type="button" data-mode="type" aria-pressed="false">Type</button>
             <button id="buttonModeButton" class="interaction-mode-button" type="button" data-mode="button" aria-pressed="false">Button</button>
           </div>
-          <div id="quickReplyBar" class="quick-reply-bar" hidden aria-label="Quick reply choices"></div>
 
           <button id="sessionHistoryButton" class="session-history-button" type="button">Recent Talks</button>
         </section>
@@ -386,7 +389,8 @@
             <div class="media-eyebrow">YOUR SAVED VIDEO</div><h2 id="clipPlaybackTitle"></h2>
             <p id="clipPlaybackMeta" class="media-hint"></p>
             <div class="clip-player">
-              <video id="clipSavedVideo" controls playsinline preload="metadata" aria-label="Saved avatar clip"></video>
+              <video id="clipSavedVideo" controls playsinline webkit-playsinline preload="metadata" aria-label="Saved avatar clip"></video>
+              <button id="clipPlayButton" class="clip-play-overlay" type="button" aria-label="Play this saved clip" title="Play or replay this clip"><span aria-hidden="true">▶</span> Play clip</button>
             </div>
             <div class="clip-caption-panel" aria-label="Bilingual subtitles below video">
               <div id="clipSubtitles" class="clip-subtitles" aria-label="Spoken words, synchronized to recorded audio"></div>
@@ -517,6 +521,6 @@
     </form>
   </dialog>
 
-  <script src="/app.bundle.js?v=ecl-immersive-talk-v62-20261030" type="module"></script>
+  <script src="/app.bundle.js?v=ecl-talk-clips-v63-20261030" type="module"></script>
 </body>
 </html>
