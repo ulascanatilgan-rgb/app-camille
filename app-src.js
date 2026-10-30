@@ -127,6 +127,7 @@ let connectionEpoch = 0; // Cancel pending Anam or OpenAI connection when leavin
 let currentMessages = [];
 let lastProcessedUserMessageId = null;
 let isResponding = false;
+let voiceButtonTimer = null;
 let activeChatAbort = null;
 let activeTalkStream = null;
 let partialTranslationSeq = 0;
@@ -1823,6 +1824,15 @@ async function sendTypedTurn(text, inputKind = 'type') {
     finalizeUserTranslation(clean,itemId);
     upsertConversationTurn({id:itemId,role:'user',content:clean});
     isResponding=true;
+    if(voiceButtonTimer)window.clearTimeout(voiceButtonTimer);
+    voiceButtonTimer=window.setTimeout(()=>{
+      voiceButtonTimer=null;
+      if(selectedProvider==='voice'&&interactionMode==='button'&&connected&&isResponding){
+        isResponding=false;
+        setStatus('No voice reply yet · choose again');
+        renderQuickChoices(defaultButtonChoices('generic'));
+      }
+    },17000);
     setStatus(personaName()+' is replying…');
     saveCurrentHistory();
     renderMessages(currentMessages);
@@ -2346,6 +2356,7 @@ async function connectVoiceOnly() {
         const clean=limitCamilleReply(text).text;
         const itemId=id||'voice-persona-'+Date.now();
         isResponding=false;
+        if(voiceButtonTimer){window.clearTimeout(voiceButtonTimer);voiceButtonTimer=null;}
         upsertConversationTurn({id:itemId,role:'persona',content:clean});
         saveCurrentHistory();
         renderMessages(currentMessages);
@@ -2357,6 +2368,8 @@ async function connectVoiceOnly() {
       onError:message=>{
         if(selectedProvider!=='voice')return;
         isResponding=false;
+        if(voiceButtonTimer){window.clearTimeout(voiceButtonTimer);voiceButtonTimer=null;}
+        if(interactionMode==='button'&&connected)renderQuickChoices(defaultButtonChoices('generic'));
         console.warn('OpenAI voice error:',message);
         setStatus('Voice error: '+String(message).slice(0,75));
       }
@@ -2515,6 +2528,7 @@ async function connect() {
 }
 
 function resetUiAfterDisconnect() {
+  if(voiceButtonTimer){window.clearTimeout(voiceButtonTimer);voiceButtonTimer=null;}
   sessionOpeningSeq += 1;
   languageToggle.disabled = false;
   updateTopicUi();
