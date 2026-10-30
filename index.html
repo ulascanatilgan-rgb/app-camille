@@ -12,7 +12,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=ecl-20261027" />
   <link rel="icon" type="image/png" href="/favicon-64.png?v=ecl-20261027" />
   <title>ECL — Emma, Charlotte &amp; Louis</title>
-  <link rel="stylesheet" href="/styles.css?v=ecl-talk-avatar-v66-20261030" />
+  <link rel="stylesheet" href="/styles.css?v=ecl-clip-tabs-talk-v67-20261030" />
 </head>
 <body>
   <main class="app-shell">
@@ -109,6 +109,14 @@
 
                     
 
+        <div id="wordCard" class="word-card" hidden>
+          <div class="word-card-label">NEW WORD</div>
+          <div class="word-card-pair">
+            <span id="wordNl" class="word-card-nl"></span>
+            <span class="word-card-arrow">→</span>
+            <span id="wordEn" class="word-card-en"></span>
+          </div>
+        </div>
           <div class="avatar-meta">
             <span id="avatarBadge" class="avatar-badge">Anam live avatar</span>
           </div>
@@ -159,17 +167,10 @@
 
         </section>
 
-        <div id="wordCard" class="word-card" hidden>
-          <div class="word-card-label">NEW WORD</div>
-          <div class="word-card-pair">
-            <span id="wordNl" class="word-card-nl"></span>
-            <span class="word-card-arrow">→</span>
-            <span id="wordEn" class="word-card-en"></span>
-          </div>
-        </div>
+
 
         <section id="talkAnswerDock" class="talk-answer-dock" hidden aria-label="Suggested replies to the current conversation">
-          <div class="talk-answer-heading">CHOOSE YOUR REPLY</div>
+          
           <div id="quickReplyBar" class="quick-reply-bar" hidden aria-label="Quick reply choices"></div>
         </section>
         <section id="messages" class="messages inline-history-store" hidden aria-hidden="true"></section>
@@ -310,8 +311,7 @@
     </section>
     <section id="songPage" class="study-page media-page" hidden aria-label="Song vocabulary practice">
       <header class="study-page-header">
-        <div><div class="eyebrow">SONG · LEARN THROUGH MUSIC</div><h1>Your vocabulary. Your lyrics.</h1>
-          <p>Turn saved words into original songs. Audio generation will be available when ElevenLabs is connected.</p></div>
+        <div><div class="eyebrow">SONG</div></div>
       </header>
       <div class="media-grid">
         <div class="media-panel">
@@ -341,11 +341,15 @@
     </section>
     <section id="clipsPage" class="study-page media-page" hidden aria-label="Clips avatar video practice">
       <header class="study-page-header">
-        <div><div class="eyebrow">CLIPS · WATCH & REPEAT</div><h1>One minute with your avatar</h1>
-          <p>Create short spoken lessons with your saved words. Recorded clips can be replayed without another Anam session.</p></div>
+        <div><div class="eyebrow">CLIPS · WATCH & REPEAT</div></div>
       </header>
-      <div class="media-grid">
-        <div class="media-panel">
+      <div id="clipViewTabs" class="clip-view-tabs" role="tablist" aria-label="Clips sections">
+        <button id="clipVideosTab" class="clip-view-tab selected" type="button" role="tab" aria-selected="true" aria-controls="clipLibraryPanel">Clips</button>
+        <button id="clipNewTab" class="clip-view-tab" type="button" role="tab" aria-selected="false" aria-controls="clipNewPanel">New</button>
+      </div>
+      <div class="media-grid clip-media-grid" data-view="clips">
+        <div class="media-panel clip-sidebar">
+          <div id="clipNewPanel" hidden>
           <h2>New clip</h2><p id="clipWordsInfo" class="media-hint"></p>
           <div class="media-fields">
             <label>Speaker<select id="clipPersona"></select></label>
@@ -380,11 +384,14 @@
             <video id="clipLiveVideo" autoplay playsinline aria-label="Anam live recording"></video>
             <p id="clipScript" class="clip-script-preview"></p>
           </div>
+          </div>
+          <div id="clipLibraryPanel">
           <div class="media-library-heading"><h2>My Clips</h2><span id="clipLibraryCount">0 saved clips</span></div>
           <div id="clipLibrary" class="media-library"></div>
-          <p class="media-hint">Videos are stored in this browser on this device. Download important clips to keep a separate backup.</p>
+          <p class="media-hint">Videos are saved on this device. Download to back up.</p>
+          </div>
         </div>
-        <div class="media-panel media-reading">
+        <div class="media-panel media-reading clip-video-panel">
           <div id="clipPlayback" hidden>
             <div class="media-eyebrow">YOUR SAVED VIDEO</div><h2 id="clipPlaybackTitle"></h2>
             <p id="clipPlaybackMeta" class="media-hint"></p>
@@ -406,7 +413,7 @@
             <h3>Full script · interactive transcript</h3><div id="clipTranscript" class="clip-transcript"></div>
             <p class="media-hint">Highlighting follows timestamps from the recorded voice. Existing Clips can be re-synchronized; replay does not use Anam credits.</p>
           </div>
-          <p class="media-placeholder">Choose Clip 1, Clip 2, and other saved videos to watch again and review the complete script.</p>
+          <p class="media-placeholder">Select a clip to play.</p>
         </div>
       </div>
     </section>
@@ -522,6 +529,6 @@
     </form>
   </dialog>
 
-  <script src="/app.bundle.js?v=ecl-talk-avatar-v66-20261030" type="module"></script>
+  <script src="/app.bundle.js?v=ecl-clip-tabs-talk-v67-20261030" type="module"></script>
 </body>
 </html>
