@@ -1,4 +1,4 @@
-const CACHE = 'ecl-clips-workflow-v57';
+const CACHE = 'ecl-talk-articles-v58';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
