@@ -275,7 +275,11 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   // Safari occasionally releases capture before delivering pointerup to
   // the original card. Handle it globally too, without double-answering.
   window.addEventListener('pointerup',finishSwipe);
-  slide.addEventListener('pointercancel',resetSwipe);
+  slide.addEventListener('pointercancel',ev=>{
+    // A touch-generated pointercancel is normal on iOS when scrolling is
+    // recognized. It must NEVER erase the independent touch swipe state.
+    if(gesture?.id!=='touch'&&gesture?.id===ev.pointerId)resetSwipe();
+  });
   // iOS may fire pointercancel on a horizontal swipe despite PointerEvent
   // support. Use native touch events on all touchscreens; pointer gestures
   // above are reserved for mouse and pen to prevent competing state.
