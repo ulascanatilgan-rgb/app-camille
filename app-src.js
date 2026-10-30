@@ -1109,6 +1109,36 @@ function primeButtonChoices() {
   }
 }
 
+function instantTipFor(question) {
+  const q=String(question||'').toLocaleLowerCase();
+  const examples={
+    nl:[
+      [/\b(waar|waarheen)\b/,['Hier in de buurt.','Here in the area.']],
+      [/\b(wanneer|hoe laat)\b/,['Morgen, als dat kan.','Tomorrow, if possible.']],
+      [/\b(waarom)\b/,['Omdat het belangrijk is.','Because it is important.']],
+      [/\b(wat|welke)\b/,['Dat vind ik interessant.','I find that interesting.']],
+      [/\b(hoe gaat|hoe is|alles goed)\b/,['Goed, dank je!','Good, thank you!']]
+    ],
+    fr:[
+      [/\b(où)\b/,['Près de chez moi.','Near my home.']],
+      [/\b(quand|quelle heure)\b/,['Demain, si possible.','Tomorrow, if possible.']],
+      [/\b(pourquoi)\b/,['Parce que c’est important.','Because it is important.']],
+      [/\b(quoi|que|quel|quelle)\b/,['Ça m’intéresse beaucoup.','I find that interesting.']],
+      [/\b(comment ça va|tu vas bien)\b/,['Très bien, merci !','Very well, thank you!']]
+    ],
+    en:[
+      [/\b(where)\b/,['Near my office.','']],
+      [/\b(when|what time)\b/,['Tomorrow works for me.','']],
+      [/\b(why)\b/,['Because it matters.','']],
+      [/\b(what|which)\b/,['That sounds useful.','']],
+      [/\b(how are you)\b/,['I’m doing well.','']]
+    ]
+  };
+  const fallback={nl:['Ja, graag.','Yes, please.'],fr:['Oui, volontiers.','Yes, gladly.'],en:['Yes, please.','']}[targetLanguage];
+  const found=(examples[targetLanguage]||examples.nl).find(([re])=>re.test(q));
+  const [text,english]=found?found[1]:fallback;
+  return {text,english};
+}
 function hideTip() {
   tipRequestSeq += 1;
   if (tipAbortController) tipAbortController.abort();
@@ -1132,9 +1162,9 @@ async function showTip() {
   const quick=[...quickReplyBar?.querySelectorAll('.quick-reply-button')||[]][0];
   const initial=quick?.querySelector('.quick-reply-target')?.textContent?.trim();
   const initialEn=quick?.querySelector('.quick-reply-english')?.textContent?.trim();
-  const fallback=defaultButtonChoices('generic')[0];
-  tipTarget.textContent=initial||fallback?.text||'Yes';
-  tipEnglish.textContent=targetLanguage==='en'?'':(initialEn||fallback?.english||'');
+  const fallback=instantTipFor(question);
+  tipTarget.textContent=initial||fallback.text;
+  tipEnglish.textContent=targetLanguage==='en'?'':(initialEn||fallback.english);
 
   if (cachedTip?.key === cacheKey) {
     tipTarget.textContent = cachedTip.text;
