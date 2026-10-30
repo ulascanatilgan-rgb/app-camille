@@ -1,4 +1,4 @@
-const CACHE = 'ecl-clip-language-lock-v68';
+const CACHE = 'ecl-slow-clips-v69';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
