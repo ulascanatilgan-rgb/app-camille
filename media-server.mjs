@@ -86,7 +86,9 @@ export function registerMediaRoutes(app){
       return {words:Array.isArray(result.words)?result.words:[],
         duration:Number(result.duration)||0};
     })();
-    const translationTask=language==='en'?Promise.resolve(sentences.map(x=>x.text)):
+    const captionsAlreadyAvailable=req.headers['x-clip-translations-ready']==='1';
+    const translationTask=language==='en'||captionsAlreadyAvailable?
+      Promise.resolve([]):
       (async()=>{
         const response=await fetch('https://api.openai.com/v1/chat/completions',{
           method:'POST',headers:{Authorization:'Bearer '+process.env.OPENAI_API_KEY,
@@ -148,7 +150,9 @@ export function registerMediaRoutes(app){
       kind==='clip'?
         'Create ONE fresh, ORIGINAL one-person spoken monologue for an avatar, about 110-130 words lasting around 60 seconds at a calm speaking pace. Incorporate ALL the supplied selected vocabulary (up to 20), naturally and grammatically, with one cohesive story rather than a word list. Prefer everyday B1 language, fluid short sentences and a fresh angle each time even for identical inputs. No dialogue labels, stage directions or markdown.':
         'Write an ORIGINAL, short, singable, easy-to-understand song lyric, including a recurring chorus, in the requested genre '+genre+'. Use 15-20 input vocabulary items when available; for fewer words, use all naturally. Repetition helps memorization. 3 verses/chorus sections maximum. Do not imitate specific artists or copyrighted songs.',
-      'Return ONLY JSON {"title":"...","text":"...","usedWords":["..."]}.',
+      kind==='clip'?
+        'Return ONLY JSON {"title":"...","text":"...","usedWords":["..."],"englishSentences":["..."]}. For each full sentence in text, add precisely one natural English translation to englishSentences in the SAME order. Match sentence count exactly. Do not insert blank entries. If the target language is English, translations may be the same.':
+        'Return ONLY JSON {"title":"...","text":"...","usedWords":["..."]}.',
       'The text and title must be solely in the target language. Use newline breaks for song verses.',
       'Only put words actually used in text in usedWords. No explanation, no adult or unsafe themes.',
       kind==='clip'&&previousText?'The user previously received a clip script. Write a clearly DIFFERENT narrative, setting and sentence order, without reusing earlier sentences.':''
@@ -158,7 +162,7 @@ export function registerMediaRoutes(app){
         method:'POST',headers:{'Authorization':'Bearer '+process.env.OPENAI_API_KEY,'Content-Type':'application/json'},
         signal:AbortSignal.timeout(55000),
         body:JSON.stringify({
-          model:'gpt-4o-mini',temperature:kind==='clip' ? 0.85 : 0.55,response_format:{type:'json_object'},max_tokens:1450,
+          model:'gpt-4o-mini',temperature:kind==='clip' ? 0.85 : 0.55,response_format:{type:'json_object'},max_tokens:kind==='clip'?2100:1450,
           messages:[{role:'system',content:system},{role:'user',content:JSON.stringify({theme,genre,words,previousTitle,previousText})}]
         })
       });
@@ -169,7 +173,12 @@ export function registerMediaRoutes(app){
       if(text.length<65)throw new Error('The resulting script was too short.');
       const title=clean(obj.title,100)||theme;
       const normalized=words.filter(w=>text.toLocaleLowerCase().includes(w.word.toLocaleLowerCase()));
-      res.json({title,text,usedWords:normalized,language,theme,genre,kind});
+      const originals=kind==='clip'?clipSentences(text):[];
+      const translation=Array.isArray(obj.englishSentences)?obj.englishSentences:[];
+      const captionSentences=originals.map((part,i)=>({...part,
+        english:translation.length===originals.length?
+          clean(translation[i],320):''}));
+      res.json({title,text,usedWords:normalized,language,theme,genre,kind,captionSentences});
     }catch(e){
       console.warn('Media script generation:',e.message);
       res.status(502).json({error:'Could not create this text right now. Please retry.'});
