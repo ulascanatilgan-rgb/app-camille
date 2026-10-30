@@ -22,13 +22,14 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   const key=(group,lang=getLanguage())=>'ecl.'+group+'.v1.'+lang;
   const validWords=()=>getTalkWords().filter(w=>w?.nl&&w?.en&&(!w.language||w.language===getLanguage())).slice(-800);
   const score=()=>read(key('slide.results'),[]);
-  const newsWords=()=>read(key('news.words'),[]);
-  const newsArchive=()=>read(key('news.archive'),[]);
+  const articleMatches=story=>!story?.language||story.language===getLanguage();
+  const newsWords=()=>read(key('news.words'),[]).filter(w=>!w.language||w.language===getLanguage());
+  const newsArchive=()=>read(key('news.archive'),[]).filter(articleMatches);
   const currentArticle=()=>archiveStory||newsData?.stories?.[newsReaderIndex];
   function saveNewsArchive(stories){
     const archive=newsArchive(),byId=new Map(archive.map((a,i)=>[a.id,i]));
     for(const story of stories) {
-      if(!story?.id)continue;
+      if(!story?.id||!articleMatches(story))continue;
       const oldIndex=byId.get(story.id);
       if(oldIndex!==undefined){
         const old=archive[oldIndex];
@@ -192,8 +193,9 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       // No card should remain locked if a reload or page change intervenes.
       if(cards!==previousDeck){slideLocked=false;return;}
       cardIndex++;
-      if(currentPage==='slide'&&deckLang===langAtSwipe)renderSlide();
-      else {
+      if(currentPage==='slide'&&deckLang===langAtSwipe){
+        renderSlide();slideLocked=false;
+      }else {
         slideLocked=false;
         card.classList.remove('fly-left','fly-right');
         card.style.transform='';
@@ -208,6 +210,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   let gesture=null,slideLocked=false,slideAdvanceTimer=null,slideSnapTimer=null;
   const slide=$('slideCard');
   function resetSwipe(){
+    if(slideLocked)return;
     gesture=null;
     slide.classList.remove('dragging');
     slide.classList.add('snap-back');
@@ -220,7 +223,9 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     },220);
   }
   slide.addEventListener('pointerdown',ev=>{
-    if(slideLocked||pendingDeck||ev.button>0||!cards.length)return;
+    if(slideLocked||pendingDeck||ev.button>0||!cards.length||
+       ev.pointerType==='touch')return;
+    // Touchscreen gestures are handled by touch events on ALL iOS versions.
     // Keep swipe working when a finger starts on the LEFT/RIGHT buttons.
     // Ordinary taps still dispatch their normal click handler.
     if(slideSnapTimer){window.clearTimeout(slideSnapTimer);slideSnapTimer=null}
@@ -262,7 +267,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     const dx=ev.clientX-gesture.x;
     gesture=null;
     try{if(slide.hasPointerCapture(ev.pointerId))slide.releasePointerCapture(ev.pointerId)}catch{}
-    if(tracking&&Math.abs(dx)>=Math.max(40,slide.clientWidth*.115)&&
+    if(tracking&&Math.abs(dx)>=Math.max(35,slide.clientWidth*.095)&&
       Math.abs(dx)>Math.abs(dy)*1.05)answerSlide(dx<0?'left':'right');
     else resetSwipe();
   };
@@ -271,10 +276,14 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   // the original card. Handle it globally too, without double-answering.
   window.addEventListener('pointerup',finishSwipe);
   slide.addEventListener('pointercancel',resetSwipe);
-  // Older iOS versions do not always provide reliable Pointer Events.
-  if(!window.PointerEvent){
+  // iOS may fire pointercancel on a horizontal swipe despite PointerEvent
+  // support. Use native touch events on all touchscreens; pointer gestures
+  // above are reserved for mouse and pen to prevent competing state.
+  {
     slide.addEventListener('touchstart',ev=>{
       if(slideLocked||pendingDeck||!ev.touches.length)return;
+      if(slideSnapTimer){window.clearTimeout(slideSnapTimer);slideSnapTimer=null}
+      slide.classList.remove('snap-back');
       const t=ev.touches[0];
       gesture={id:'touch',x:t.clientX,y:t.clientY,dx:0,dy:0,tracking:false};
     },{passive:true});
@@ -292,14 +301,14 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     slide.addEventListener('touchend',()=>{
       if(!gesture||gesture.id!=='touch')return;
       const {dx,dy,tracking}=gesture;gesture=null;
-      if(tracking&&Math.abs(dx)>=Math.max(40,slide.clientWidth*.115)&&Math.abs(dx)>Math.abs(dy))
+      if(tracking&&Math.abs(dx)>=Math.max(35,slide.clientWidth*.095)&&Math.abs(dx)>Math.abs(dy))
         answerSlide(dx<0?'left':'right');
       else resetSwipe();
     });
     slide.addEventListener('touchcancel',resetSwipe);
   }
   slide.addEventListener('lostpointercapture',()=>{
-    if(gesture&&gesture.tracking)resetSwipe();
+    if(!slideLocked&&gesture?.id!=='touch'&&gesture?.tracking)resetSwipe();
   });
   slide.addEventListener('keydown',ev=>{
     if(ev.target!==slide)return;
@@ -516,7 +525,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       if(!w?.word||!w.english)continue;
       const normalized=String(w.word).toLocaleLowerCase();
       if(known.has(normalized))continue;
-      existing.push({...w,articleId,at:new Date().toISOString()});
+      existing.push({...w,language:getLanguage(),articleId,at:new Date().toISOString()});
       known.add(normalized);changed=true;
     }
     if(changed)store(key('news.words'),existing.slice(-800));
@@ -530,7 +539,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       const previous=read(key('news.daily.long.v3',lang),null);
       if(previous?.stories?.length)saveNewsArchive(previous.stories);
       if(saved?.stories?.length)saveNewsArchive(saved.stories);
-      newsData=saved?.stories?.length?saved:null;
+      newsData=saved?.stories?.length?{...saved,stories:saved.stories.filter(articleMatches)}:null;
     }
     const stories=$('newsStoryList');
     stories.replaceChildren();
@@ -569,6 +578,11 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       const data=await resp.json();
       if(!resp.ok)throw new Error(data?.error||'Articles unavailable');
       if(!Array.isArray(data.stories)||data.stories.length===0)throw new Error('No articles in update');
+      if(data.language&&data.language!==lang)
+        throw new Error('Received articles for the wrong language');
+      const validStories=data.stories.filter(story=>!story.language||story.language===lang);
+      if(!validStories.length)throw new Error('No articles in selected language');
+      data.stories=validStories;
       store(key('news.daily.magazine.v6',lang),data);
       if(lang===getLanguage()){
         saveNewsArchive(data.stories);
