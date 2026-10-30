@@ -66,7 +66,14 @@ export function initMediaPages({getLanguage,getTalkWords}){
   let selectedClipWords=[],clipDraft=null,preparingClip=false,prepareSequence=0;
   const status=(id,msg)=>{const el=$(id);if(el)el.textContent=msg};
   const langName=()=>({nl:'Dutch',fr:'French',en:'English'}[getLanguage()]||'Dutch');
-  const dictionary=()=>new Map(safeWords(getTalkWords,getLanguage()).map(w=>[w.word.toLocaleLowerCase(),w.english]));
+  const dictionary=(language=getLanguage())=>{
+    const words=language===getLanguage()?getTalkWords():(()=>{
+      try{return JSON.parse(localStorage.getItem('camille.words.v3.'+language)||'[]')}
+      catch{return []}
+    })();
+    return new Map(safeWords(()=>words,language)
+      .map(w=>[w.word.toLocaleLowerCase(),w.english]));
+  };
   const sourceWords=count=>{
     const words=safeWords(getTalkWords,getLanguage());
     return words.slice(-count).reverse();
@@ -340,7 +347,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
         button.type='button';button.textContent=words[i];
         button.className='media-subtitle-word';button.dataset.index=String(i);
         const normalized=words[i].replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,'').toLocaleLowerCase();
-        button.addEventListener('click',()=>showClipWord(words[i],dictionary().get(normalized)));
+        button.addEventListener('click',()=>showClipWord(words[i],dictionary(activeClip.language).get(normalized)));
         box.append(button);
       }
       const englishText=activeClip.language==='en'?'':String(sentence.english||'');
@@ -496,7 +503,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
     $('clipPlayButton').hidden=false;
     showClipPlaybackMessage('Clip '+(clip.number||'')+' ready · Tap Play to watch again.');
     status('clipWordDetail','Tap a script word to pause the video and see its English meaning.');
-    renderTokens($('clipTranscript'),clip.text,dictionary(),-1,showClipWord);
+    renderTokens($('clipTranscript'),clip.text,dictionary(clip.language),-1,showClipWord);
     captionSentenceIndex=-1;captionWordIndex=-2;
     status('clipSyncStatus',clip.aligned&&clip.wordTimes?.length?
       'Synchronized from the recorded voice · Replaying costs no Anam credits':
@@ -530,11 +537,12 @@ export function initMediaPages({getLanguage,getTalkWords}){
       await putClip(clip);
     }
     write('clip.last-number','all',highest);
-    const clips=all.filter(c=>c.language===lang)
-      .sort((a,b)=>Number(a.number)-Number(b.number));
+    // The Clips folder is global across NL/FR/EN; language switching must
+    // never hide or orphan recordings saved under another study language.
+    const clips=all.sort((a,b)=>Number(a.number)-Number(b.number));
     status('clipLibraryCount',clips.length+' saved clips · Clips folder');
     if(!clips.length){
-      list.textContent='No saved clips in '+langName()+'. Create your first Clip with Mix → Prepare → Run.';
+      list.textContent='No saved clips yet. Create Clip 1 with Mix → Prepare → Run.';
       $('clipPlayback').hidden=true;activeClip=null;cleanClipVideo();return;
     }
     for(const clip of clips){
@@ -546,7 +554,8 @@ export function initMediaPages({getLanguage,getTalkWords}){
       number.textContent='Clip '+clip.number;
       const title=document.createElement('strong');title.textContent=clip.title;
       const meta=document.createElement('small');
-      meta.textContent=(NAMES[clip.persona]||'Avatar')+' · '+asDate(clip.createdAt)+
+      meta.textContent=clip.language.toUpperCase()+' · '+
+        (NAMES[clip.persona]||'Avatar')+' · '+asDate(clip.createdAt)+
         ' · '+Math.round(clip.duration||60)+'s';
       b.append(number,title,meta);
       b.addEventListener('click',()=>{
