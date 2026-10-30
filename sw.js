@@ -1,4 +1,4 @@
-const CACHE = 'ecl-immersive-talk-v61';
+const CACHE = 'ecl-immersive-talk-v62';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
