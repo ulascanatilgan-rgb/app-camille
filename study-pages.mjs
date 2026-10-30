@@ -109,7 +109,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     if(!item){setSlideEmpty('No cards yet. Open Talk to learn words, then return to Slide.');return}
     $('slideCard').hidden=false;
     $('slideLeftWord').disabled=false;$('slideRightWord').disabled=false;
-    info('slideStatus',(cardIndex+1)+' / '+cards.length+' · Swipe the card or tap the left/right word');
+    info('slideStatus',((cardIndex%cards.length)+1)+' / '+cards.length+' · Swipe anywhere on the card or tap an answer');
     info('slideDefinition',item.definition);
     info('slideSentenceEnglish',item.englishSentence||'');
     const sentence=$('slideSentence');sentence.replaceChildren();
@@ -133,6 +133,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     // Keep visible success/failure feedback until the next attempt.
     c.classList.remove('swipe-left','swipe-right','fly-left','fly-right','dragging','snap-back');
     c.style.transform='';gesture=null;slideLocked=false;
+    $('slideLeftWord').classList.remove('direction-active');$('slideRightWord').classList.remove('direction-active');
   }
   let slideAudioCtx=null;
   function playSlideResultSound(correct){
@@ -185,19 +186,26 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     card.classList.add(side==='left'?'fly-left':'fly-right');
     const langAtSwipe=getLanguage();
     const previousDeck=cards;
-    window.setTimeout(()=>{
+    if(slideAdvanceTimer)window.clearTimeout(slideAdvanceTimer);
+    slideAdvanceTimer=window.setTimeout(()=>{
+      slideAdvanceTimer=null;
+      // No card should remain locked if a reload or page change intervenes.
       if(cards!==previousDeck){slideLocked=false;return;}
       cardIndex++;
       if(currentPage==='slide'&&deckLang===langAtSwipe)renderSlide();
-      else slideLocked=false;
-    },620);
+      else {
+        slideLocked=false;
+        card.classList.remove('fly-left','fly-right');
+        card.style.transform='';
+      }
+    },340);
     updateCounts();
   }
   $('slideLeftWord').addEventListener('click',()=>answerSlide('left'));
   $('slideRightWord').addEventListener('click',()=>answerSlide('right'));
   // Capture the pointer from the beginning (especially on iOS) and release
   // after each attempt. Choices are actual buttons and never start a drag.
-  let gesture=null,slideLocked=false;
+  let gesture=null,slideLocked=false,slideAdvanceTimer=null,slideSnapTimer=null;
   const slide=$('slideCard');
   function resetSwipe(){
     gesture=null;
@@ -205,10 +213,18 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     slide.classList.add('snap-back');
     slide.style.transform='';
     slide.querySelectorAll('.slide-choice').forEach(e=>e.classList.remove('direction-active'));
-    window.setTimeout(()=>slide.classList.remove('snap-back'),220);
+    if(slideSnapTimer)window.clearTimeout(slideSnapTimer);
+    slideSnapTimer=window.setTimeout(()=>{
+      slideSnapTimer=null;
+      if(!gesture)slide.classList.remove('snap-back');
+    },220);
   }
   slide.addEventListener('pointerdown',ev=>{
-    if(slideLocked||pendingDeck||ev.button>0||!cards.length||ev.target.closest('button'))return;
+    if(slideLocked||pendingDeck||ev.button>0||!cards.length)return;
+    // Keep swipe working when a finger starts on the LEFT/RIGHT buttons.
+    // Ordinary taps still dispatch their normal click handler.
+    if(slideSnapTimer){window.clearTimeout(slideSnapTimer);slideSnapTimer=null}
+    slide.classList.remove('snap-back');
     gesture={id:ev.pointerId,x:ev.clientX,y:ev.clientY,dx:0,dy:0,tracking:false};
     try{slide.setPointerCapture(ev.pointerId)}catch{}
   });
@@ -232,16 +248,48 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     $('slideRightWord').classList.toggle('direction-active',active==='right');
     if(ev.cancelable)ev.preventDefault();
   });
-  slide.addEventListener('pointerup',ev=>{
+  const finishSwipe=ev=>{
     if(!gesture||ev.pointerId!==gesture.id)return;
-    const {dx,dy,tracking}=gesture;
+    const {tracking,dy}=gesture;
+    const dx=ev.clientX-gesture.x;
     gesture=null;
     try{if(slide.hasPointerCapture(ev.pointerId))slide.releasePointerCapture(ev.pointerId)}catch{}
-    if(tracking&&Math.abs(dx)>=Math.max(55,slide.clientWidth*.16)&&
-      Math.abs(dx)>Math.abs(dy)*1.1)answerSlide(dx<0?'left':'right');
+    if(tracking&&Math.abs(dx)>=Math.max(40,slide.clientWidth*.115)&&
+      Math.abs(dx)>Math.abs(dy)*1.05)answerSlide(dx<0?'left':'right');
     else resetSwipe();
-  });
+  };
+  slide.addEventListener('pointerup',finishSwipe);
+  // Safari occasionally releases capture before delivering pointerup to
+  // the original card. Handle it globally too, without double-answering.
+  window.addEventListener('pointerup',finishSwipe);
   slide.addEventListener('pointercancel',resetSwipe);
+  // Older iOS versions do not always provide reliable Pointer Events.
+  if(!window.PointerEvent){
+    slide.addEventListener('touchstart',ev=>{
+      if(slideLocked||pendingDeck||!ev.touches.length)return;
+      const t=ev.touches[0];
+      gesture={id:'touch',x:t.clientX,y:t.clientY,dx:0,dy:0,tracking:false};
+    },{passive:true});
+    slide.addEventListener('touchmove',ev=>{
+      if(!gesture||gesture.id!=='touch'||!ev.touches.length)return;
+      const t=ev.touches[0];
+      gesture.dx=t.clientX-gesture.x;gesture.dy=t.clientY-gesture.y;
+      if(Math.abs(gesture.dx)>12&&Math.abs(gesture.dx)>Math.abs(gesture.dy)*1.1){
+        gesture.tracking=true;
+        slide.classList.add('dragging');
+        slide.style.transform='translateX('+gesture.dx+'px) rotate('+(gesture.dx/22)+'deg)';
+        if(ev.cancelable)ev.preventDefault();
+      }
+    },{passive:false});
+    slide.addEventListener('touchend',()=>{
+      if(!gesture||gesture.id!=='touch')return;
+      const {dx,dy,tracking}=gesture;gesture=null;
+      if(tracking&&Math.abs(dx)>=Math.max(40,slide.clientWidth*.115)&&Math.abs(dx)>Math.abs(dy))
+        answerSlide(dx<0?'left':'right');
+      else resetSwipe();
+    });
+    slide.addEventListener('touchcancel',resetSwipe);
+  }
   slide.addEventListener('lostpointercapture',()=>{
     if(gesture&&gesture.tracking)resetSwipe();
   });
@@ -256,7 +304,9 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   }
   async function loadSlide(force=false) {
     if(pendingDeck)return;
-    const lang=getLanguage();deckLang=lang;
+    if(slideAdvanceTimer){window.clearTimeout(slideAdvanceTimer);slideAdvanceTimer=null;}
+    const lang=getLanguage(),previousLang=deckLang,priorCards=cards;
+    deckLang=lang;slideLocked=false;gesture=null;
     updateCounts();
     const words=validWords();
     if(!words.length){cards=[];setSlideEmpty('No Talk words yet. Practice a conversation to collect new vocabulary.');return}
@@ -265,7 +315,9 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     if(!force&&cached.signature===signature&&Array.isArray(cached.cards)&&cached.cards.length){
       cards=makeDeck(cached.cards,lang);cardIndex=0;renderSlide();return;
     }
-    pendingDeck=true;setSlideEmpty('Preparing practice cards from your Talk words…');
+    pendingDeck=true;
+    if(!priorCards.length||previousLang!==lang)setSlideEmpty('Preparing practice cards from your Talk words…');
+    else info('slideStatus','Preparing new cards · current deck preserved until ready…');
     try {
       const input=shuffled(words).slice(0,24).map(w=>({id:String(w.id||w.nl),word:String(w.nl),meaning:String(w.en)}));
       const resp=await fetch('/study-slide-deck',{
@@ -280,7 +332,16 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       store(key('slide.deck.v3',lang),{signature,cards:accepted});
       cards=makeDeck(accepted,lang);cardIndex=0;
       info('slideFeedback','');renderSlide();
-    }catch(error){if(getLanguage()===lang)setSlideEmpty(String(error.message||'Card generator unavailable'))}
+    }catch(error){
+      if(getLanguage()===lang){
+        if(priorCards.length&&previousLang===lang){
+          cards=priorCards;
+          info('slideStatus','New cards unavailable · previous deck is ready. Swipe or tap an answer.');
+          $('slideLeftWord').disabled=false;$('slideRightWord').disabled=false;
+          slideLocked=false;
+        }else setSlideEmpty(String(error.message||'Card generator unavailable'));
+      }
+    }
     finally{pendingDeck=false;}
   }
   $('slideReloadButton').addEventListener('click',()=>void loadSlide(true));
