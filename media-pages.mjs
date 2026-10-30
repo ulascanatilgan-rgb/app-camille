@@ -240,12 +240,44 @@ export function initMediaPages({getLanguage,getTalkWords}){
   }
   function cleanClipVideo(){
     if(captionFrame){cancelAnimationFrame(captionFrame);captionFrame=0;}
+    const video=$('clipSavedVideo');
+    video.pause();video.removeAttribute('src');video.load();
     if(clipUrl){URL.revokeObjectURL(clipUrl);clipUrl=''}
-    $('clipSavedVideo').pause();$('clipSavedVideo').removeAttribute('src');
-    $('clipSavedVideo').load();
+    $('clipPlayButton').hidden=false;
     captionSentenceIndex=-1;captionWordIndex=-2;
     $('clipSubtitles').replaceChildren();
     $('clipEnglishSubtitles').replaceChildren();
+  }
+  function showClipPlaybackMessage(message){
+    status('clipPlaybackStatus',message);
+  }
+  function playSavedClip(){
+    const video=$('clipSavedVideo');
+    if(!activeClip?.blob?.size){
+      showClipPlaybackMessage('This saved recording is missing its video file.');
+      return;
+    }
+    // Keep play() directly inside the tap handler for iOS user activation.
+    if(video.ended||video.currentTime>=video.duration-.12){
+      try{video.currentTime=0}catch{}
+    }
+    showClipPlaybackMessage('Starting Clip '+(activeClip.number||'')+'…');
+    try{
+      const started=video.play();
+      if(started&&typeof started.then==='function')
+        started.then(()=>{
+          $('clipPlayButton').hidden=true;
+          showClipPlaybackMessage('Playing · Both subtitle lines follow the recorded video.');
+        }).catch(error=>{
+          $('clipPlayButton').hidden=false;
+          showClipPlaybackMessage('Playback unavailable: '+String(error?.message||'Unsupported video format')+
+            '. Try the Download video option.');
+        });
+    }catch(error){
+      $('clipPlayButton').hidden=false;
+      showClipPlaybackMessage('Cannot play this recording: '+String(error?.message||error)+
+        '. Use Download video to open it in a compatible player.');
+    }
   }
   function showClipWord(word,english){
     $('clipSavedVideo').pause();
@@ -396,8 +428,18 @@ export function initMediaPages({getLanguage,getTalkWords}){
     status('clipPlaybackTitle',number+' · '+clip.title);
     status('clipPlaybackMeta',(NAMES[clip.persona]||'Avatar')+' · '+asDate(clip.createdAt)+
       ' · '+clip.language.toUpperCase()+' · Saved in My Clips on this device');
-    clipUrl=URL.createObjectURL(clip.blob);
-    $('clipSavedVideo').src=clipUrl;
+    const video=$('clipSavedVideo');
+    video.controls=true;video.playsInline=true;video.preload='metadata';
+    const original=clip.blob;
+    // Old library entries may have a Blob without a valid media MIME type.
+    // Keep their actual bytes intact and only restore the missing type.
+    const typedBlob=original.type&&/^video\//i.test(original.type)?original:
+      new Blob([original],{type:/mp4/i.test(clip.mimeType||'')?'video/mp4':'video/webm'});
+    clipUrl=URL.createObjectURL(typedBlob);
+    video.src=clipUrl;
+    video.load();
+    $('clipPlayButton').hidden=false;
+    showClipPlaybackMessage('Clip '+(clip.number||'')+' ready · Tap Play to watch again.');
     status('clipWordDetail','Tap a script word to pause the video and see its English meaning.');
     renderTokens($('clipTranscript'),clip.text,dictionary(),-1,showClipWord);
     captionSentenceIndex=-1;captionWordIndex=-2;
@@ -456,7 +498,12 @@ export function initMediaPages({getLanguage,getTalkWords}){
         for(const item of list.querySelectorAll('.clip-folder-active'))
           item.classList.remove('clip-folder-active');
         b.classList.add('clip-folder-active');
-        void selectClip(clip);
+        void selectClip(clip).then(()=>{
+          // On mobile the video is below the library. Bring it into view
+          // without requiring a manual scroll through the whole editor.
+          if(window.innerWidth<=1010)
+            $('clipPlayback').scrollIntoView?.({behavior:'smooth',block:'start'});
+        }).catch(error=>showClipPlaybackMessage('Could not open saved clip: '+error.message));
       });
       const del=document.createElement('button');del.type='button';
       del.className='media-delete';del.textContent='Delete';
@@ -592,7 +639,8 @@ export function initMediaPages({getLanguage,getTalkWords}){
         allSaved.reduce((n,c)=>Math.max(n,Number(c.number)||0),0))+1;
       const clip={id:'clip-'+Date.now(),number:nextNumber,createdAt:new Date().toISOString(),
         language:lang,persona,title:data.title,text:script,theme:data.theme,
-        usedWords:data.usedWords,selectedWords:data.selectedWords,blob,duration:(Date.now()-liveSince)/1000};
+        usedWords:data.usedWords,selectedWords:data.selectedWords,mimeType:type,
+        blob,duration:(Date.now()-liveSince)/1000};
       await putClip(clip);
       write('clip.last-number','all',nextNumber);
       status('clipStatus','Saved! Replay this video any time without starting Anam again.');
@@ -630,12 +678,29 @@ export function initMediaPages({getLanguage,getTalkWords}){
   $('clipSavedVideo').addEventListener('timeupdate',updateSubtitles);
   $('clipSavedVideo').addEventListener('loadedmetadata',updateSubtitles);
   $('clipSavedVideo').addEventListener('seeked',updateSubtitles);
-  $('clipSavedVideo').addEventListener('play',animateClipCaptions);
+  $('clipPlayButton').addEventListener('click',playSavedClip);
+  $('clipSavedVideo').addEventListener('play',()=>{
+    $('clipPlayButton').hidden=true;
+    animateClipCaptions();
+  });
   $('clipSavedVideo').addEventListener('pause',()=>{
     if(captionFrame){cancelAnimationFrame(captionFrame);captionFrame=0;}
+    if($('clipSavedVideo').ended)return;
+    $('clipPlayButton').hidden=false;
     updateSubtitles();
   });
-  $('clipSavedVideo').addEventListener('ended',updateSubtitles);
+  $('clipSavedVideo').addEventListener('ended',()=>{
+    $('clipPlayButton').hidden=false;
+    showClipPlaybackMessage('Video finished · Tap Play to watch again.');
+    updateSubtitles();
+  });
+  $('clipSavedVideo').addEventListener('error',()=>{
+    $('clipPlayButton').hidden=false;
+    const code=$('clipSavedVideo').error?.code;
+    showClipPlaybackMessage(code===4?
+      'This older video format is not supported by this browser. Try Download video.':
+      'The saved video could not be loaded. Try Play again or Download video.');
+  });
   window.addEventListener('pagehide',()=>{void cancelClip();cleanClipVideo()});
   function onPage(next){
     if(current==='clips'&&next!=='clips')void cancelClip();
