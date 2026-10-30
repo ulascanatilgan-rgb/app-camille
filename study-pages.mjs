@@ -226,9 +226,13 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     if(slideSnapTimer){window.clearTimeout(slideSnapTimer);slideSnapTimer=null}
     slide.classList.remove('snap-back');
     gesture={id:ev.pointerId,x:ev.clientX,y:ev.clientY,dx:0,dy:0,tracking:false};
-    try{slide.setPointerCapture(ev.pointerId)}catch{}
+    // Capturing a button's pointer retargets its click to the card on iOS.
+    // Only capture blank card areas; monitor the window for button-origin drags.
+    if(!ev.target.closest('button')){
+      try{slide.setPointerCapture(ev.pointerId)}catch{}
+    }
   });
-  slide.addEventListener('pointermove',ev=>{
+  const trackSwipe=ev=>{
     if(!gesture||ev.pointerId!==gesture.id||slideLocked)return;
     const dx=ev.clientX-gesture.x,dy=ev.clientY-gesture.y;
     gesture.dx=dx;gesture.dy=dy;
@@ -247,6 +251,10 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     $('slideLeftWord').classList.toggle('direction-active',active==='left');
     $('slideRightWord').classList.toggle('direction-active',active==='right');
     if(ev.cancelable)ev.preventDefault();
+  };
+  slide.addEventListener('pointermove',trackSwipe);
+  window.addEventListener('pointermove',ev=>{
+    if(gesture&&!slide.hasPointerCapture?.(gesture.id))trackSwipe(ev);
   });
   const finishSwipe=ev=>{
     if(!gesture||ev.pointerId!==gesture.id)return;
