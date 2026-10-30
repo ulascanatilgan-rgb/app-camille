@@ -215,8 +215,8 @@ export function registerStudyRoutes(app) {
         signal:AbortSignal.timeout(70000),
         body:JSON.stringify({
           model:'gpt-4o-mini-tts',
-          voice:'marin',response_format:'mp3',speed:1.02,
-          instructions:'Read this '+LANGUAGE[language].name+' news story with a natural confident, relaxed, modern radio-presenter voice. Smooth connected flow, clear pronunciation, lightly expressive, understated and cool, never robotic or theatrical. Do not add or remove any words.',
+          voice:'marin',response_format:'mp3',speed:0.98,
+          instructions:'Read this '+LANGUAGE[language].name+' magazine article in a relaxed, clear, intelligent and understated conversational voice. Natural sentence rhythm and breathing, modest emphasis, smooth paragraph transitions, authentic '+LANGUAGE[language].locale+' pronunciation. Sound like a thoughtful narrator, not a synthetic announcer or dramatic radio host. Preserve the exact text.',
           input:text
         })
       });
