@@ -399,6 +399,7 @@ function setAvatarLive(isLive) {
 }
 
 function setSubtitle(nl = '', en = '') {
+  stopLiveCaption();
   if (!captionsToggle.checked) {
     subtitleNl.textContent = '';
     subtitleEn.textContent = '';
@@ -686,45 +687,65 @@ function celebrateUserTurn() {
   }, 420);
 }
 
-function renderLiveDutch(text, activeChunk = '') {
-  if (!captionsToggle.checked) {
-    subtitleNl.textContent = '';
-    return;
+// Anam exposes streaming transcript chunks, but not per-word playback
+// timestamps. Pace each highlighted word to natural speech and follow SDK
+// text as it becomes available; never imply frame-perfect phoneme timing.
+let liveCaptionTimer=null,liveCaptionRun=0,liveCaptionId=null;
+let liveCaptionText='',liveCaptionIndex=0,liveCaptionFinal=false;
+let lockedEnglishTurn=null;
+function stopLiveCaption(){
+  ++liveCaptionRun;
+  if(liveCaptionTimer){window.clearTimeout(liveCaptionTimer);liveCaptionTimer=null}
+  liveCaptionId=null;liveCaptionText='';liveCaptionIndex=0;liveCaptionFinal=false;
+}
+function captionWordCount(text){
+  return replayWordParts(text).filter(part=>/^[\p{L}\p{N}]/u.test(part)).length;
+}
+function liveSpeechWordDelay(text,index){
+  const words=String(text||'').match(/[\p{L}\p{N}][\p{L}\p{N}'’\-]*/gu)||[];
+  const word=words[index]||'';
+  // Slow, conversational Flemish/French: 2.2–3.0 words per second;
+  // punctuation receives additional pause time.
+  const base=270+Math.min(230,word.length*17);
+  const after=(String(text).match(/[\p{L}\p{N}][\p{L}\p{N}'’\-]*[.,!?;:]?/gu)||[])[index]||'';
+  return Math.min(770,base+( /[.!?]$/.test(after)?260:/[,;:]$/.test(after)?130:0));
+}
+function renderLiveDutch(text,activeChunk='',messageId=activeSubtitleMessageId){
+  if(!captionsToggle.checked){subtitleNl.textContent='';return}
+  const clean=String(text||'').trim();
+  if(!clean)return;
+  if(messageId!==liveCaptionId||clean.length<liveCaptionText.length){
+    stopLiveCaption();
+    liveCaptionId=messageId;
+    liveCaptionIndex=0;liveCaptionFinal=false;
   }
-
-  const clean = String(text || '');
-  const chunk = String(activeChunk || '');
-  const matches = [...chunk.matchAll(/[\p{L}\p{M}][\p{L}\p{M}'’\-]*/gu)];
-  const activeWord = matches.length ? matches[matches.length - 1][0] : '';
-
-  if (!activeWord) {
-    subtitleNl.textContent = clean;
-    return;
+  liveCaptionText=clean;
+  renderReplayHighlight(subtitleNl,clean,liveCaptionIndex);
+  if(liveCaptionTimer)return;
+  const run=liveCaptionRun;
+  const tick=()=>{
+    liveCaptionTimer=null;
+    if(run!==liveCaptionRun||!captionsToggle.checked)return;
+    const size=captionWordCount(liveCaptionText);
+    if(liveCaptionIndex<size-1){
+      liveCaptionIndex++;
+      renderReplayHighlight(subtitleNl,liveCaptionText,liveCaptionIndex);
+    }else if(liveCaptionFinal){
+      renderReplayHighlight(subtitleNl,liveCaptionText,-1);
+      return;
+    }
+    liveCaptionTimer=window.setTimeout(tick,liveSpeechWordDelay(liveCaptionText,liveCaptionIndex));
+  };
+  liveCaptionTimer=window.setTimeout(tick,530);
+}
+function finishLiveCaption(text,messageId){
+  if(messageId!==liveCaptionId){
+    renderLiveDutch(text,'',messageId);
+  }else if(text&&String(text).length>=liveCaptionText.length){
+    liveCaptionText=String(text);
+    renderReplayHighlight(subtitleNl,liveCaptionText,liveCaptionIndex);
   }
-
-  const lower = clean.toLocaleLowerCase(languageConfig().locale);
-  const target = activeWord.toLocaleLowerCase(languageConfig().locale);
-  const index = lower.lastIndexOf(target);
-
-  if (index < 0) {
-    subtitleNl.textContent = clean;
-    return;
-  }
-
-  subtitleNl.replaceChildren();
-
-  const before = clean.slice(0, index);
-  const word = clean.slice(index, index + activeWord.length);
-  const after = clean.slice(index + activeWord.length);
-
-  if (before) subtitleNl.appendChild(document.createTextNode(before));
-
-  const active = document.createElement('span');
-  active.className = 'spoken-word';
-  active.textContent = word;
-  subtitleNl.appendChild(active);
-
-  if (after) subtitleNl.appendChild(document.createTextNode(after));
+  liveCaptionFinal=true;
 }
 
 function scrollConversationToBottom() {
@@ -933,35 +954,39 @@ async function translateToEnglish(text) {
   }
 }
 
-async function schedulePartialTranslation(text, messageId) {
-  const clean = (text || '').trim();
-  if (!captionsToggle.checked || clean.length < 2) return;
-
-  const now = Date.now();
-  if (now - lastPartialTranslationAt < 160) return;
-
-  lastPartialTranslationAt = now;
-  const seq = ++partialTranslationSeq;
-  const english = await translateToEnglish(clean);
-
-  if (
-    seq === partialTranslationSeq &&
-    activeSubtitleMessageId === messageId &&
-    english
-  ) {
-    subtitleEn.textContent = english;
+async function schedulePartialTranslation(text,messageId){
+  const clean=String(text||'').trim();
+  // Never translate unfinished fragments: English should be one complete,
+  // stable sentence/turn, not a rapidly changing approximation.
+  if(!captionsToggle.checked||targetLanguage==='en'||lockedEnglishTurn===messageId||
+     clean.length<10||!/[.!?…][”"'’)]?$/.test(clean))return;
+  const seq=++partialTranslationSeq;
+  const english=await translateToEnglish(clean);
+  if(seq===partialTranslationSeq&&activeSubtitleMessageId===messageId&&
+     lockedEnglishTurn!==messageId&&english&&captionsToggle.checked){
+    lockedEnglishTurn=messageId;
+    translationByMessageId.set(messageId,english);
+    subtitleEn.textContent=english;
+    lastSubtitlePair={nl:clean,en:english};
   }
 }
 
-async function finalizeSubtitle(nlText, messageId) {
-  const clean = (nlText || '').trim();
-  if (!clean) return;
-
-  const english = await translateToEnglish(clean);
-  if (messageId && english) translationByMessageId.set(messageId, english);
-
-  lastSubtitlePair = { nl: clean, en: english };
-  setSubtitle(clean, english);
+async function finalizeSubtitle(nlText,messageId){
+  const clean=String(nlText||'').trim();
+  if(!clean)return;
+  const existing=translationByMessageId.get(messageId)||'';
+  const english=existing||(await translateToEnglish(clean));
+  if(messageId&&english){
+    translationByMessageId.set(messageId,english);
+    if(lockedEnglishTurn!==messageId&&activeSubtitleMessageId===messageId){
+      lockedEnglishTurn=messageId;subtitleEn.textContent=english;
+    }
+  }
+  lastSubtitlePair={nl:clean,en:english};
+  // Preserve live word highlighting until the spoken turn finishes; English
+  // stays pinned once translated. Do not repaint the two lines on every chunk.
+  if(messageId&&liveCaptionId===messageId)finishLiveCaption(clean,messageId);
+  else if(activeSubtitleMessageId===messageId||!messageId)setSubtitle(clean,english);
   saveCurrentHistory();
   renderMessages(currentMessages);
 }
@@ -2588,6 +2613,7 @@ function resetUiAfterDisconnect() {
   languageToggle.disabled = false;
   updateTopicUi();
   replaySequence += 1;
+  stopLiveCaption();lockedEnglishTurn=null;
   window.speechSynthesis?.cancel?.();
   replayingAudio = false;
   clearQuickChoices();
