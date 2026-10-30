@@ -361,9 +361,11 @@ export function initMediaPages({getLanguage,getTalkWords}){
         if(activeClip?.id===requestedId){
           activeClip=revised;captionSentenceIndex=-1;captionWordIndex=-2;
           updateSubtitles();
-          status('clipSyncStatus',aligned?
-            'Synchronized to the recorded voice · English captions ready':
-            'English captions ready · Word alignment needs another attempt');
+          const englishReady=revised.language==='en'||captions.some(x=>x.english);
+          status('clipSyncStatus',aligned
+            ?'Synchronized to recorded speech'+(englishReady?' · Bilingual captions ready':' · English translation pending')
+            :(englishReady?'English captions ready · Word alignment needs another attempt':
+              'Subtitle alignment unavailable · Try Sync subtitles again'));
         }
         return revised;
       }catch(error){
@@ -415,7 +417,8 @@ export function initMediaPages({getLanguage,getTalkWords}){
     const lang=getLanguage(),list=$('clipLibrary');
     list.replaceChildren();
     const all=await allClips();
-    let highest=all.reduce((max,c)=>Math.max(max,Number(c.number)||0),0);
+    let highest=Math.max(read('clip.last-number','all',0),
+      all.reduce((max,c)=>Math.max(max,Number(c.number)||0),0));
     // Stable chronological Clip 1, Clip 2, etc., including legacy videos.
     // Never reuse a number after deleting an existing saved Clip.
     for(const clip of [...all].sort((a,b)=>a.createdAt.localeCompare(b.createdAt))){
@@ -423,6 +426,7 @@ export function initMediaPages({getLanguage,getTalkWords}){
       clip.number=++highest;
       await putClip(clip);
     }
+    write('clip.last-number','all',highest);
     const clips=all.filter(c=>c.language===lang)
       .sort((a,b)=>Number(a.number)-Number(b.number));
     status('clipLibraryCount',clips.length+' saved clips · Clips folder');
@@ -578,11 +582,13 @@ export function initMediaPages({getLanguage,getTalkWords}){
       const blob=new Blob(recorded,{type:r.mimeType||type});
       if(blob.size<10000)throw new Error('The recording was incomplete. Please retry.');
       const allSaved=await allClips();
-      const nextNumber=allSaved.reduce((n,c)=>Math.max(n,Number(c.number)||0),0)+1;
+      const nextNumber=Math.max(read('clip.last-number','all',0),
+        allSaved.reduce((n,c)=>Math.max(n,Number(c.number)||0),0))+1;
       const clip={id:'clip-'+Date.now(),number:nextNumber,createdAt:new Date().toISOString(),
         language:lang,persona,title:data.title,text:script,theme:data.theme,
         usedWords:data.usedWords,selectedWords:data.selectedWords,blob,duration:(Date.now()-liveSince)/1000};
       await putClip(clip);
+      write('clip.last-number','all',nextNumber);
       status('clipStatus','Saved! Replay this video any time without starting Anam again.');
       await renderClips();await selectClip(clip);
     }catch(e){
