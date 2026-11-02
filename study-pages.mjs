@@ -654,6 +654,85 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     }
     finally{$('newsUpdateButton').disabled=false;}
   }
+  const uploadedPhoto=$('newsUploadFile');
+  let uploadingPhoto=false;
+  function uploadMessage(message,isError=false){
+    const el=$('newsUploadStatus');
+    el.textContent=message;
+    el.hidden=!message;
+    el.classList.toggle('study-upload-error',isError);
+  }
+  async function resizeArticlePhoto(file){
+    if(!file||!/^image\//.test(file.type)||file.size>24*1024*1024)
+      throw new Error('Select a photograph (up to 24 MB).');
+    const objectUrl=URL.createObjectURL(file);
+    const image=new Image();
+    try{
+      await new Promise((resolve,reject)=>{
+        image.onload=resolve;
+        image.onerror=()=>reject(new Error('Could not open this image. Try JPG or PNG.'));
+        image.src=objectUrl;
+      });
+      if(!image.naturalWidth||!image.naturalHeight)
+        throw new Error('The image is empty.');
+      const canvas=document.createElement('canvas');
+      const ctx=canvas.getContext('2d');
+      if(!ctx)throw new Error('Photo processing is unavailable on this browser.');
+      // Preserve enough resolution for type while bounding iOS memory/network.
+      const scale=Math.min(1,2200/Math.max(image.naturalWidth,image.naturalHeight));
+      canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));
+      canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+      ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(image,0,0,canvas.width,canvas.height);
+      let result='';
+      for(const quality of [.87,.77,.64,.52]){
+        result=canvas.toDataURL('image/jpeg',quality);
+        if(result.length<=3_500_000)break;
+      }
+      if(result.length>3_500_000)
+        throw new Error('The photo is too large. Crop it to the article text and retry.');
+      return result;
+    }finally{URL.revokeObjectURL(objectUrl)}
+  }
+  async function uploadArticlePhoto(file){
+    if(uploadingPhoto||!file)return;
+    const lang=getLanguage();
+    uploadingPhoto=true;
+    $('newsUploadButton').disabled=true;
+    uploadMessage('Reading photo and preparing your vocabulary…');
+    try{
+      const image=await resizeArticlePhoto(file);
+      const response=await fetch('/study-upload-article',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({language:lang,image}),signal:AbortSignal.timeout(115000)
+      });
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(data.error||'Photo reading failed.');
+      if(data.kind!=='upload'||data.language!==lang||
+         !Array.isArray(data.sentences)||!data.sentences.length||
+         !Array.isArray(data.words))
+        throw new Error('Incomplete scan. Please retry.');
+      if(lang!==getLanguage())throw new Error('Language changed during upload. Choose the image again.');
+      // Only the extracted text, translations and vocabulary are stored.
+      // The original photo is not retained in the app library.
+      await photoStore('readwrite',store=>store.put(data));
+      await loadPhotoScans();
+      archiveStory=data;newsReaderIndex=-1;
+      renderNewsReader();
+      uploadMessage('Saved to My scans · '+data.wordCount+' words · Press Run to listen.');
+    }catch(error){
+      uploadMessage(String(error?.message||'Could not read the photo.'),true);
+    }finally{
+      uploadingPhoto=false;
+      $('newsUploadButton').disabled=false;
+      uploadedPhoto.value='';
+    }
+  }
+  $('newsUploadButton').addEventListener('click',()=>uploadedPhoto.click());
+  uploadedPhoto.addEventListener('change',()=>{
+    const image=uploadedPhoto.files?.[0];
+    if(image)void uploadArticlePhoto(image);
+  });
   $('newsUpdateButton').addEventListener('click',()=>void updateNews(true));
   $('newsArticlesButton').addEventListener('click',()=>{stopNews();archiveStory=null;newsReaderIndex=-1;renderNews();});
   $('newsBackButton').addEventListener('click',()=>{
