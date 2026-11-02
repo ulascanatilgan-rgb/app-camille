@@ -273,10 +273,14 @@
         <div class="study-header-actions">
           <button id="newsArticlesButton" class="study-secondary-button" type="button">All articles</button>
           <button id="newsUpdateButton" class="study-primary-button" type="button">Update</button>
+          <button id="newsUploadButton" class="study-secondary-button" type="button">Upload photo</button>
+          <input id="newsUploadFile" type="file" accept="image/*" aria-label="Choose or photograph a Dutch, French or English article" hidden />
+          <button id="newsScansButton" class="study-secondary-button" type="button">My scans</button>
           <button id="newsWordsButton" class="study-secondary-button" type="button">Words</button>
           <button id="newsHistoryButton" class="study-secondary-button" type="button">History</button>
         </div>
       </header>
+      <div id="newsUploadStatus" class="study-message" role="status" aria-live="polite" hidden></div>
       <div id="newsStatus" class="study-message" role="status"></div>
       <div id="newsStoryList" class="news-story-list"></div>
       <section id="newsReader" class="news-reader" hidden>
