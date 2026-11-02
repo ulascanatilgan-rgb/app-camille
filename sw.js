@@ -1,4 +1,4 @@
-const CACHE = 'ecl-slow-clips-v69';
+const CACHE = 'ecl-photo-articles-v70';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
