@@ -12,7 +12,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const port = process.env.PORT || 3000;
 
-app.use(express.json({ limit: '1mb' }));
+// Photo uploads are resized client-side and validated again by the study route.
+app.use(express.json({ limit: '4mb' }));
 // Prevent installed iOS PWAs from keeping old HTML, scripts and styles.
 app.use((req, res, next) => {
   if (req.method === 'GET' && (/^\/$/.test(req.path) || /\.(?:html|js|css|webmanifest|png|jpg|jpeg)$/.test(req.path) || req.path === '/sw.js')) {
