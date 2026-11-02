@@ -728,6 +728,44 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       uploadedPhoto.value='';
     }
   }
+  let creatingArticle=false;
+  $('newsCreateButton').addEventListener('click',async()=>{
+    if(creatingArticle||uploadingPhoto)return;
+    const lang=getLanguage();
+    const pool=validWords().filter(w=>w.nl&&w.en);
+    if(pool.length<3){
+      uploadMessage('Learn at least three words in Talk or Articles before creating an article.',true);
+      return;
+    }
+    creatingArticle=true;
+    $('newsCreateButton').disabled=true;
+    uploadMessage('Writing your article from learned words…');
+    try{
+      const chosen=[...pool].sort(()=>Math.random()-.5).slice(0,20)
+        .map(w=>({word:w.nl,english:w.en}));
+      const response=await fetch('/study-create-article',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({language:lang,words:chosen}),
+        signal:AbortSignal.timeout(115000)
+      });
+      const article=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(article.error||'Could not create the article');
+      if(lang!==getLanguage())throw new Error('Language changed during creation. Press Create again.');
+      if(article.language!==lang||article.kind!=='custom'||!Array.isArray(article.sentences)||
+         !article.sentences.length)throw new Error('Invalid article returned.');
+      // Personal creations and photo scans are stored in the same independent,
+      // quota-friendly local IndexedDB; existing magazine archives are intact.
+      await photoStore('readwrite',store=>store.put(article));
+      await loadPhotoScans();
+      archiveStory=article;newsReaderIndex=-1;renderNewsReader();
+      uploadMessage('Your article is saved in History. Press Run to listen.');
+    }catch(error){
+      uploadMessage(String(error?.message||'Article creation failed.'),true);
+    }finally{
+      creatingArticle=false;
+      $('newsCreateButton').disabled=false;
+    }
+  });
   $('newsUploadButton').addEventListener('click',()=>uploadedPhoto.click());
   uploadedPhoto.addEventListener('change',()=>{
     const image=uploadedPhoto.files?.[0];
