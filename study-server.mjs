@@ -117,7 +117,116 @@ async function jsonFromOpenAI(apiKey,system,user,maxTokens=3400) {
   const data=await response.json();
   return JSON.parse(data?.choices?.[0]?.message?.content||'{}');
 }
+
+// Upload OCR is private and transient: image bytes are sent only to the
+// vision model, never stored in the server or browser history. The extracted
+// text + bilingual learning materials are saved locally on the user's device.
+const uploadRate=new Map();
+const uploadStopwords={
+  nl:new Set('de het een en van voor met naar zijn wij ik je jij ze ons in is op aan bij om als maar niet ook kan moet deze die dit dat nog dan heel over heeft hebben willen vandaag morgen graag omdat wanneer hoe waar waarom altijd nooit onze jouw mijn hun hij haar zij samen'.split(' ')),
+  fr:new Set('le la les un une des du de et est avec dans pour nous vous ils elles je tu il elle sur au aux ce cette ces mais pas sont ont que qui quoi quand comment pourquoi où être avoir tout très plus aussi comme alors notre votre leur mon ton son mes tes ses'.split(' ')),
+  en:new Set('the and of to in is a an are was were with for on from this that these those as at by or but we they you he she it their our your his her has have had be been do did does can could would should into about after before not no'.split(' '))
+};
+function uploadSentenceParts(text){
+  const paragraphs=String(text||'').split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  const sentences=[];
+  for(const p of paragraphs){
+    const parts=p.match(/[^.!?。！？]+(?:[.!?。！？]+|$)/gu)||[p];
+    for(const part of parts){const line=part.trim();if(line)sentences.push(line)}
+  }
+  return sentences.slice(0,125);
+}
+async function visionUpload(apiKey,imageData,language){
+  const response=await fetch('https://api.openai.com/v1/chat/completions',{
+    method:'POST',
+    headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json'},
+    signal:AbortSignal.timeout(65000),
+    body:JSON.stringify({model:'gpt-4o',temperature:0,max_tokens:3400,
+      response_format:{type:'json_object'},
+      messages:[
+        {role:'system',content:
+          'You are a meticulous optical text transcription assistant, not a translator or creative writer. '+
+          'Read ALL clearly visible article/newspaper/magazine text from the photo in natural column reading order. '+
+          'Keep the EXACT original language and wording, including proper names; do not invent missing words or complete cut-off sentences. '+
+          'Ignore navigation, advertising, decorative text and page numbers when distinguishable. '+
+          'Preserve paragraph breaks with newlines. Identify the PRIMARY language of the photographed body text as nl, fr, en or other. '+
+          'Return JSON {"language":"nl|fr|en|other","title":"visible title if any","text":"faithful transcription"}. '+
+          'Never put English explanations inside Dutch or French text.'},
+        {role:'user',content:[
+          {type:'text',text:'Transcribe only the visible writing in this photographed article. Expected language: '+LANGUAGE[language].name+'. Do not translate the original.'},
+          {type:'image_url',image_url:{url:imageData,detail:'high'}}
+        ]}
+      ]})
+  });
+  if(!response.ok)throw new Error('Image reading failed: HTTP '+response.status);
+  const data=await response.json();
+  return JSON.parse(data?.choices?.[0]?.message?.content||'{}');
+}
 export function registerStudyRoutes(app) {
+  const uploadAttempts=new Map();
+  app.post('/study-upload-article',async(req,res)=>{
+    res.set('Cache-Control','no-store');
+    const apiKey=process.env.OPENAI_API_KEY;
+    if(!apiKey)return res.status(503).json({error:'Photo reading is not configured.'});
+    const language=LANGUAGE[req.body?.language]?req.body.language:'nl';
+    const photo=typeof req.body?.image==='string'?req.body.image:'';
+    if(!/^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=]+$/i.test(photo)||
+       photo.length<1000||photo.length>3_600_000)
+      return res.status(400).json({error:'Choose a JPG, PNG or WebP photo up to 2.5 MB. Large photos are automatically resized.'});
+    const ip=req.ip||'anonymous',now=Date.now();
+    const attempts=(uploadAttempts.get(ip)||[]).filter(t=>now-t<3600000);
+    if(attempts.length>=12)return res.status(429).json({error:'Photo reading limit reached. Try again later.'});
+    attempts.push(now);uploadAttempts.set(ip,attempts);
+    if(uploadAttempts.size>500)uploadAttempts.clear();
+    try{
+      const raw=await visionUpload(apiKey,photo,language);
+      const detected=String(raw.language||'other').toLowerCase();
+      if(detected!==language)
+        return res.status(422).json({error:
+          'This photo appears to contain '+(LANGUAGE[detected]?.name||'another language')+
+          '. Switch to that language before uploading. No scan was saved.'});
+      const original=String(raw.text||'').replace(/\r/g,'').replace(/\n{3,}/g,'\n\n').trim();
+      if(original.length<55)return res.status(422).json({error:'Not enough legible text was found. Try a clearer photo with the whole page visible.'});
+      if(original.length>5900)return res.status(422).json({error:'This page is too long for one scan. Photograph its upper and lower sections separately.'});
+      const parts=uploadSentenceParts(original);
+      if(!parts.length)return res.status(422).json({error:'Could not identify readable sentences in this photo.'});
+      const instructions=[
+        'You prepare study metadata for exact already-transcribed '+LANGUAGE[language].name+' writing.',
+        'CRITICAL: Do NOT rewrite, summarize, add, omit or correct any original sentence.',
+        'Translate each numbered source sentence naturally into English, preserving its order.',
+        'Extract 10 to 20 high-utility learning vocabulary words or short phrases from ONLY the exact source text.',
+        'Prioritize useful nouns, verbs, adjectives, common expressions (A2/B1). Exclude names, stopwords, and anything absent from source.',
+        'Return JSON {"english":["one translation for each sentence"],"words":[{"word":"exact source-language word/phrase","english":"English meaning","definition":"short English definition","example":"short target-language example"}]}.',
+        'Do not mix English into a Dutch/French example. Do not include the source text again.'
+      ].join(' ');
+      const enriched=await jsonFromOpenAI(apiKey,instructions,
+        JSON.stringify({language,sentences:parts.map((text,i)=>({index:i+1,text}))}),4500);
+      const english=Array.isArray(enriched.english)?enriched.english:[];
+      if(english.length!==parts.length||english.some(x=>!String(x||'').trim()))
+        return res.status(502).json({error:'The photo was read, but some English sentences could not be translated. Please retry.'});
+      const sentences=parts.map((target,i)=>({target,english:safeText(english[i],650)}));
+      const wordSet=new Set(),stop=uploadStopwords[language]||uploadStopwords.en;
+      const words=(Array.isArray(enriched.words)?enriched.words:[])
+        .map(w=>({word:safeText(w?.word,70),english:safeText(w?.english,105),
+          definition:safeText(w?.definition,230),example:safeText(w?.example,240)}))
+        .filter(w=>{
+          const normalized=w.word.toLocaleLowerCase();
+          if(!normalized||!w.english||stop.has(normalized)||wordSet.has(normalized))return false;
+          if(!original.toLocaleLowerCase().includes(normalized))return false;
+          wordSet.add(normalized);return true;
+        }).slice(0,20);
+      const title=safeText(raw.title,160)||safeText(parts[0],105);
+      res.json({kind:'upload',language,title,
+        id:'scan-'+language+'-'+Date.now()+'-'+Math.random().toString(36).slice(2,9),
+        source:'My Upload',publishedAt:new Date().toISOString(),
+        uploadedAt:new Date().toISOString(),sentences,words,
+        wordCount:original.split(/\s+/).length});
+    }catch(error){
+      console.warn('Photo article recognition:',error?.message||error);
+      res.status(502).json({error:'Could not read this photograph. Try a sharper, well-lit image or a smaller crop.'});
+    }
+  });
+
   app.post('/study-slide-deck',async(req,res)=>{
     res.setHeader('Cache-Control','no-store');
     if(!process.env.OPENAI_API_KEY)return res.status(503).json({error:'OpenAI API key not configured.'});
