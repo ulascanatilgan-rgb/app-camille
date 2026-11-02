@@ -164,6 +164,60 @@ async function visionUpload(apiKey,imageData,language){
 }
 export function registerStudyRoutes(app) {
   const uploadAttempts=new Map();
+  const createdArticleRate=new Map();
+  app.post('/study-create-article',async(req,res)=>{
+    res.set('Cache-Control','no-store');
+    if(!process.env.OPENAI_API_KEY)return res.status(503).json({error:'Article creation unavailable.'});
+    const language=LANGUAGE[req.body?.language]?req.body.language:'nl';
+    const list=(Array.isArray(req.body?.words)?req.body.words:[]).slice(0,25)
+      .map(x=>({word:safeText(x?.word,65),english:safeText(x?.english,95)}))
+      .filter(w=>w.word&&w.english);
+    if(list.length<3)return res.status(400).json({error:'Learn at least three words in Talk, Articles or a photo scan first.'});
+    const ip=req.ip||'anonymous',now=Date.now();
+    const attempts=(createdArticleRate.get(ip)||[]).filter(time=>now-time<3600000);
+    if(attempts.length>=6)return res.status(429).json({error:'Article creation limit reached. Try again later.'});
+    attempts.push(now);createdArticleRate.set(ip,attempts);
+    if(createdArticleRate.size>500)createdArticleRate.clear();
+    try{
+      let result=null;
+      for(let attempt=0;attempt<2;attempt++){
+        const prompt=[
+          'You write ORIGINAL engaging educational magazine articles for '+LANGUAGE[language].name+' learners.',
+          'Write one coherent 280–330 word story about practical culture, science, lifestyle, economics or everyday life.',
+          'Use 8–15 supplied vocabulary words NATURALLY; do not list them separately in the article.',
+          'Use only the selected language in title and full source story, NEVER English inside Dutch/French original.',
+          'Keep a natural flow of 18–28 sentences. Provide accurate English for EACH source sentence.',
+          'Return JSON {"title":"...","sentences":[{"target":"target-language sentence","english":"full English translation"}],"words":[{"word":"source-language vocabulary","english":"meaning","definition":"short English definition","example":"example in selected language"}]}.',
+          'The sentences array MUST contain AT LEAST 250 total target-language words. The English translations must correspond 1:1.',
+          'No made-up news, copyrighted excerpts or full quotes. Original composition only.',
+          attempt?'Previous attempt was too short. Ensure 250+ target-language words.':''
+        ].join(' ');
+        const generated=await jsonFromOpenAI(process.env.OPENAI_API_KEY,prompt,
+          JSON.stringify({language,words:list}),5500);
+        const sentences=(Array.isArray(generated.sentences)?generated.sentences:[])
+          .map(item=>({target:safeText(item?.target,440),english:safeText(item?.english,620)}))
+          .filter(item=>item.target&&item.english);
+        const wordCount=sentences.reduce((n,item)=>n+item.target.split(/\s+/).length,0);
+        if(wordCount>=250&&sentences.length>=15){
+          result={generated,sentences,wordCount};break;
+        }
+      }
+      if(!result)return res.status(502).json({error:'The article was too short. Try Create again.'});
+      const original=result.sentences.map(x=>x.target).join(' ').toLocaleLowerCase();
+      const words=(Array.isArray(result.generated.words)?result.generated.words:[])
+        .map(w=>({word:safeText(w?.word,65),english:safeText(w?.english,95),
+          definition:safeText(w?.definition,210),example:safeText(w?.example,230)}))
+        .filter(w=>w.word&&w.english&&original.includes(w.word.toLocaleLowerCase())).slice(0,20);
+      return res.json({id:'custom-'+language+'-'+Date.now(),kind:'custom',language,
+        source:'My Article',publishedAt:new Date().toISOString(),uploadedAt:new Date().toISOString(),
+        title:safeText(result.generated.title,170)||'My article',
+        sentences:result.sentences,words,wordCount:result.wordCount});
+    }catch(error){
+      console.warn('Custom article error:',error?.message||error);
+      return res.status(502).json({error:'Could not create your article. Please retry.'});
+    }
+  });
+
   app.post('/study-upload-article',async(req,res)=>{
     res.set('Cache-Control','no-store');
     const apiKey=process.env.OPENAI_API_KEY;
