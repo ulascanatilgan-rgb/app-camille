@@ -20,7 +20,17 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   const store=(key,obj)=>{try{localStorage.setItem(key,JSON.stringify(obj))}catch{}};
   const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}catch{return fallback}};
   const key=(group,lang=getLanguage())=>'ecl.'+group+'.v1.'+lang;
-  const validWords=()=>getTalkWords().filter(w=>w?.nl&&w?.en&&(!w.language||w.language===getLanguage())).slice(-800);
+  // Shared per-language pool: Talk + Articles + imported photo vocabulary.
+  // Slide uses the same source that Song and Clips already read.
+  const validWords=()=>{
+    const talk=getTalkWords().filter(w=>w?.nl&&w?.en&&(!w.language||w.language===getLanguage()));
+    const stored=new Set(talk.map(w=>String(w.nl).toLocaleLowerCase()));
+    const article=newsWords().filter(w=>w?.word&&w?.english).map(w=>({
+      id:'article-'+getLanguage()+'-'+String(w.word).toLocaleLowerCase(),
+      nl:w.word,en:w.english,language:getLanguage(),source:'Articles'
+    })).filter(w=>{const k=String(w.nl).toLocaleLowerCase();if(stored.has(k))return false;stored.add(k);return true});
+    return [...talk,...article].slice(-800);
+  };
   const score=()=>read(key('slide.results'),[]);
   const articleMatches=story=>!story?.language||story.language===getLanguage();
   const newsWords=()=>read(key('news.words'),[]).filter(w=>!w.language||w.language===getLanguage());
@@ -369,7 +379,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   }
   $('slideReloadButton').addEventListener('click',()=>void loadSlide(true));
 
-  // Word libraries are independent: Slide uses Talk words, News has its own.
+  // All sections share learning vocabulary; existing libraries remain intact.
   async function slideWordDetails(item) {
     const lang=getLanguage(),id=String(item.id||item.nl);
     const all=read(key('slide.deck.v3',lang),{}).cards||[];
@@ -606,13 +616,17 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   $('newsBackButton').addEventListener('click',()=>{
     stopNews();newsReaderIndex=-1;archiveStory=null;renderNews();
   });
-  function openNewsArchive(){
+  function openNewsArchive(filter='all'){
     stopNews();
     const dialog=$('newsHistoryDialog'),list=$('newsHistoryList');
     list.replaceChildren();
-    const history=newsArchive();
+    const history=newsArchive().filter(story=>filter!=='uploads'||story.kind==='upload');
+    const heading=dialog.querySelector('h2');
+    if(heading)heading.textContent=filter==='uploads'?'My scans':'Saved articles';
     if(!history.length){
-      const empty=document.createElement('p');empty.textContent='No saved articles yet. Tap Update to prepare your first articles.';
+      const empty=document.createElement('p');empty.textContent=filter==='uploads'?
+        'No scans yet. Tap Upload photo to save your first article.':
+        'No saved articles yet. Tap Update or Upload photo.';
       list.append(empty);
     }
     history.forEach(story=>{
@@ -630,7 +644,8 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     });
     dialog.showModal();
   }
-  $('newsHistoryButton').addEventListener('click',openNewsArchive);
+  $('newsHistoryButton').addEventListener('click',()=>openNewsArchive('all'));
+  $('newsScansButton').addEventListener('click',()=>openNewsArchive('uploads'));
   $('newsHistoryClose').addEventListener('click',()=>$('newsHistoryDialog').close());
   $('newsHistoryDialog').addEventListener('click',e=>{
     if(e.target===$('newsHistoryDialog'))e.target.close();
@@ -646,21 +661,29 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     info('newsReaderTitle',article.title);
     const source=$('newsReaderSource');source.replaceChildren();
     const name=document.createElement('span');
-    name.textContent=(article.sources?.length?'Sources: ':'Source: ')+article.source+
-      (article.publishedAt?' · '+new Date(article.publishedAt).toLocaleDateString():'')+' · ';
-    source.append(name);
-    const links=article.sources?.length?article.sources:[{name:'Original article',url:article.url}];
-    links.forEach((item,index)=>{
-      if(index)source.append(document.createTextNode(' · '));
-      const link=document.createElement('a');
-      link.textContent=item.name||'Original article';
-      link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';
-      source.append(link);
-    });
+    if(article.kind==='upload'){
+      name.textContent='My Upload · '+new Date(article.uploadedAt||article.publishedAt||Date.now()).toLocaleDateString();
+      source.append(name);
+    }else{
+      name.textContent=(article.sources?.length?'Sources: ':'Source: ')+article.source+
+        (article.publishedAt?' · '+new Date(article.publishedAt).toLocaleDateString():'')+' · ';
+      source.append(name);
+      const links=article.sources?.length?article.sources:[{name:'Original article',url:article.url}];
+      links.forEach((item,index)=>{
+        if(index)source.append(document.createTextNode(' · '));
+        if(!/^https?:\/\//.test(item.url||''))return;
+        const link=document.createElement('a');
+        link.textContent=item.name||'Original article';
+        link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';
+        source.append(link);
+      });
+    }
     addNewsWords(article);
-    info('newsNarrationDisclosure',article.kind==='article'
-      ?'Original magazine-style learning article · Natural AI narration · Select any word to study'
-      : 'Saved reading · Tap a word for its meaning');
+    info('newsNarrationDisclosure',article.kind==='upload'
+      ?'Your scanned text · Tap a word to study · Run to listen'
+      :article.kind==='article'
+        ?'Original learning article · Select any word to study'
+        :'Saved reading · Tap a word for its meaning');
     $('newsCompleteButton').hidden=!article.sentences.some(s=>s.english);
     const vocab=$('newsReaderWords');vocab.replaceChildren();
     for(const w of article.words){
