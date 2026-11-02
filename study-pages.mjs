@@ -29,7 +29,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       id:'article-'+getLanguage()+'-'+String(w.word).toLocaleLowerCase(),
       nl:w.word,en:w.english,language:getLanguage(),source:'Articles'
     })).filter(w=>{const k=String(w.nl).toLocaleLowerCase();if(stored.has(k))return false;stored.add(k);return true});
-    return [...talk,...article].slice(-800);
+    return [...talk,...article].slice(-1600);
   };
   const score=()=>read(key('slide.results'),[]);
   // Photo scans are kept in IndexedDB, not the small localStorage quota.
@@ -450,7 +450,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     stopNews();
     const dialog=$('studyWordsDialog'),lang=getLanguage(),isSlide=which==='slide';
     info('studyWordsTitle',isSlide?'Slide Words':'Article Words');
-    info('studyWordsEyebrow',(isSlide?'TALK WORDS':'ARTICLE VOCABULARY')+' · '+lang.toUpperCase());
+    info('studyWordsEyebrow',(isSlide?'LEARNED WORDS':'ARTICLE & SCAN VOCABULARY')+' · '+lang.toUpperCase());
     const filters=$('studyWordsFilters');filters.replaceChildren();
     const options=isSlide?['All Words','Wrong Words','Correct Words']:['All Words'];
     const records=isSlide?validWords():newsWords(),results=score(),list=$('studyWordsList');
@@ -589,7 +589,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       existing.push({...w,language:getLanguage(),articleId,at:new Date().toISOString()});
       known.add(normalized);changed=true;
     }
-    if(changed)store(key('news.words'),existing.slice(-800));
+    if(changed)store(key('news.words'),existing.slice(-3000));
   }
   function addNewsWords(article) {saveNewsWords(article.words||[],article.id);}
   function renderNews() {
@@ -647,7 +647,9 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
       store(key('news.daily.magazine.v6',lang),data);
       if(lang===getLanguage()){
         saveNewsArchive(data.stories);
-        newsData=data;newsLang=lang;newsReaderIndex=-1;archiveStory=null;renderNews();
+        const personalReading=archiveStory&&['upload','custom'].includes(archiveStory.kind)?archiveStory:null;
+        newsData=data;newsLang=lang;newsReaderIndex=-1;
+        archiveStory=personalReading;renderNews();
       }
     }catch(error){
       info('newsStatus',(newsData?.stories?.length?'Could not refresh; saved stories remain available. ':'')+String(error.message||'Article update could not finish'));
