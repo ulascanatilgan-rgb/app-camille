@@ -32,9 +32,51 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     return [...talk,...article].slice(-800);
   };
   const score=()=>read(key('slide.results'),[]);
+  // Photo scans are kept in IndexedDB, not the small localStorage quota.
+  // Old magazine/news archives, word lists and saved videos are untouched.
+  let photoScans=[],photoScansLang='',scanLoadSeq=0;
+  async function photoStore(mode,action){
+    const db=await new Promise((resolve,reject)=>{
+      const req=indexedDB.open('ecl-photo-articles-v1',1);
+      req.onupgradeneeded=()=>{
+        if(!req.result.objectStoreNames.contains('scans'))
+          req.result.createObjectStore('scans',{keyPath:'id'});
+      };
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error||new Error('Photo history unavailable'));
+    });
+    try{return await new Promise((resolve,reject)=>{
+      const tx=db.transaction('scans',mode),req=action(tx.objectStore('scans'));
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error||new Error('Could not save scan'));
+      tx.onabort=()=>reject(tx.error||new Error('Photo history transaction aborted'));
+      tx.onerror=()=>reject(tx.error||new Error('Photo history transaction error'));
+    })}finally{db.close()}
+  }
+  async function loadPhotoScans(){
+    const lang=getLanguage(),seq=++scanLoadSeq;
+    try{
+      const all=await photoStore('readonly',store=>store.getAll());
+      if(seq===scanLoadSeq&&lang===getLanguage()){
+        photoScans=(Array.isArray(all)?all:[]).filter(x=>x.language===lang)
+          .sort((a,b)=>String(b.uploadedAt||'').localeCompare(String(a.uploadedAt||'')));
+        photoScansLang=lang;
+      }
+    }catch(error){
+      console.warn('Photo scans storage unavailable',error);
+      if(seq===scanLoadSeq&&lang===getLanguage()){photoScans=[];photoScansLang=lang;}
+    }
+  }
   const articleMatches=story=>!story?.language||story.language===getLanguage();
   const newsWords=()=>read(key('news.words'),[]).filter(w=>!w.language||w.language===getLanguage());
-  const newsArchive=()=>read(key('news.archive'),[]).filter(articleMatches);
+  const newsArchive=()=>{
+    const saved=read(key('news.archive'),[]).filter(articleMatches);
+    const scans=photoScansLang===getLanguage()?photoScans:[];
+    const byId=new Map([...saved,...scans].filter(x=>x?.id).map(x=>[x.id,x]));
+    return [...byId.values()].sort((a,b)=>
+      String(b.uploadedAt||b.archivedAt||b.publishedAt||'')
+        .localeCompare(String(a.uploadedAt||a.archivedAt||a.publishedAt||'')));
+  };
   const currentArticle=()=>archiveStory||newsData?.stories?.[newsReaderIndex];
   function saveNewsArchive(stories){
     // Preserve every legacy record, including any accidentally saved under
@@ -104,6 +146,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     media.onPage(next);
     if(next==='slide')void loadSlide();
     if(next==='news'){
+      void loadPhotoScans();
       renderNews();
       if(!newsData?.stories?.length||new Date(newsData.updatedAt).toLocaleDateString('sv-SE',{timeZone:'Europe/Brussels'})!==safeDate())void updateNews();
     }
@@ -616,8 +659,9 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
   $('newsBackButton').addEventListener('click',()=>{
     stopNews();newsReaderIndex=-1;archiveStory=null;renderNews();
   });
-  function openNewsArchive(filter='all'){
+  async function openNewsArchive(filter='all'){
     stopNews();
+    await loadPhotoScans();
     const dialog=$('newsHistoryDialog'),list=$('newsHistoryList');
     list.replaceChildren();
     const history=newsArchive().filter(story=>filter!=='uploads'||story.kind==='upload');
@@ -644,8 +688,8 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     });
     dialog.showModal();
   }
-  $('newsHistoryButton').addEventListener('click',()=>openNewsArchive('all'));
-  $('newsScansButton').addEventListener('click',()=>openNewsArchive('uploads'));
+  $('newsHistoryButton').addEventListener('click',()=>void openNewsArchive('all'));
+  $('newsScansButton').addEventListener('click',()=>void openNewsArchive('uploads'));
   $('newsHistoryClose').addEventListener('click',()=>$('newsHistoryDialog').close());
   $('newsHistoryDialog').addEventListener('click',e=>{
     if(e.target===$('newsHistoryDialog'))e.target.close();
@@ -1094,6 +1138,7 @@ export function initStudyPages({getLanguage,getTalkWords,stopTalk}) {
     stopNews();media.refreshLanguage();
     if(currentPage==='slide'){cards=[];cardIndex=0;void loadSlide();}
     if(currentPage==='news'){
+      photoScans=[];photoScansLang='';void loadPhotoScans();
       newsLang='';newsReaderIndex=-1;archiveStory=null;renderNews();
       if(!newsData?.stories?.length||new Date(newsData.updatedAt).toLocaleDateString('sv-SE',{timeZone:'Europe/Brussels'})!==safeDate())void updateNews();
     }
